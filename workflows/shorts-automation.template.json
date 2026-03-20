@@ -6,7 +6,7 @@
   },
   "meta": {
     "template": true,
-    "description": "Workflow base para generar y publicar videos cortos con OpenAI, ElevenLabs, Pexels y FFmpeg."
+    "description": "Workflow base para generar un short con OpenAI, ElevenLabs, Pexels, FFmpeg y subida automatica a YouTube."
   },
   "nodes": [
     {
@@ -35,7 +35,7 @@
       "type": "n8n-nodes-base.set",
       "typeVersion": 3.4,
       "position": [
-        440,
+        460,
         300
       ],
       "parameters": {
@@ -55,103 +55,67 @@
               "value": "25"
             },
             {
-              "name": "aspect_ratio",
-              "value": "9:16"
+              "name": "video_style",
+              "value": "tecnologico, claro, directo"
+            },
+            {
+              "name": "language",
+              "value": "es"
             }
           ]
         }
       }
     },
     {
-      "id": "openai-script",
-      "name": "OpenAI Script",
-      "type": "n8n-nodes-base.httpRequest",
-      "typeVersion": 4.2,
+      "id": "prepare-workspace",
+      "name": "Prepare Workspace",
+      "type": "n8n-nodes-base.executeCommand",
+      "typeVersion": 1,
       "position": [
-        700,
+        720,
         300
       ],
-      "retryOnFail": true,
-      "maxTries": 3,
-      "waitBetweenTries": 2000,
       "parameters": {
-        "method": "POST",
-        "url": "https://api.openai.com/v1/responses",
-        "sendHeaders": true,
-        "headerParameters": {
-          "parameters": [
-            {
-              "name": "Authorization",
-              "value": "=Bearer {{$env.OPENAI_API_KEY}}"
-            },
-            {
-              "name": "Content-Type",
-              "value": "application/json"
-            }
-          ]
-        },
-        "sendBody": true,
-        "specifyBody": "json",
-        "jsonBody": "={\"model\":\"{{$env.OPENAI_MODEL}}\",\"input\":\"Genera un guion para un video vertical de {{$json.duration_seconds}} segundos sobre {{$json.topic}}. Estructura: hook de 2 segundos, desarrollo claro, cierre con CTA: {{$json.cta}}. Devuelve tambien un titulo corto y una lista de palabras clave visuales para buscar clips.\"}"
+        "command": "rm -rf /tmp-output && mkdir -p /tmp-output/clips"
       }
     },
     {
-      "id": "elevenlabs-voice",
-      "name": "ElevenLabs Voice",
-      "type": "n8n-nodes-base.httpRequest",
-      "typeVersion": 4.2,
+      "id": "generate-script",
+      "name": "Generate Script",
+      "type": "n8n-nodes-base.executeCommand",
+      "typeVersion": 1,
       "position": [
-        960,
+        980,
         300
       ],
-      "retryOnFail": true,
-      "maxTries": 3,
-      "waitBetweenTries": 2000,
       "parameters": {
-        "method": "POST",
-        "url": "=https://api.elevenlabs.io/v1/text-to-speech/{{$env.ELEVENLABS_VOICE_ID}}",
-        "sendHeaders": true,
-        "headerParameters": {
-          "parameters": [
-            {
-              "name": "xi-api-key",
-              "value": "={{$env.ELEVENLABS_API_KEY}}"
-            },
-            {
-              "name": "Content-Type",
-              "value": "application/json"
-            }
-          ]
-        },
-        "sendBody": true,
-        "specifyBody": "json",
-        "jsonBody": "={\"text\":\"{{$json.output_text || $json.script || 'Sustituye esta expresion por el texto final del guion'}}\",\"model_id\":\"eleven_multilingual_v2\"}"
+        "command": "=node /app/scripts/generate-script.js /tmp-output/script.json \"{{$json.topic}}\" \"{{$json.duration_seconds}}\" \"{{$json.cta}}\" \"{{$json.video_style}}\" \"{{$json.language}}\""
       }
     },
     {
-      "id": "pexels-search",
-      "name": "Pexels Search",
-      "type": "n8n-nodes-base.httpRequest",
-      "typeVersion": 4.2,
+      "id": "generate-voice",
+      "name": "Generate Voice",
+      "type": "n8n-nodes-base.executeCommand",
+      "typeVersion": 1,
       "position": [
-        1220,
+        1240,
         300
       ],
-      "retryOnFail": true,
-      "maxTries": 3,
-      "waitBetweenTries": 2000,
       "parameters": {
-        "method": "GET",
-        "url": "=https://api.pexels.com/videos/search?query={{$json.topic}}&orientation=portrait&per_page=5",
-        "sendHeaders": true,
-        "headerParameters": {
-          "parameters": [
-            {
-              "name": "Authorization",
-              "value": "={{$env.PEXELS_API_KEY}}"
-            }
-          ]
-        }
+        "command": "node /app/scripts/generate-voice.js /tmp-output/script.json /tmp-output/narration.mp3"
+      }
+    },
+    {
+      "id": "fetch-pexels",
+      "name": "Fetch Pexels",
+      "type": "n8n-nodes-base.executeCommand",
+      "typeVersion": 1,
+      "position": [
+        1500,
+        300
+      ],
+      "parameters": {
+        "command": "node /app/scripts/fetch-pexels.js /tmp-output/script.json /tmp-output/clips"
       }
     },
     {
@@ -160,11 +124,11 @@
       "type": "n8n-nodes-base.executeCommand",
       "typeVersion": 1,
       "position": [
-        1480,
+        1760,
         300
       ],
       "parameters": {
-        "command": "bash /app/scripts/build-short.sh /tmp-output/final.mp4 /tmp-output/narration.mp3 /tmp-output/clips /tmp-output/subtitles.srt"
+        "command": "bash /app/scripts/build-short.sh /tmp-output/final.mp4 /tmp-output/narration.mp3 /tmp-output/clips"
       }
     },
     {
@@ -173,8 +137,8 @@
       "type": "n8n-nodes-base.executeCommand",
       "typeVersion": 1,
       "position": [
-        1740,
-        220
+        2020,
+        300
       ],
       "parameters": {
         "command": "node /app/scripts/upload-youtube.js /tmp-output/final.mp4"
@@ -182,30 +146,14 @@
     },
     {
       "id": "tiktok-upload",
-      "name": "TikTok Upload",
-      "type": "n8n-nodes-base.httpRequest",
-      "typeVersion": 4.2,
+      "name": "TikTok Upload Placeholder",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
       "position": [
-        1740,
-        380
+        2020,
+        460
       ],
-      "parameters": {
-        "method": "POST",
-        "url": "https://open.tiktokapis.com/v2/post/publish/video/init/",
-        "sendHeaders": true,
-        "headerParameters": {
-          "parameters": [
-            {
-              "name": "Authorization",
-              "value": "=Bearer {{$env.TIKTOK_ACCESS_TOKEN}}"
-            },
-            {
-              "name": "Content-Type",
-              "value": "application/json"
-            }
-          ]
-        }
-      }
+      "parameters": {}
     }
   ],
   "connections": {
@@ -224,41 +172,47 @@
       "main": [
         [
           {
-            "node": "OpenAI Script",
+            "node": "Prepare Workspace",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "OpenAI Script": {
+    "Prepare Workspace": {
       "main": [
         [
           {
-            "node": "ElevenLabs Voice",
-            "type": "main",
-            "index": 0
-          },
-          {
-            "node": "Pexels Search",
+            "node": "Generate Script",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "ElevenLabs Voice": {
+    "Generate Script": {
       "main": [
         [
           {
-            "node": "Build Video",
+            "node": "Generate Voice",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Pexels Search": {
+    "Generate Voice": {
+      "main": [
+        [
+          {
+            "node": "Fetch Pexels",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch Pexels": {
       "main": [
         [
           {
@@ -278,7 +232,7 @@
             "index": 0
           },
           {
-            "node": "TikTok Upload",
+            "node": "TikTok Upload Placeholder",
             "type": "main",
             "index": 0
           }

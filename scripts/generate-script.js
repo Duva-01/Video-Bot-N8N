@@ -1,0 +1,136 @@
+require("dotenv").config();
+
+const fs = require("fs");
+const path = require("path");
+
+function fail(message) {
+  console.error(`[generate-script][error] ${message}`);
+  process.exit(1);
+}
+
+function log(message, meta = {}) {
+  console.log(
+    JSON.stringify({
+      ts: new Date().toISOString(),
+      message,
+      ...meta,
+    }),
+  );
+}
+
+function getRequiredEnv(name) {
+  const value = process.env[name];
+  if (!value) {
+    fail(`Missing required environment variable: ${name}`);
+  }
+  return value;
+}
+
+function extractJson(text) {
+  const trimmed = text.trim();
+
+  if (trimmed.startsWith("{")) {
+    return trimmed;
+  }
+
+  const fencedMatch = trimmed.match(/```json\s*([\s\S]+?)```/i) || trimmed.match(/```\s*([\s\S]+?)```/);
+  if (fencedMatch) {
+    return fencedMatch[1].trim();
+  }
+
+  const firstBrace = trimmed.indexOf("{");
+  const lastBrace = trimmed.lastIndexOf("}");
+  if (firstBrace !== -1 && lastBrace !== -1 && lastBrace > firstBrace) {
+    return trimmed.slice(firstBrace, lastBrace + 1);
+  }
+
+  fail("OpenAI response did not contain valid JSON text");
+}
+
+async function main() {
+  const outputPath = process.argv[2] || "/tmp-output/script.json";
+  const topic = process.argv[3] || process.env.VIDEO_DEFAULT_TOPIC || "automatizacion, IA y productividad para negocios digitales";
+  const durationSeconds = Number(process.argv[4] || process.env.VIDEO_DEFAULT_DURATION_SECONDS || 25);
+  const cta = process.argv[5] || process.env.VIDEO_DEFAULT_CTA || "Visita el portfolio o pide una automatizacion a medida";
+  const style = process.argv[6] || process.env.VIDEO_DEFAULT_STYLE || "tecnologico, claro, directo";
+  const language = process.argv[7] || process.env.VIDEO_DEFAULT_LANGUAGE || "es";
+  const model = process.env.OPENAI_MODEL || "gpt-4.1-mini";
+  const apiKey = getRequiredEnv("OPENAI_API_KEY");
+
+  const prompt = [
+    "Genera un plan completo para un video corto vertical para YouTube Shorts y TikTok.",
+    `Idioma: ${language}.`,
+    `Tema: ${topic}.`,
+    `Duracion objetivo: ${durationSeconds} segundos.`,
+    `Estilo: ${style}.`,
+    `CTA final: ${cta}.`,
+    "Devuelve solo JSON valido, sin markdown ni explicaciones.",
+    "Schema esperado:",
+    "{",
+    '  "title": "titulo corto y atractivo",',
+    '  "description": "descripcion corta para publicacion",',
+    '  "narration": "texto completo para locucion en menos de 90 palabras",',
+    '  "visual_keywords": ["keyword1", "keyword2", "keyword3", "keyword4"],',
+    '  "search_query": "consulta breve para buscar clips en Pexels",',
+    '  "tags": ["tag1", "tag2", "tag3", "tag4"]',
+    "}",
+  ].join("\n");
+
+  log("openai script generation starting", {
+    outputPath,
+    topic,
+    durationSeconds,
+    model,
+  });
+
+  const response = await fetch("https://api.openai.com/v1/responses", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${apiKey}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      model,
+      input: prompt,
+    }),
+  });
+
+  if (!response.ok) {
+    fail(`OpenAI request failed with status ${response.status}: ${await response.text()}`);
+  }
+
+  const data = await response.json();
+  const outputText = data.output_text;
+
+  if (!outputText) {
+    fail("OpenAI response did not include output_text");
+  }
+
+  const parsed = JSON.parse(extractJson(outputText));
+  const payload = {
+    topic,
+    duration_seconds: durationSeconds,
+    cta,
+    style,
+    language,
+    title: parsed.title,
+    description: parsed.description,
+    narration: parsed.narration,
+    visual_keywords: Array.isArray(parsed.visual_keywords) ? parsed.visual_keywords : [],
+    search_query: parsed.search_query || topic,
+    tags: Array.isArray(parsed.tags) ? parsed.tags : [],
+  };
+
+  fs.mkdirSync(path.dirname(outputPath), { recursive: true });
+  fs.writeFileSync(outputPath, JSON.stringify(payload, null, 2));
+
+  log("openai script generation completed", {
+    outputPath,
+    title: payload.title,
+    searchQuery: payload.search_query,
+  });
+}
+
+main().catch((error) => {
+  fail(error.message);
+});

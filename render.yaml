@@ -32,12 +32,26 @@ services:
         sync: false
       - key: OPENAI_MODEL
         value: gpt-4.1-mini
+      - key: VIDEO_DEFAULT_TOPIC
+        value: automatizacion, IA y productividad para negocios digitales
+      - key: VIDEO_DEFAULT_DURATION_SECONDS
+        value: "25"
+      - key: VIDEO_DEFAULT_CTA
+        value: Visita el portfolio o pide una automatizacion a medida
+      - key: VIDEO_DEFAULT_STYLE
+        value: tecnologico, claro, directo
+      - key: VIDEO_DEFAULT_LANGUAGE
+        value: es
       - key: ELEVENLABS_API_KEY
         sync: false
       - key: ELEVENLABS_VOICE_ID
         sync: false
+      - key: ELEVENLABS_MODEL_ID
+        value: eleven_multilingual_v2
       - key: PEXELS_API_KEY
         sync: false
+      - key: PEXELS_CLIPS_COUNT
+        value: "3"
       - key: YOUTUBE_CLIENT_ID
         sync: false
       - key: YOUTUBE_CLIENT_SECRET

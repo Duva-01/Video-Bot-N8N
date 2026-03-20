@@ -16,6 +16,9 @@ Sistema automatizado para generar y publicar videos cortos con `n8n`, `OpenAI`, 
 
 - `services/render-proxy.js`: proxy HTTP + keep-alive + arranque de `n8n`.
 - `scripts/build-short.sh`: script reutilizable para el montaje del video en vertical.
+- `scripts/generate-script.js`: genera guion estructurado con OpenAI y lo guarda en JSON.
+- `scripts/generate-voice.js`: sintetiza la narracion con ElevenLabs y la guarda en MP3.
+- `scripts/fetch-pexels.js`: busca y descarga clips verticales desde Pexels.
 - `scripts/upload-youtube.js`: subida a YouTube con OAuth usando `googleapis`.
 - `workflows/shorts-automation.template.json`: workflow base para importar y adaptar en `n8n`.
 - `render.yaml`: blueprint listo para desplegar en Render.
@@ -25,12 +28,12 @@ Sistema automatizado para generar y publicar videos cortos con `n8n`, `OpenAI`, 
 
 1. `Schedule Trigger` dispara la automatizacion.
 2. `Set` define el tema, CTA y duracion objetivo.
-3. `HTTP Request` llama a OpenAI para generar el guion.
-4. `HTTP Request` llama a ElevenLabs para sintetizar el audio.
-5. `HTTP Request` consulta Pexels y descarga clips.
+3. `Execute Command` usa `scripts/generate-script.js` para generar un JSON con guion, titulo y keywords.
+4. `Execute Command` usa `scripts/generate-voice.js` para sintetizar el audio.
+5. `Execute Command` usa `scripts/fetch-pexels.js` para descargar clips.
 6. `Execute Command` usa `scripts/build-short.sh`.
 7. `Execute Command` usa `scripts/upload-youtube.js` para subir el resultado a YouTube.
-8. `HTTP Request` o integracion equivalente publican en TikTok.
+8. `TikTok` queda como siguiente integracion.
 
 ## Keep-alive para Render
 
@@ -64,6 +67,21 @@ Variables recomendadas para YouTube:
 - `YOUTUBE_DEFAULT_DESCRIPTION`
 - `YOUTUBE_DEFAULT_TAGS`
 
+Variables recomendadas para generacion:
+
+- `OPENAI_API_KEY`
+- `OPENAI_MODEL`
+- `VIDEO_DEFAULT_TOPIC`
+- `VIDEO_DEFAULT_DURATION_SECONDS`
+- `VIDEO_DEFAULT_CTA`
+- `VIDEO_DEFAULT_STYLE`
+- `VIDEO_DEFAULT_LANGUAGE`
+- `ELEVENLABS_API_KEY`
+- `ELEVENLABS_VOICE_ID`
+- `ELEVENLABS_MODEL_ID`
+- `PEXELS_API_KEY`
+- `PEXELS_CLIPS_COUNT`
+
 ## Desarrollo local
 
 Instalacion:
@@ -86,6 +104,22 @@ npm start
 
 La aplicacion publica escuchara en `N8N_PORT` y `n8n` correra internamente en `N8N_INTERNAL_PORT`.
 
+Prueba local de subida a YouTube:
+
+```bash
+node scripts/upload-youtube.js "C:\\ruta\\a\\video.mp4"
+```
+
+Prueba local del pipeline por pasos:
+
+```bash
+node scripts/generate-script.js ./tmp-output/script.json
+node scripts/generate-voice.js ./tmp-output/script.json ./tmp-output/narration.mp3
+node scripts/fetch-pexels.js ./tmp-output/script.json ./tmp-output/clips
+bash scripts/build-short.sh ./tmp-output/final.mp4 ./tmp-output/narration.mp3 ./tmp-output/clips
+node scripts/upload-youtube.js ./tmp-output/final.mp4
+```
+
 ## FFmpeg
 
 El script `scripts/build-short.sh` espera:
@@ -107,6 +141,7 @@ Comportamiento:
 - Los nodos HTTP del workflow plantilla ya incluyen reintentos.
 - El proxy escribe logs de arranque, health-check y keep-alive.
 - El script de FFmpeg valida entradas antes de procesar.
+- Los scripts de OpenAI, ElevenLabs y Pexels escriben logs simples por cada paso y fallan con mensajes utiles.
 - La subida a YouTube usa la libreria oficial de Google y falla con errores claros si faltan credenciales o el fichero final no existe.
 
 ## Notas
