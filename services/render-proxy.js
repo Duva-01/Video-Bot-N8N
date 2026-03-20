@@ -25,7 +25,12 @@ const authSecret =
   process.env.N8N_ENCRYPTION_KEY ||
   process.env.N8N_BASIC_AUTH_PASSWORD ||
   "change-me-in-render";
-const cookieSecure = webhookUrl.startsWith("https://");
+const cookieSecure =
+  process.env.APP_AUTH_COOKIE_SECURE === "true"
+    ? true
+    : process.env.APP_AUTH_COOKIE_SECURE === "false"
+      ? false
+      : webhookUrl.startsWith("https://");
 
 const proxy = httpProxy.createProxyServer({
   target: `http://${internalHost}:${internalPort}`,
@@ -43,6 +48,8 @@ const staticFiles = {
   "/login": path.join("..", "auth", "login.html"),
   "/auth/login.css": path.join("..", "auth", "login.css"),
   "/auth/login.js": path.join("..", "auth", "login.js"),
+  "/ui/chrome.css": path.join("..", "ui", "chrome.css"),
+  "/ui/chrome.js": path.join("..", "ui", "chrome.js"),
 };
 
 function log(message, meta = {}) {
@@ -115,6 +122,89 @@ function sendStaticFile(res, fileName) {
     "cache-control": fileName.endsWith(".html") ? "no-store" : "public, max-age=300",
   });
   res.end(fs.readFileSync(fullPath));
+}
+
+function shouldDecorateHtml(req, pathname) {
+  if (req.method !== "GET") {
+    return false;
+  }
+
+  if (pathname.startsWith("/dashboard") || pathname.startsWith("/auth") || pathname === "/login") {
+    return false;
+  }
+
+  const accept = String(req.headers.accept || "");
+  return accept.includes("text/html") || pathname === "/";
+}
+
+function injectChrome(html) {
+  const assets = [
+    '<link rel="stylesheet" href="/ui/chrome.css" />',
+    '<script src="/ui/chrome.js" defer></script>',
+  ].join("");
+
+  if (html.includes("/ui/chrome.js")) {
+    return html;
+  }
+
+  if (html.includes("</head>")) {
+    return html.replace("</head>", `${assets}</head>`);
+  }
+
+  return `${assets}${html}`;
+}
+
+function proxyDecoratedHtml(req, res) {
+  const headers = {
+    ...req.headers,
+    host: `${internalHost}:${internalPort}`,
+  };
+
+  delete headers["accept-encoding"];
+
+  const upstream = http.request(
+    {
+      hostname: internalHost,
+      port: internalPort,
+      method: req.method,
+      path: req.url,
+      headers,
+    },
+    (upstreamRes) => {
+      const chunks = [];
+      upstreamRes.on("data", (chunk) => chunks.push(chunk));
+      upstreamRes.on("end", () => {
+        const bodyBuffer = Buffer.concat(chunks);
+        const contentType = String(upstreamRes.headers["content-type"] || "");
+        const responseHeaders = { ...upstreamRes.headers };
+
+        if (contentType.includes("text/html")) {
+          const html = injectChrome(bodyBuffer.toString("utf8"));
+          responseHeaders["content-length"] = Buffer.byteLength(html);
+          delete responseHeaders["content-encoding"];
+          res.writeHead(upstreamRes.statusCode || 200, responseHeaders);
+          res.end(html);
+          return;
+        }
+
+        res.writeHead(upstreamRes.statusCode || 200, responseHeaders);
+        res.end(bodyBuffer);
+      });
+    },
+  );
+
+  upstream.on("error", (error) => {
+    log("decorated proxy error", {
+      error: error.message,
+      method: req.method,
+      url: req.url,
+    });
+    if (!res.headersSent) {
+      sendJson(res, 502, { error: "n8n upstream unavailable" });
+    }
+  });
+
+  req.pipe(upstream);
 }
 
 function sendHtml(res, statusCode, html) {
@@ -420,6 +510,11 @@ const server = http.createServer((req, res) => {
       redirectToLogin(req, res);
       return;
     }
+  }
+
+  if (shouldDecorateHtml(req, pathname)) {
+    proxyDecoratedHtml(req, res);
+    return;
   }
 
   proxy.web(req, res);
