@@ -22,6 +22,4 @@ COPY .env.example ./
 
 RUN chmod +x /app/scripts/build-short.sh
 
-USER node
-
 CMD ["node", "/app/services/render-proxy.js"]
