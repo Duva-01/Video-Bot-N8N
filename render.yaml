@@ -68,6 +68,10 @@ services:
         value: es
       - key: FACT_ALLOWED_CATEGORIES
         value: space,science,history,technology,animals,psychology,geography,food,sports,culture,internet
+      - key: FACT_TOPIC_MODE
+        value: dynamic-first
+      - key: FACT_DYNAMIC_TOPIC_ATTEMPTS
+        value: "4"
       - key: NEON_DATABASE_URL
         sync: false
       - key: ELEVENLABS_API_KEY

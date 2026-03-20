@@ -37,10 +37,17 @@ Sistema automatizado para generar `YouTube Shorts` de `facts` y `hechos curiosos
 Si `NEON_DATABASE_URL` esta configurado:
 
 - el bot registra cada `topic_key` en `content_runs`
-- solo elige topics no usados
-- cuando se agota el catalogo actual, falla de forma explicita
+- primero intenta generar topics nuevos con `Gemini`
+- valida contra `Neon` antes de reservar el topic
+- si Gemini falla o devuelve duplicados, usa el catalogo fijo como fallback
+- cuando se agota tambien el catalogo fijo, falla de forma explicita
 
 Eso evita repeticiones silenciosas. Si quieres mas volumen, amplias `data/fact-topics.json`.
+
+Variables relacionadas:
+
+- `FACT_TOPIC_MODE=dynamic-first`
+- `FACT_DYNAMIC_TOPIC_ATTEMPTS=4`
 
 ## Dashboard
 

@@ -171,6 +171,7 @@ async function main() {
   const parsed = JSON.parse(extractJson(outputText));
   const payload = {
     topic_key: topicFile?.key || null,
+    topic_source: topicFile?.source || "catalog",
     category,
     topic,
     angle,
@@ -182,7 +183,7 @@ async function main() {
     description: parsed.description,
     narration: parsed.narration,
     visual_keywords: Array.isArray(parsed.visual_keywords) ? parsed.visual_keywords : [],
-    search_query: parsed.search_query || topic,
+    search_query: parsed.search_query || topicFile?.search_hint || topic,
     tags: Array.isArray(parsed.tags) ? parsed.tags : [],
   };
 

@@ -43,7 +43,7 @@ async function ensureSchema(pool) {
   `);
 }
 
-async function upsertSelection(pool, item) {
+async function upsertSelection(pool, item, metadata = {}) {
   await pool.query(
     `
       INSERT INTO content_runs (topic_key, category, topic, angle, status, metadata)
@@ -54,7 +54,7 @@ async function upsertSelection(pool, item) {
         updated_at = NOW(),
         metadata = content_runs.metadata || EXCLUDED.metadata
     `,
-    [item.key, item.category, item.topic, item.angle, JSON.stringify({ source: "catalog" })],
+    [item.key, item.category, item.topic, item.angle, JSON.stringify(metadata)],
   );
 }
 
@@ -77,6 +77,7 @@ async function markGenerated(pool, payload) {
       JSON.stringify({
         search_query: payload.search_query,
         tags: payload.tags || [],
+        topic_source: payload.topic_source || "catalog",
       }),
     ],
   );
@@ -154,6 +155,7 @@ async function getDashboardSummary(pool) {
           status,
           youtube_url,
           youtube_video_id,
+          metadata->>'source' AS source,
           selected_at,
           published_at
         FROM content_runs

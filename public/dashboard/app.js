@@ -102,7 +102,7 @@ function renderRecent(items) {
     title.textContent = item.title || item.topic;
     const meta = document.createElement("p");
     meta.className = "meta";
-    meta.textContent = `${item.category} · ${item.angle}`;
+    meta.textContent = `${item.category} · ${item.angle} · ${item.source || "catalog"}`;
     titleBlock.appendChild(title);
     titleBlock.appendChild(meta);
 
