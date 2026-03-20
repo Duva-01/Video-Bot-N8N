@@ -2,6 +2,7 @@ require("dotenv").config();
 
 const fs = require("fs");
 const path = require("path");
+const fetch = global.fetch || require("node-fetch");
 
 function fail(message) {
   console.error(`[generate-script][error] ${message}`);

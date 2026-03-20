@@ -1,23 +1,18 @@
 {
   "name": "AI Shorts Automation Template",
-  "active": false,
-  "settings": {
-    "executionOrder": "v1"
-  },
-  "meta": {
-    "template": true,
-    "description": "Workflow base para generar un short con Gemini, Pexels, FFmpeg y subida automatica a YouTube."
-  },
   "nodes": [
     {
-      "id": "schedule-trigger",
-      "name": "Schedule Trigger",
-      "type": "n8n-nodes-base.scheduleTrigger",
-      "typeVersion": 1.2,
+      "parameters": {},
+      "id": "manual-trigger",
+      "name": "Manual Trigger",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
       "position": [
         200,
-        300
-      ],
+        180
+      ]
+    },
+    {
       "parameters": {
         "rule": {
           "interval": [
@@ -27,17 +22,17 @@
             }
           ]
         }
-      }
+      },
+      "id": "schedule-trigger",
+      "name": "Schedule Trigger",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1,
+      "position": [
+        200,
+        340
+      ]
     },
     {
-      "id": "set-topic",
-      "name": "Set Topic",
-      "type": "n8n-nodes-base.set",
-      "typeVersion": 3.4,
-      "position": [
-        460,
-        300
-      ],
       "parameters": {
         "keepOnlySet": false,
         "values": {
@@ -52,7 +47,7 @@
             },
             {
               "name": "duration_seconds",
-              "value": "25"
+              "value": "15"
             },
             {
               "name": "video_style",
@@ -63,100 +58,110 @@
               "value": "es"
             }
           ]
-        }
-      }
+        },
+        "options": {}
+      },
+      "id": "set-topic",
+      "name": "Set Topic",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 1,
+      "position": [
+        460,
+        260
+      ]
     },
     {
+      "parameters": {
+        "command": "rm -rf /tmp-output && mkdir -p /tmp-output/clips"
+      },
       "id": "prepare-workspace",
       "name": "Prepare Workspace",
       "type": "n8n-nodes-base.executeCommand",
       "typeVersion": 1,
       "position": [
-        720,
-        300
-      ],
-      "parameters": {
-        "command": "rm -rf /tmp-output && mkdir -p /tmp-output/clips"
-      }
+        740,
+        260
+      ]
     },
     {
+      "parameters": {
+        "command": "=node /app/scripts/generate-script.js /tmp-output/script.json \"{{$json[\"topic\"]}}\" \"{{$json[\"duration_seconds\"]}}\" \"{{$json[\"cta\"]}}\" \"{{$json[\"video_style\"]}}\" \"{{$json[\"language\"]}}\""
+      },
       "id": "generate-script",
       "name": "Generate Script",
       "type": "n8n-nodes-base.executeCommand",
       "typeVersion": 1,
       "position": [
-        980,
-        300
-      ],
-      "parameters": {
-        "command": "=node /app/scripts/generate-script.js /tmp-output/script.json \"{{$json.topic}}\" \"{{$json.duration_seconds}}\" \"{{$json.cta}}\" \"{{$json.video_style}}\" \"{{$json.language}}\""
-      }
+        1020,
+        260
+      ]
     },
     {
+      "parameters": {
+        "command": "node /app/scripts/generate-voice.js /tmp-output/script.json /tmp-output/narration.wav"
+      },
       "id": "generate-voice",
       "name": "Generate Voice",
       "type": "n8n-nodes-base.executeCommand",
       "typeVersion": 1,
       "position": [
-        1240,
-        300
-      ],
-      "parameters": {
-        "command": "node /app/scripts/generate-voice.js /tmp-output/script.json /tmp-output/narration.wav"
-      }
+        1300,
+        260
+      ]
     },
     {
+      "parameters": {
+        "command": "node /app/scripts/fetch-pexels.js /tmp-output/script.json /tmp-output/clips"
+      },
       "id": "fetch-pexels",
       "name": "Fetch Pexels",
       "type": "n8n-nodes-base.executeCommand",
       "typeVersion": 1,
       "position": [
-        1500,
-        300
-      ],
-      "parameters": {
-        "command": "node /app/scripts/fetch-pexels.js /tmp-output/script.json /tmp-output/clips"
-      }
+        1580,
+        260
+      ]
     },
     {
+      "parameters": {
+        "command": "bash /app/scripts/build-short.sh /tmp-output/final.mp4 /tmp-output/narration.wav /tmp-output/clips"
+      },
       "id": "build-video",
       "name": "Build Video",
       "type": "n8n-nodes-base.executeCommand",
       "typeVersion": 1,
       "position": [
-        1760,
-        300
-      ],
-      "parameters": {
-        "command": "bash /app/scripts/build-short.sh /tmp-output/final.mp4 /tmp-output/narration.wav /tmp-output/clips"
-      }
+        1860,
+        260
+      ]
     },
     {
+      "parameters": {
+        "command": "node /app/scripts/upload-youtube.js /tmp-output/final.mp4"
+      },
       "id": "youtube-upload",
       "name": "YouTube Upload",
       "type": "n8n-nodes-base.executeCommand",
       "typeVersion": 1,
       "position": [
-        2020,
-        300
-      ],
-      "parameters": {
-        "command": "node /app/scripts/upload-youtube.js /tmp-output/final.mp4"
-      }
-    },
-    {
-      "id": "tiktok-upload",
-      "name": "TikTok Upload Placeholder",
-      "type": "n8n-nodes-base.noOp",
-      "typeVersion": 1,
-      "position": [
-        2020,
-        460
-      ],
-      "parameters": {}
+        2140,
+        260
+      ]
     }
   ],
+  "pinData": {},
   "connections": {
+    "Manual Trigger": {
+      "main": [
+        [
+          {
+            "node": "Set Topic",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
     "Schedule Trigger": {
       "main": [
         [
@@ -230,14 +235,19 @@
             "node": "YouTube Upload",
             "type": "main",
             "index": 0
-          },
-          {
-            "node": "TikTok Upload Placeholder",
-            "type": "main",
-            "index": 0
           }
         ]
       ]
     }
-  }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "5fc91b0d-b1c0-4a18-96e0-botdevideos0001",
+  "meta": {
+    "template": true,
+    "description": "Workflow base compatible con n8n 0.222.0 para generar y subir un short automatizado."
+  },
+  "tags": []
 }
