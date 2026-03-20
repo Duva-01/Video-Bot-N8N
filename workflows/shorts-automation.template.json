@@ -170,24 +170,14 @@
     {
       "id": "youtube-upload",
       "name": "YouTube Upload",
-      "type": "n8n-nodes-base.httpRequest",
-      "typeVersion": 4.2,
+      "type": "n8n-nodes-base.executeCommand",
+      "typeVersion": 1,
       "position": [
         1740,
         220
       ],
       "parameters": {
-        "method": "POST",
-        "url": "https://www.googleapis.com/upload/youtube/v3/videos?part=snippet,status",
-        "sendHeaders": true,
-        "headerParameters": {
-          "parameters": [
-            {
-              "name": "Authorization",
-              "value": "=Bearer {{$env.YOUTUBE_REFRESH_TOKEN}}"
-            }
-          ]
-        }
+        "command": "node /app/scripts/upload-youtube.js /tmp-output/final.mp4"
       }
     },
     {

@@ -16,6 +16,7 @@ Sistema automatizado para generar y publicar videos cortos con `n8n`, `OpenAI`, 
 
 - `services/render-proxy.js`: proxy HTTP + keep-alive + arranque de `n8n`.
 - `scripts/build-short.sh`: script reutilizable para el montaje del video en vertical.
+- `scripts/upload-youtube.js`: subida a YouTube con OAuth usando `googleapis`.
 - `workflows/shorts-automation.template.json`: workflow base para importar y adaptar en `n8n`.
 - `render.yaml`: blueprint listo para desplegar en Render.
 - `.env.example`: variables necesarias.
@@ -28,7 +29,7 @@ Sistema automatizado para generar y publicar videos cortos con `n8n`, `OpenAI`, 
 4. `HTTP Request` llama a ElevenLabs para sintetizar el audio.
 5. `HTTP Request` consulta Pexels y descarga clips.
 6. `Execute Command` usa `scripts/build-short.sh`.
-7. `HTTP Request` o credenciales OAuth suben el resultado a YouTube.
+7. `Execute Command` usa `scripts/upload-youtube.js` para subir el resultado a YouTube.
 8. `HTTP Request` o integracion equivalente publican en TikTok.
 
 ## Keep-alive para Render
@@ -51,6 +52,17 @@ https://tu-app.onrender.com/health
 3. Configura las variables de entorno de `.env.example`.
 4. Ajusta `WEBHOOK_URL` al dominio real de Render.
 5. Importa el workflow plantilla en `n8n` y completa credenciales/OAuth.
+
+Variables recomendadas para YouTube:
+
+- `YOUTUBE_CLIENT_ID`
+- `YOUTUBE_CLIENT_SECRET`
+- `YOUTUBE_REFRESH_TOKEN`
+- `YOUTUBE_PRIVACY_STATUS`
+- `YOUTUBE_CATEGORY_ID`
+- `YOUTUBE_DEFAULT_TITLE`
+- `YOUTUBE_DEFAULT_DESCRIPTION`
+- `YOUTUBE_DEFAULT_TAGS`
 
 ## Desarrollo local
 
@@ -95,9 +107,10 @@ Comportamiento:
 - Los nodos HTTP del workflow plantilla ya incluyen reintentos.
 - El proxy escribe logs de arranque, health-check y keep-alive.
 - El script de FFmpeg valida entradas antes de procesar.
+- La subida a YouTube usa la libreria oficial de Google y falla con errores claros si faltan credenciales o el fichero final no existe.
 
 ## Notas
 
 - Las subidas a YouTube y TikTok requieren credenciales reales y posiblemente aprobacion de scopes en cada plataforma.
 - El workflow incluido es una plantilla operativa; debes ajustar IDs de credenciales, prompts y rutas segun tu cuenta y tu estrategia de contenido.
-
+- La subida a YouTube queda en `private` por defecto mientras pruebas el flujo completo.

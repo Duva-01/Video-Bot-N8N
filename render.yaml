@@ -44,10 +44,19 @@ services:
         sync: false
       - key: YOUTUBE_REFRESH_TOKEN
         sync: false
+      - key: YOUTUBE_PRIVACY_STATUS
+        value: private
+      - key: YOUTUBE_CATEGORY_ID
+        value: "28"
+      - key: YOUTUBE_DEFAULT_TITLE
+        value: Short IA automatizado
+      - key: YOUTUBE_DEFAULT_DESCRIPTION
+        value: Video generado automaticamente con n8n.
+      - key: YOUTUBE_DEFAULT_TAGS
+        value: ia,automatizacion,shorts
       - key: TIKTOK_ACCESS_TOKEN
         sync: false
       - key: TIKTOK_REFRESH_TOKEN
         sync: false
       - key: TIKTOK_OPEN_ID
         sync: false
-
