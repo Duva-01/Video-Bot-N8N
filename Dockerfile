@@ -17,6 +17,7 @@ RUN npm ci --omit=dev
 COPY services ./services
 COPY public ./public
 COPY scripts ./scripts
+COPY data ./data
 COPY workflows ./workflows
 COPY README.md ./
 
