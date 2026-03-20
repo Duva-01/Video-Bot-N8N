@@ -127,8 +127,15 @@ Opcionalmente puedes separar las credenciales del proxy con:
 
 Para `Render Free`, mantien:
 
-- `VIDEO_DEFAULT_DURATION_SECONDS=15`
+- `VIDEO_DEFAULT_DURATION_SECONDS=12`
 - `PEXELS_CLIPS_COUNT=1`
+- `RENDER_LOW_MEMORY_MODE=true`
+- `SHORTS_WIDTH=540`
+- `SHORTS_HEIGHT=960`
+- `SHORTS_FPS=20`
+- `FFMPEG_THREADS=1`
+
+Con esa configuracion el video final consume bastante menos memoria al montar en `FFmpeg`, que es justo donde `Render Free` suele matar la instancia por pasar de `512MB`.
 
 ## Neon
 

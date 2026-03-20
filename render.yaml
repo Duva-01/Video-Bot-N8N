@@ -63,7 +63,7 @@ services:
       - key: VIDEO_DEFAULT_TOPIC
         value: hechos curiosos
       - key: VIDEO_DEFAULT_DURATION_SECONDS
-        value: "15"
+        value: "12"
       - key: VIDEO_DEFAULT_CTA
         value: Sigue la cuenta para mas hechos curiosos
       - key: VIDEO_DEFAULT_STYLE
@@ -88,6 +88,26 @@ services:
         sync: false
       - key: PEXELS_CLIPS_COUNT
         value: "1"
+      - key: RENDER_LOW_MEMORY_MODE
+        value: "true"
+      - key: SHORTS_WIDTH
+        value: "540"
+      - key: SHORTS_HEIGHT
+        value: "960"
+      - key: SHORTS_FPS
+        value: "20"
+      - key: FFMPEG_THREADS
+        value: "1"
+      - key: FFMPEG_PRESET
+        value: ultrafast
+      - key: FFMPEG_CRF
+        value: "30"
+      - key: FFMPEG_VIDEO_BITRATE
+        value: 1200k
+      - key: FFMPEG_AUDIO_BITRATE
+        value: 64k
+      - key: FFMPEG_AUDIO_RATE
+        value: "22050"
       - key: YOUTUBE_CLIENT_ID
         sync: false
       - key: YOUTUBE_CLIENT_SECRET
