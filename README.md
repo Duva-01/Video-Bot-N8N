@@ -53,7 +53,8 @@ https://tu-app.onrender.com/health
 2. Usa el `Dockerfile` incluido, basado en `n8nio/n8n:latest-debian` para permitir `ffmpeg`, `bash` y `Execute Command`.
 3. Configura las variables de entorno de `.env.example`.
 4. Ajusta `WEBHOOK_URL` al dominio real de Render.
-5. Importa el workflow plantilla en `n8n` y completa credenciales/OAuth.
+5. Ajusta `N8N_EDITOR_BASE_URL` al mismo dominio publico y usa `N8N_PROXY_HOPS=1` al estar detras del proxy de Render.
+6. Importa el workflow plantilla en `n8n` y completa credenciales/OAuth.
 
 Variables recomendadas para YouTube:
 

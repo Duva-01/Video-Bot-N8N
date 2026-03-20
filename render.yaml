@@ -22,10 +22,22 @@ services:
         value: 127.0.0.1
       - key: N8N_INTERNAL_PORT
         value: "5678"
+      - key: N8N_EDITOR_BASE_URL
+        sync: false
+      - key: N8N_PROXY_HOPS
+        value: "1"
       - key: KEEP_ALIVE_ENABLED
         value: "true"
       - key: KEEP_ALIVE_INTERVAL_MS
         value: "300000"
+      - key: EXECUTIONS_DATA_SAVE_MANUAL_EXECUTIONS
+        value: "true"
+      - key: EXECUTIONS_DATA_SAVE_ON_PROGRESS
+        value: "true"
+      - key: EXECUTIONS_DATA_SAVE_ON_ERROR
+        value: all
+      - key: EXECUTIONS_DATA_SAVE_ON_SUCCESS
+        value: all
       - key: WEBHOOK_URL
         sync: false
       - key: TEXT_PROVIDER

@@ -1,6 +1,7 @@
 require("dotenv").config();
 
 const http = require("http");
+const https = require("https");
 const { spawn } = require("child_process");
 const httpProxy = require("http-proxy");
 
@@ -66,6 +67,29 @@ function getHealthPayload() {
   });
 }
 
+function requestUrl(target) {
+  const client = target.startsWith("https://") ? https : http;
+
+  return new Promise((resolve, reject) => {
+    const req = client.request(
+      target,
+      {
+        method: "GET",
+        headers: {
+          "user-agent": "render-keepalive/1.0",
+        },
+      },
+      (res) => {
+        res.resume();
+        resolve({ statusCode: res.statusCode || 0 });
+      },
+    );
+
+    req.on("error", reject);
+    req.end();
+  });
+}
+
 function startKeepAlive() {
   if (!keepAliveEnabled) {
     log("keep-alive disabled");
@@ -82,15 +106,11 @@ function startKeepAlive() {
 
   setInterval(async () => {
     try {
-      const response = await fetch(target, {
-        headers: {
-          "user-agent": "render-keepalive/1.0",
-        },
-      });
+      const response = await requestUrl(target);
 
       log("keep-alive ping completed", {
         target,
-        statusCode: response.status,
+        statusCode: response.statusCode,
       });
     } catch (error) {
       log("keep-alive ping failed", {
