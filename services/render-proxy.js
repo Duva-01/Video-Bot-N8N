@@ -1,3 +1,5 @@
+require("dotenv").config();
+
 const http = require("http");
 const { spawn } = require("child_process");
 const httpProxy = require("http-proxy");
@@ -169,4 +171,3 @@ function shutdown(signal) {
 
 process.on("SIGINT", () => shutdown("SIGINT"));
 process.on("SIGTERM", () => shutdown("SIGTERM"));
-
