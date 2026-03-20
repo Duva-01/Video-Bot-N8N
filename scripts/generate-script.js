@@ -67,10 +67,10 @@ async function main() {
   const outputPath = process.argv[2] || "/tmp-output/script.json";
   const topicFilePath = process.argv[3] && process.argv[3].endsWith(".json") ? process.argv[3] : null;
   const topicFile = topicFilePath && fs.existsSync(topicFilePath) ? JSON.parse(fs.readFileSync(topicFilePath, "utf8")) : null;
-  const topic = topicFile?.topic || process.argv[3] || process.env.VIDEO_DEFAULT_TOPIC || "automatizacion, IA y productividad para negocios digitales";
+  const topic = topicFile?.topic || process.argv[3] || process.env.VIDEO_DEFAULT_TOPIC || "hechos curiosos";
   const durationSeconds = Number(topicFile?.duration_seconds || process.argv[4] || process.env.VIDEO_DEFAULT_DURATION_SECONDS || 25);
-  const cta = topicFile?.cta || process.argv[5] || process.env.VIDEO_DEFAULT_CTA || "Visita el portfolio o pide una automatizacion a medida";
-  const style = topicFile?.video_style || process.argv[6] || process.env.VIDEO_DEFAULT_STYLE || "tecnologico, claro, directo";
+  const cta = topicFile?.cta || process.argv[5] || process.env.VIDEO_DEFAULT_CTA || "Sigue la cuenta para mas hechos curiosos";
+  const style = topicFile?.video_style || process.argv[6] || process.env.VIDEO_DEFAULT_STYLE || "curioso, rapido, directo";
   const language = topicFile?.language || process.argv[7] || process.env.VIDEO_DEFAULT_LANGUAGE || "es";
   const provider = process.env.TEXT_PROVIDER || (process.env.GEMINI_API_KEY ? "gemini" : "openai");
   const model =
@@ -81,7 +81,7 @@ async function main() {
   const category = topicFile?.category || "general";
 
   const prompt = [
-    "Genera un plan completo para un video corto vertical de facts y hechos curiosos para YouTube Shorts y TikTok.",
+    "Genera un plan completo para un video corto vertical de facts y hechos curiosos para YouTube Shorts.",
     `Idioma: ${language}.`,
     `Categoria: ${category}.`,
     `Tema: ${topic}.`,
@@ -91,6 +91,8 @@ async function main() {
     `CTA final: ${cta}.`,
     "Debe ser un hecho curioso concreto, verificable, sorprendente y facil de entender en menos de 30 segundos.",
     "No repitas el tema de forma generica; enfoca el guion en el angulo concreto indicado.",
+    "No menciones portfolio, servicios, clientes, productos SaaS ni llamadas a contratar nada.",
+    "No metas introducciones largas, relleno, ni opiniones.",
     "Devuelve solo JSON valido, sin markdown ni explicaciones.",
     "Schema esperado:",
     "{",

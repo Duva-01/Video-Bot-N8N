@@ -2,8 +2,11 @@ require("dotenv").config();
 
 const http = require("http");
 const https = require("https");
+const fs = require("fs");
+const path = require("path");
 const { spawn } = require("child_process");
 const httpProxy = require("http-proxy");
+const { loadDashboardData } = require("./dashboard-data");
 
 const publicHost = process.env.N8N_HOST || "0.0.0.0";
 const publicPort = Number(process.env.N8N_PORT || process.env.PORT || 10000);
@@ -20,6 +23,13 @@ const proxy = httpProxy.createProxyServer({
 });
 
 let shuttingDown = false;
+const dashboardRoot = path.join(__dirname, "..", "public", "dashboard");
+const staticFiles = {
+  "/dashboard": "index.html",
+  "/dashboard/": "index.html",
+  "/dashboard/styles.css": "styles.css",
+  "/dashboard/app.js": "app.js",
+};
 
 function log(message, meta = {}) {
   const payload = {
@@ -65,6 +75,31 @@ function getHealthPayload() {
     n8nTarget: `http://${internalHost}:${internalPort}`,
     timestamp: new Date().toISOString(),
   });
+}
+
+function sendJson(res, statusCode, payload) {
+  res.writeHead(statusCode, {
+    "content-type": "application/json",
+    "cache-control": "no-store",
+  });
+  res.end(JSON.stringify(payload));
+}
+
+function sendStaticFile(res, fileName) {
+  const fullPath = path.join(dashboardRoot, fileName);
+  if (!fs.existsSync(fullPath)) {
+    sendJson(res, 404, { error: "file not found" });
+    return;
+  }
+
+  const contentType =
+    fileName.endsWith(".css") ? "text/css; charset=utf-8" : fileName.endsWith(".js") ? "application/javascript; charset=utf-8" : "text/html; charset=utf-8";
+
+  res.writeHead(200, {
+    "content-type": contentType,
+    "cache-control": fileName.endsWith(".html") ? "no-store" : "public, max-age=300",
+  });
+  res.end(fs.readFileSync(fullPath));
 }
 
 function requestUrl(target) {
@@ -146,11 +181,22 @@ proxy.on("error", (error, req, res) => {
 const server = http.createServer((req, res) => {
   if (req.url === "/health") {
     const body = getHealthPayload();
-    res.writeHead(200, {
-      "content-type": "application/json",
-      "cache-control": "no-store",
-    });
-    res.end(body);
+    sendJson(res, 200, JSON.parse(body));
+    return;
+  }
+
+  if (req.url === "/api/dashboard") {
+    loadDashboardData()
+      .then((payload) => sendJson(res, 200, payload))
+      .catch((error) => {
+        log("dashboard api error", { error: error.message });
+        sendJson(res, 500, { error: error.message });
+      });
+    return;
+  }
+
+  if (staticFiles[req.url]) {
+    sendStaticFile(res, staticFiles[req.url]);
     return;
   }
 

@@ -61,7 +61,7 @@ services:
       - key: VIDEO_DEFAULT_DURATION_SECONDS
         value: "15"
       - key: VIDEO_DEFAULT_CTA
-        value: Si quieres mas facts curiosos, sigue la cuenta
+        value: Sigue la cuenta para mas hechos curiosos
       - key: VIDEO_DEFAULT_STYLE
         value: curioso, rapido, directo
       - key: VIDEO_DEFAULT_LANGUAGE
@@ -96,9 +96,3 @@ services:
         value: Video generado automaticamente con n8n.
       - key: YOUTUBE_DEFAULT_TAGS
         value: facts,curiosidades,shorts
-      - key: TIKTOK_ACCESS_TOKEN
-        sync: false
-      - key: TIKTOK_PRIVACY_LEVEL
-        value: SELF_ONLY
-      - key: TIKTOK_DEFAULT_TITLE
-        value: Dato curioso del dia

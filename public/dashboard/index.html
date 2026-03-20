@@ -1,0 +1,120 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Facts Engine Dashboard</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&family=IBM+Plex+Mono:wght@400;500&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="/dashboard/styles.css" />
+  </head>
+  <body>
+    <div class="backdrop backdrop-a"></div>
+    <div class="backdrop backdrop-b"></div>
+    <main class="shell">
+      <section class="hero">
+        <div class="hero-copy">
+          <p class="eyebrow">AUTOMATED YOUTUBE SHORTS</p>
+          <h1>Facts Engine</h1>
+          <p class="lede">
+            Dashboard operativo para el bot de hechos curiosos. Muestra pipeline, actividad reciente,
+            cobertura por categoria y estado real del catalogo sin entrar en n8n.
+          </p>
+          <div class="hero-links">
+            <a class="button primary" href="/" target="_blank" rel="noreferrer">Abrir n8n</a>
+            <a class="button secondary" href="/health" target="_blank" rel="noreferrer">Ver health</a>
+          </div>
+        </div>
+        <div class="hero-panel glass">
+          <div class="orbital">
+            <div class="orbital-ring ring-1"></div>
+            <div class="orbital-ring ring-2"></div>
+            <div class="orbital-core"></div>
+          </div>
+          <div class="stack">
+            <div>
+              <span class="label">Modo</span>
+              <strong id="modeValue">Cargando</strong>
+            </div>
+            <div>
+              <span class="label">Categorias</span>
+              <strong id="categoriesValue">-</strong>
+            </div>
+            <div>
+              <span class="label">Base de datos</span>
+              <strong id="databaseValue">-</strong>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="stats-grid">
+        <article class="metric glass accent-cyan">
+          <span class="metric-label">Videos Totales</span>
+          <strong id="totalVideos">0</strong>
+        </article>
+        <article class="metric glass accent-lime">
+          <span class="metric-label">Publicados</span>
+          <strong id="publishedVideos">0</strong>
+        </article>
+        <article class="metric glass accent-gold">
+          <span class="metric-label">Categorias Cubiertas</span>
+          <strong id="categoriesCovered">0</strong>
+        </article>
+        <article class="metric glass accent-coral">
+          <span class="metric-label">Ultima Publicacion</span>
+          <strong id="lastPublished">-</strong>
+        </article>
+      </section>
+
+      <section class="layout-grid">
+        <article class="panel glass">
+          <div class="panel-head">
+            <h2>Pipeline</h2>
+            <span class="tag">YouTube Only</span>
+          </div>
+          <div class="pipeline">
+            <div class="step">Topic Select</div>
+            <div class="step">Script</div>
+            <div class="step">Voice</div>
+            <div class="step">Subtitles</div>
+            <div class="step">Pexels</div>
+            <div class="step">FFmpeg</div>
+            <div class="step">YouTube</div>
+            <div class="step">Neon Log</div>
+          </div>
+          <div class="sparkline" id="timelineChart"></div>
+        </article>
+
+        <article class="panel glass">
+          <div class="panel-head">
+            <h2>Estados</h2>
+            <span class="tag">Live</span>
+          </div>
+          <div class="status-bars" id="statusBars"></div>
+        </article>
+
+        <article class="panel glass">
+          <div class="panel-head">
+            <h2>Categorias</h2>
+            <span class="tag">Top 8</span>
+          </div>
+          <div class="category-chart" id="categoryChart"></div>
+        </article>
+
+        <article class="panel glass span-2">
+          <div class="panel-head">
+            <h2>Videos Recientes</h2>
+            <span class="tag">Neon</span>
+          </div>
+          <div class="recent-list" id="recentList"></div>
+        </article>
+      </section>
+    </main>
+    <script src="/dashboard/app.js"></script>
+  </body>
+</html>

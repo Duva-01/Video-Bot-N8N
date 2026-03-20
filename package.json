@@ -5,7 +5,7 @@
   "description": "Automatizacion de shorts con n8n, OpenAI, ElevenLabs, Pexels y Render",
   "scripts": {
     "start": "node services/render-proxy.js",
-    "check": "node --check services/render-proxy.js && node --check scripts/select-fact-topic.js && node --check scripts/generate-script.js && node --check scripts/generate-voice.js && node --check scripts/generate-subtitles.js && node --check scripts/fetch-pexels.js && node --check scripts/upload-youtube.js && node --check scripts/upload-tiktok.js && node --check scripts/finalize-content.js"
+    "check": "node --check services/render-proxy.js && node --check services/dashboard-data.js && node --check scripts/select-fact-topic.js && node --check scripts/generate-script.js && node --check scripts/generate-voice.js && node --check scripts/generate-subtitles.js && node --check scripts/fetch-pexels.js && node --check scripts/upload-youtube.js && node --check scripts/finalize-content.js"
   },
   "engines": {
     "node": ">=16"

@@ -1,36 +1,470 @@
 [
-  { "key": "space-black-hole-sound", "category": "space", "topic": "black holes", "angle": "por que un agujero negro puede producir senales que convertimos en sonido" },
-  { "key": "space-neutron-star-density", "category": "space", "topic": "neutron stars", "angle": "cuanta materia cabe en una cucharada de estrella de neutrones" },
-  { "key": "space-venus-day", "category": "space", "topic": "venus", "angle": "por que un dia en Venus dura mas que un ano" },
-  { "key": "space-saturn-float", "category": "space", "topic": "saturn", "angle": "por que Saturno teoricamente flotaria en una banera gigante" },
-  { "key": "science-bananas-radioactive", "category": "science", "topic": "bananas", "angle": "por que los platanos son tecnicamente radiactivos" },
-  { "key": "science-hot-water-freeze", "category": "science", "topic": "water physics", "angle": "por que a veces el agua caliente se congela antes que la fria" },
-  { "key": "science-octopus-hearts", "category": "science", "topic": "octopus", "angle": "por que los pulpos tienen tres corazones y sangre azul" },
-  { "key": "science-honey-never-expires", "category": "science", "topic": "honey", "angle": "por que la miel puede durar miles de anos sin caducar" },
-  { "key": "history-cleopatra-moon-landing", "category": "history", "topic": "Cleopatra", "angle": "por que Cleopatra vivio mas cerca del alunizaje que de las piramides" },
-  { "key": "history-oxford-aztecs", "category": "history", "topic": "Oxford University", "angle": "por que Oxford es mas antigua que el imperio azteca" },
-  { "key": "history-napoleon-rabbits", "category": "history", "topic": "Napoleon", "angle": "la vez que Napoleon fue perseguido por conejos" },
-  { "key": "history-great-fire-london-plague", "category": "history", "topic": "London", "angle": "como el gran incendio de Londres llego justo despues de la peste" },
-  { "key": "technology-first-webcam-coffee", "category": "technology", "topic": "first webcam", "angle": "por que la primera webcam del mundo vigilaba una cafetera" },
-  { "key": "technology-qwerty-layout", "category": "technology", "topic": "QWERTY keyboard", "angle": "por que seguimos usando QWERTY aunque no sea el teclado mas rapido" },
-  { "key": "technology-gps-relativity", "category": "technology", "topic": "GPS", "angle": "por que el GPS solo funciona porque Einstein tenia razon" },
-  { "key": "technology-bluetooth-king", "category": "technology", "topic": "Bluetooth", "angle": "por que Bluetooth se llama como un rey vikingo" },
-  { "key": "animals-shrimp-punch", "category": "animals", "topic": "mantis shrimp", "angle": "como un camaron mantis golpea mas rapido que una bala" },
-  { "key": "animals-wombat-cubes", "category": "animals", "topic": "wombat", "angle": "por que los wombats hacen excrementos en forma de cubo" },
-  { "key": "animals-tardigrades-space", "category": "animals", "topic": "tardigrades", "angle": "como los tardigrados sobreviven al vacio del espacio" },
-  { "key": "animals-koala-fingerprints", "category": "animals", "topic": "koala", "angle": "por que las huellas dactilares de un koala se parecen a las humanas" },
-  { "key": "psychology-memory-rewrite", "category": "psychology", "topic": "memory", "angle": "por que cada vez que recuerdas algo lo reescribes un poco" },
-  { "key": "psychology-music-chills", "category": "psychology", "topic": "music and brain", "angle": "por que algunas canciones te ponen la piel de gallina" },
-  { "key": "psychology-time-speed-age", "category": "psychology", "topic": "time perception", "angle": "por que el tiempo parece ir mas rapido cuando eres adulto" },
-  { "key": "geography-russia-eleven-zones", "category": "geography", "topic": "Russia", "angle": "por que Rusia tiene once husos horarios" },
-  { "key": "geography-canada-lakes", "category": "geography", "topic": "Canada", "angle": "por que Canada tiene mas lagos que el resto del mundo junto" },
-  { "key": "geography-desert-antarctica", "category": "geography", "topic": "Antarctica", "angle": "por que la Antartida tambien es un desierto" },
-  { "key": "food-carrots-orange", "category": "food", "topic": "carrots", "angle": "por que las zanahorias no siempre fueron naranjas" },
-  { "key": "food-wasabi-fake", "category": "food", "topic": "wasabi", "angle": "por que mucho del wasabi que comes no es wasabi real" },
-  { "key": "sports-golf-moon", "category": "sports", "topic": "golf on the moon", "angle": "por que hay pelotas de golf en la Luna" },
-  { "key": "sports-olympic-gold", "category": "sports", "topic": "Olympic medals", "angle": "por que las medallas de oro olimpicas casi no son de oro" },
-  { "key": "culture-anime-disney-lion-king", "category": "culture", "topic": "The Lion King", "angle": "el debate sobre influencias entre Disney y el anime de los 90" },
-  { "key": "culture-haagen-dazs-name", "category": "culture", "topic": "Haagen-Dazs", "angle": "por que la marca Haagen-Dazs suena escandinava pero no significa nada" },
-  { "key": "internet-404-origin", "category": "internet", "topic": "404 errors", "angle": "de donde sale realmente el error 404" },
-  { "key": "internet-first-youtube-video", "category": "internet", "topic": "YouTube", "angle": "por que el primer video de YouTube fue un paseo corto por un zoo" }
+  {
+    "key": "space-black-hole-sound",
+    "category": "space",
+    "topic": "black holes",
+    "angle": "por que un agujero negro puede producir senales que convertimos en sonido"
+  },
+  {
+    "key": "space-neutron-star-density",
+    "category": "space",
+    "topic": "neutron stars",
+    "angle": "cuanta materia cabe en una cucharada de estrella de neutrones"
+  },
+  {
+    "key": "space-venus-day",
+    "category": "space",
+    "topic": "venus",
+    "angle": "por que un dia en Venus dura mas que un ano"
+  },
+  {
+    "key": "space-saturn-float",
+    "category": "space",
+    "topic": "saturn",
+    "angle": "por que Saturno teoricamente flotaria en una banera gigante"
+  },
+  {
+    "key": "science-bananas-radioactive",
+    "category": "science",
+    "topic": "bananas",
+    "angle": "por que los platanos son tecnicamente radiactivos"
+  },
+  {
+    "key": "science-hot-water-freeze",
+    "category": "science",
+    "topic": "water physics",
+    "angle": "por que a veces el agua caliente se congela antes que la fria"
+  },
+  {
+    "key": "science-octopus-hearts",
+    "category": "science",
+    "topic": "octopus",
+    "angle": "por que los pulpos tienen tres corazones y sangre azul"
+  },
+  {
+    "key": "science-honey-never-expires",
+    "category": "science",
+    "topic": "honey",
+    "angle": "por que la miel puede durar miles de anos sin caducar"
+  },
+  {
+    "key": "history-cleopatra-moon-landing",
+    "category": "history",
+    "topic": "Cleopatra",
+    "angle": "por que Cleopatra vivio mas cerca del alunizaje que de las piramides"
+  },
+  {
+    "key": "history-oxford-aztecs",
+    "category": "history",
+    "topic": "Oxford University",
+    "angle": "por que Oxford es mas antigua que el imperio azteca"
+  },
+  {
+    "key": "history-napoleon-rabbits",
+    "category": "history",
+    "topic": "Napoleon",
+    "angle": "la vez que Napoleon fue perseguido por conejos"
+  },
+  {
+    "key": "history-great-fire-london-plague",
+    "category": "history",
+    "topic": "London",
+    "angle": "como el gran incendio de Londres llego justo despues de la peste"
+  },
+  {
+    "key": "technology-first-webcam-coffee",
+    "category": "technology",
+    "topic": "first webcam",
+    "angle": "por que la primera webcam del mundo vigilaba una cafetera"
+  },
+  {
+    "key": "technology-qwerty-layout",
+    "category": "technology",
+    "topic": "QWERTY keyboard",
+    "angle": "por que seguimos usando QWERTY aunque no sea el teclado mas rapido"
+  },
+  {
+    "key": "technology-gps-relativity",
+    "category": "technology",
+    "topic": "GPS",
+    "angle": "por que el GPS solo funciona porque Einstein tenia razon"
+  },
+  {
+    "key": "technology-bluetooth-king",
+    "category": "technology",
+    "topic": "Bluetooth",
+    "angle": "por que Bluetooth se llama como un rey vikingo"
+  },
+  {
+    "key": "animals-shrimp-punch",
+    "category": "animals",
+    "topic": "mantis shrimp",
+    "angle": "como un camaron mantis golpea mas rapido que una bala"
+  },
+  {
+    "key": "animals-wombat-cubes",
+    "category": "animals",
+    "topic": "wombat",
+    "angle": "por que los wombats hacen excrementos en forma de cubo"
+  },
+  {
+    "key": "animals-tardigrades-space",
+    "category": "animals",
+    "topic": "tardigrades",
+    "angle": "como los tardigrados sobreviven al vacio del espacio"
+  },
+  {
+    "key": "animals-koala-fingerprints",
+    "category": "animals",
+    "topic": "koala",
+    "angle": "por que las huellas dactilares de un koala se parecen a las humanas"
+  },
+  {
+    "key": "psychology-memory-rewrite",
+    "category": "psychology",
+    "topic": "memory",
+    "angle": "por que cada vez que recuerdas algo lo reescribes un poco"
+  },
+  {
+    "key": "psychology-music-chills",
+    "category": "psychology",
+    "topic": "music and brain",
+    "angle": "por que algunas canciones te ponen la piel de gallina"
+  },
+  {
+    "key": "psychology-time-speed-age",
+    "category": "psychology",
+    "topic": "time perception",
+    "angle": "por que el tiempo parece ir mas rapido cuando eres adulto"
+  },
+  {
+    "key": "geography-russia-eleven-zones",
+    "category": "geography",
+    "topic": "Russia",
+    "angle": "por que Rusia tiene once husos horarios"
+  },
+  {
+    "key": "geography-canada-lakes",
+    "category": "geography",
+    "topic": "Canada",
+    "angle": "por que Canada tiene mas lagos que el resto del mundo junto"
+  },
+  {
+    "key": "geography-desert-antarctica",
+    "category": "geography",
+    "topic": "Antarctica",
+    "angle": "por que la Antartida tambien es un desierto"
+  },
+  {
+    "key": "food-carrots-orange",
+    "category": "food",
+    "topic": "carrots",
+    "angle": "por que las zanahorias no siempre fueron naranjas"
+  },
+  {
+    "key": "food-wasabi-fake",
+    "category": "food",
+    "topic": "wasabi",
+    "angle": "por que mucho del wasabi que comes no es wasabi real"
+  },
+  {
+    "key": "sports-golf-moon",
+    "category": "sports",
+    "topic": "golf on the moon",
+    "angle": "por que hay pelotas de golf en la Luna"
+  },
+  {
+    "key": "sports-olympic-gold",
+    "category": "sports",
+    "topic": "Olympic medals",
+    "angle": "por que las medallas de oro olimpicas casi no son de oro"
+  },
+  {
+    "key": "culture-anime-disney-lion-king",
+    "category": "culture",
+    "topic": "The Lion King",
+    "angle": "el debate sobre influencias entre Disney y el anime de los 90"
+  },
+  {
+    "key": "culture-haagen-dazs-name",
+    "category": "culture",
+    "topic": "Haagen-Dazs",
+    "angle": "por que la marca Haagen-Dazs suena escandinava pero no significa nada"
+  },
+  {
+    "key": "internet-404-origin",
+    "category": "internet",
+    "topic": "404 errors",
+    "angle": "de donde sale realmente el error 404"
+  },
+  {
+    "key": "internet-first-youtube-video",
+    "category": "internet",
+    "topic": "YouTube",
+    "angle": "por que el primer video de YouTube fue un paseo corto por un zoo"
+  },
+  {
+    "key": "space-jupiter-storm-centuries",
+    "category": "space",
+    "topic": "Jupiter",
+    "angle": "por que la gran mancha roja de Jupiter lleva activa siglos"
+  },
+  {
+    "key": "space-mars-blue-sunset",
+    "category": "space",
+    "topic": "Mars",
+    "angle": "por que en Marte los atardeceres se ven azules"
+  },
+  {
+    "key": "space-pluto-heart",
+    "category": "space",
+    "topic": "Pluto",
+    "angle": "por que Pluton parece tener un corazon helado gigante"
+  },
+  {
+    "key": "space-sun-white",
+    "category": "space",
+    "topic": "Sun",
+    "angle": "por que el Sol en realidad es blanco y no amarillo"
+  },
+  {
+    "key": "science-glass-liquid-debate",
+    "category": "science",
+    "topic": "glass",
+    "angle": "por que se repite que el vidrio es un liquido aunque no sea exacto"
+  },
+  {
+    "key": "science-lightning-hotter-sun",
+    "category": "science",
+    "topic": "lightning",
+    "angle": "por que un rayo puede ser mas caliente que la superficie del Sol"
+  },
+  {
+    "key": "science-sharks-older-trees",
+    "category": "science",
+    "topic": "sharks",
+    "angle": "por que los tiburones son mas antiguos que los arboles"
+  },
+  {
+    "key": "science-dna-length-body",
+    "category": "science",
+    "topic": "DNA",
+    "angle": "cuanto medir?a tu ADN si lo estiraras entero"
+  },
+  {
+    "key": "history-pyramid-construction-workers",
+    "category": "history",
+    "topic": "Egyptian pyramids",
+    "angle": "por que las piramides no las construyeron esclavos como se suele decir"
+  },
+  {
+    "key": "history-viking-combs",
+    "category": "history",
+    "topic": "Vikings",
+    "angle": "por que los vikingos cuidaban mucho mas su higiene de lo que parece"
+  },
+  {
+    "key": "history-roman-concrete",
+    "category": "history",
+    "topic": "Roman concrete",
+    "angle": "por que el hormigon romano aguanta mejor que mucho hormigon moderno"
+  },
+  {
+    "key": "history-australia-war-emus",
+    "category": "history",
+    "topic": "emu war",
+    "angle": "la vez que Australia perdio una guerra contra emus"
+  },
+  {
+    "key": "technology-capcha-origin",
+    "category": "technology",
+    "topic": "CAPTCHA",
+    "angle": "por que resolver captchas ayudo durante anos a digitalizar libros"
+  },
+  {
+    "key": "technology-spacebar-largest-key",
+    "category": "technology",
+    "topic": "space bar",
+    "angle": "por que la tecla mas grande del teclado hace menos que casi todas"
+  },
+  {
+    "key": "technology-computer-bug-moth",
+    "category": "technology",
+    "topic": "computer bug",
+    "angle": "de donde viene realmente la palabra bug en informatica"
+  },
+  {
+    "key": "technology-pixel-origin",
+    "category": "technology",
+    "topic": "pixels",
+    "angle": "que significa de verdad la palabra pixel"
+  },
+  {
+    "key": "animals-elephant-cant-jump",
+    "category": "animals",
+    "topic": "elephants",
+    "angle": "por que un elefante no puede saltar aunque sea tan potente"
+  },
+  {
+    "key": "animals-otter-hand-holding",
+    "category": "animals",
+    "topic": "sea otters",
+    "angle": "por que algunas nutrias se agarran de la mano mientras duermen"
+  },
+  {
+    "key": "animals-dolphin-names",
+    "category": "animals",
+    "topic": "dolphins",
+    "angle": "por que los delfines tienen silbidos que funcionan como nombres propios"
+  },
+  {
+    "key": "animals-crows-faces",
+    "category": "animals",
+    "topic": "crows",
+    "angle": "por que los cuervos pueden recordar caras humanas durante anos"
+  },
+  {
+    "key": "psychology-placebo-real-effect",
+    "category": "psychology",
+    "topic": "placebo effect",
+    "angle": "por que el efecto placebo puede producir cambios fisicos medibles"
+  },
+  {
+    "key": "psychology-choice-overload",
+    "category": "psychology",
+    "topic": "choice overload",
+    "angle": "por que demasiadas opciones pueden hacerte decidir peor"
+  },
+  {
+    "key": "psychology-phone-vibration-phantom",
+    "category": "psychology",
+    "topic": "phantom vibration",
+    "angle": "por que a veces sientes vibrar el movil aunque no haya vibrado"
+  },
+  {
+    "key": "psychology-name-letters-bias",
+    "category": "psychology",
+    "topic": "implicit egotism",
+    "angle": "por que tendemos a preferir letras que se parecen a nuestro nombre"
+  },
+  {
+    "key": "geography-nile-not-longest-debate",
+    "category": "geography",
+    "topic": "Nile vs Amazon",
+    "angle": "por que aun se discute cual es el rio mas largo del mundo"
+  },
+  {
+    "key": "geography-mount-everest-seashells",
+    "category": "geography",
+    "topic": "Mount Everest",
+    "angle": "por que hay fosiles marinos cerca de la cima del Everest"
+  },
+  {
+    "key": "geography-africa-four-hemispheres",
+    "category": "geography",
+    "topic": "Africa",
+    "angle": "por que Africa esta en los cuatro hemisferios a la vez"
+  },
+  {
+    "key": "geography-chile-extreme-length",
+    "category": "geography",
+    "topic": "Chile",
+    "angle": "por que Chile parece una cinta pegada al mapa"
+  },
+  {
+    "key": "food-ketchup-medicine",
+    "category": "food",
+    "topic": "ketchup",
+    "angle": "por que el ketchup llego a venderse como medicina"
+  },
+  {
+    "key": "food-chocolate-dogs-danger",
+    "category": "food",
+    "topic": "chocolate",
+    "angle": "por que el chocolate es normal para nosotros pero peligroso para perros"
+  },
+  {
+    "key": "food-cheese-moon-myth",
+    "category": "food",
+    "topic": "cheese and moon",
+    "angle": "de donde sale el mito de que la Luna es de queso"
+  },
+  {
+    "key": "food-pineapple-enzyme",
+    "category": "food",
+    "topic": "pineapple",
+    "angle": "por que la pina te da la sensacion de que te esta comiendo la lengua"
+  },
+  {
+    "key": "sports-marathon-distance-royal",
+    "category": "sports",
+    "topic": "marathon",
+    "angle": "por que la distancia exacta del maraton depende de una familia real"
+  },
+  {
+    "key": "sports-tennis-love-word",
+    "category": "sports",
+    "topic": "tennis",
+    "angle": "por que en tenis cero se dice love"
+  },
+  {
+    "key": "sports-baseball-mud-balls",
+    "category": "sports",
+    "topic": "baseball",
+    "angle": "por que en beisbol se embarran las bolas antes de jugar"
+  },
+  {
+    "key": "sports-chess-not-sport-debate",
+    "category": "sports",
+    "topic": "chess",
+    "angle": "por que el ajedrez sigue dividiendo la idea de lo que es un deporte"
+  },
+  {
+    "key": "culture-hollywood-sign-origin",
+    "category": "culture",
+    "topic": "Hollywood sign",
+    "angle": "por que el cartel de Hollywood al principio no decia solo Hollywood"
+  },
+  {
+    "key": "culture-oscar-name-origin",
+    "category": "culture",
+    "topic": "Oscar statuette",
+    "angle": "por que los premios Oscar se llaman Oscar"
+  },
+  {
+    "key": "culture-bubble-wrap-wallpaper",
+    "category": "culture",
+    "topic": "bubble wrap",
+    "angle": "por que el plastico de burbujas nacio como papel pintado"
+  },
+  {
+    "key": "culture-mona-lisa-fame-theft",
+    "category": "culture",
+    "topic": "Mona Lisa",
+    "angle": "por que el robo de la Mona Lisa disparo su fama mundial"
+  },
+  {
+    "key": "internet-hashtag-origin",
+    "category": "internet",
+    "topic": "hashtags",
+    "angle": "por que el hashtag no nacio en Instagram ni en Twitter tal como lo imaginas"
+  },
+  {
+    "key": "internet-spam-monty-python",
+    "category": "internet",
+    "topic": "spam",
+    "angle": "por que el spam de internet viene de un sketch de Monty Python"
+  },
+  {
+    "key": "internet-emoji-first-set",
+    "category": "internet",
+    "topic": "emoji",
+    "angle": "como era el primer set de emoji y por que era tan pequeno"
+  },
+  {
+    "key": "internet-wifi-name-myth",
+    "category": "internet",
+    "topic": "Wi-Fi",
+    "angle": "por que Wi-Fi no significa exactamente Wireless Fidelity"
+  }
 ]

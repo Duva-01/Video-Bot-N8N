@@ -15,6 +15,7 @@ COPY package.json package-lock.json ./
 RUN npm ci --omit=dev
 
 COPY services ./services
+COPY public ./public
 COPY scripts ./scripts
 COPY workflows ./workflows
 COPY README.md ./

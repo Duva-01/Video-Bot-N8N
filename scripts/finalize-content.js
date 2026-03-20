@@ -33,7 +33,6 @@ async function main() {
 
   const scriptPath = process.argv[2] || "/tmp-output/script.json";
   const youtubeResultPath = process.argv[3] || "/tmp-output/youtube-result.json";
-  const tiktokResultPath = process.argv[4] || "/tmp-output/tiktok-result.json";
 
   const scriptData = readJsonIfExists(scriptPath);
   if (!scriptData?.topic_key) {
@@ -42,7 +41,6 @@ async function main() {
   }
 
   const youtubeResult = readJsonIfExists(youtubeResultPath) || {};
-  const tiktokResult = readJsonIfExists(tiktokResultPath) || {};
 
   const pool = createPool();
 
@@ -54,8 +52,6 @@ async function main() {
       description: scriptData.description,
       youtube_video_id: youtubeResult.videoId,
       youtube_url: youtubeResult.url,
-      tiktok_publish_id: tiktokResult.publish_id,
-      tiktok_status: tiktokResult.status,
       metadata: {
         category: scriptData.category,
         topic: scriptData.topic,
@@ -69,7 +65,6 @@ async function main() {
   log("content finalized in database", {
     topicKey: scriptData.topic_key,
     youtubeVideoId: youtubeResult.videoId || null,
-    tiktokPublishId: tiktokResult.publish_id || null,
   });
 }
 

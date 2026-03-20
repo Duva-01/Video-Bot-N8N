@@ -48,13 +48,16 @@ async function selectTopicFromDb(pool, candidates) {
 
   const usedKeys = new Set(rows.map((row) => row.topic_key));
   const available = candidates.filter((item) => !usedKeys.has(item.key));
-  const poolToUse = available.length ? available : candidates;
-  const chosen = poolToUse[Math.floor(Math.random() * poolToUse.length)];
+  if (!available.length) {
+    fail("All fact topics in the current catalog have already been used. Add more topics or expand categories.");
+  }
+
+  const chosen = available[Math.floor(Math.random() * available.length)];
 
   await upsertSelection(pool, chosen);
   return {
     ...chosen,
-    reused_catalog: !available.length,
+    reused_catalog: false,
   };
 }
 
@@ -87,7 +90,7 @@ async function main() {
 
   const payload = {
     ...selected,
-    cta: process.env.VIDEO_DEFAULT_CTA || "Visita el portfolio o pide una automatizacion a medida",
+    cta: process.env.VIDEO_DEFAULT_CTA || "Sigue la cuenta para mas hechos curiosos",
     duration_seconds: Number(process.env.VIDEO_DEFAULT_DURATION_SECONDS || 15),
     video_style: process.env.VIDEO_DEFAULT_STYLE || "rapido, curioso, directo",
     language: process.env.VIDEO_DEFAULT_LANGUAGE || "es",

@@ -112,9 +112,88 @@ async function markPublished(pool, payload) {
   );
 }
 
+async function getDashboardSummary(pool) {
+  const [totalsResult, statusResult, categoryResult, recentResult, timelineResult] = await Promise.all([
+    pool.query(
+      `
+        SELECT
+          COUNT(*)::int AS total_videos,
+          COUNT(*) FILTER (WHERE status = 'published')::int AS published_videos,
+          COUNT(*) FILTER (WHERE status = 'generated')::int AS generated_videos,
+          COUNT(*) FILTER (WHERE status = 'selected')::int AS selected_videos,
+          COUNT(DISTINCT category)::int AS categories_covered,
+          MAX(published_at) AS last_published_at
+        FROM content_runs
+      `,
+    ),
+    pool.query(
+      `
+        SELECT status, COUNT(*)::int AS total
+        FROM content_runs
+        GROUP BY status
+        ORDER BY total DESC, status ASC
+      `,
+    ),
+    pool.query(
+      `
+        SELECT category, COUNT(*)::int AS total
+        FROM content_runs
+        GROUP BY category
+        ORDER BY total DESC, category ASC
+        LIMIT 8
+      `,
+    ),
+    pool.query(
+      `
+        SELECT
+          topic_key,
+          category,
+          topic,
+          angle,
+          title,
+          status,
+          youtube_url,
+          youtube_video_id,
+          selected_at,
+          published_at
+        FROM content_runs
+        ORDER BY COALESCE(published_at, updated_at, selected_at) DESC
+        LIMIT 10
+      `,
+    ),
+    pool.query(
+      `
+        SELECT
+          TO_CHAR(DATE_TRUNC('day', selected_at), 'YYYY-MM-DD') AS day,
+          COUNT(*)::int AS total
+        FROM content_runs
+        WHERE selected_at >= NOW() - INTERVAL '14 days'
+        GROUP BY 1
+        ORDER BY 1 ASC
+      `,
+    ),
+  ]);
+
+  return {
+    totals: totalsResult.rows[0] || {
+      total_videos: 0,
+      published_videos: 0,
+      generated_videos: 0,
+      selected_videos: 0,
+      categories_covered: 0,
+      last_published_at: null,
+    },
+    byStatus: statusResult.rows,
+    byCategory: categoryResult.rows,
+    recentRuns: recentResult.rows,
+    timeline: timelineResult.rows,
+  };
+}
+
 module.exports = {
   createPool,
   ensureSchema,
+  getDashboardSummary,
   hasDatabase,
   markGenerated,
   markPublished,

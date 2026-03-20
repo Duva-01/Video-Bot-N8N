@@ -133,25 +133,12 @@
       "typeVersion": 1,
       "position": [
         2280,
-        180
+        260
       ]
     },
     {
       "parameters": {
-        "command": "node /app/scripts/upload-tiktok.js /tmp-output/final.mp4 /tmp-output/script.json /tmp-output/tiktok-result.json"
-      },
-      "id": "tiktok-upload",
-      "name": "TikTok Upload",
-      "type": "n8n-nodes-base.executeCommand",
-      "typeVersion": 1,
-      "position": [
-        2280,
-        340
-      ]
-    },
-    {
-      "parameters": {
-        "command": "node /app/scripts/finalize-content.js /tmp-output/script.json /tmp-output/youtube-result.json /tmp-output/tiktok-result.json"
+        "command": "node /app/scripts/finalize-content.js /tmp-output/script.json /tmp-output/youtube-result.json"
       },
       "id": "finalize-content",
       "name": "Finalize Content",
@@ -260,27 +247,11 @@
             "node": "YouTube Upload",
             "type": "main",
             "index": 0
-          },
-          {
-            "node": "TikTok Upload",
-            "type": "main",
-            "index": 0
           }
         ]
       ]
     },
     "YouTube Upload": {
-      "main": [
-        [
-          {
-            "node": "Finalize Content",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "TikTok Upload": {
       "main": [
         [
           {
@@ -299,7 +270,7 @@
   "versionId": "b3e7dc12-automation-facts-v1",
   "meta": {
     "template": true,
-    "description": "Workflow para facts curiosos con subtitulos, historial en Neon, YouTube y TikTok."
+    "description": "Workflow para facts curiosos con subtitulos, historial en Neon y publicacion en YouTube Shorts."
   },
   "tags": []
 }
