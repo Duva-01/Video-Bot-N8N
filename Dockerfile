@@ -1,20 +1,15 @@
-FROM n8nio/n8n:latest
+FROM n8nio/n8n:latest-debian
 
 USER root
 
-RUN if command -v apt-get >/dev/null 2>&1; then \
-      apt-get update && apt-get install -y ffmpeg && rm -rf /var/lib/apt/lists/*; \
-    elif command -v apk >/dev/null 2>&1; then \
-      apk add --no-cache ffmpeg; \
-    else \
-      echo "Unsupported package manager" >&2; \
-      exit 1; \
-    fi
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends ffmpeg bash \
+    && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
 
-COPY package.json ./
-RUN npm install --omit=dev
+COPY package.json package-lock.json ./
+RUN npm ci --omit=dev
 
 COPY services ./services
 COPY scripts ./scripts
@@ -27,4 +22,3 @@ RUN chmod +x /app/scripts/build-short.sh
 USER node
 
 CMD ["node", "/app/services/render-proxy.js"]
-
