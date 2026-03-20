@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Acceso | Facts Engine</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&family=IBM+Plex+Mono:wght@400;500&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="/auth/login.css" />
+  </head>
+  <body>
+    <div class="mesh mesh-a"></div>
+    <div class="mesh mesh-b"></div>
+    <main class="layout">
+      <section class="intro">
+        <p class="eyebrow">PRIVATE CONTROL PANEL</p>
+        <h1>Facts Engine Access</h1>
+        <p class="copy">
+          Acceso persistente para entrar en `n8n` y el dashboard sin el popup incómodo del navegador.
+        </p>
+        <ul class="highlights">
+          <li>Sesión con cookie segura</li>
+          <li>Sin bucles de autenticación del navegador</li>
+          <li>Acceso a `n8n` y `/dashboard` desde el mismo login</li>
+        </ul>
+      </section>
+
+      <section class="panel">
+        <form id="loginForm" class="form">
+          <div class="panel-head">
+            <span class="badge">Secure Sign In</span>
+            <h2>Iniciar sesión</h2>
+            <p>Usa las mismas credenciales que estabas usando hasta ahora.</p>
+          </div>
+
+          <label class="field">
+            <span>Usuario</span>
+            <input id="username" name="username" type="text" autocomplete="username" required />
+          </label>
+
+          <label class="field">
+            <span>Contraseña</span>
+            <input id="password" name="password" type="password" autocomplete="current-password" required />
+          </label>
+
+          <input id="next" name="next" type="hidden" />
+
+          <button type="submit" class="submit">Entrar al panel</button>
+          <p id="message" class="message" aria-live="polite"></p>
+        </form>
+      </section>
+    </main>
+
+    <script src="/auth/login.js"></script>
+  </body>
+</html>

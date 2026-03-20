@@ -2,6 +2,7 @@ require("dotenv").config();
 
 const http = require("http");
 const https = require("https");
+const crypto = require("crypto");
 const fs = require("fs");
 const path = require("path");
 const { spawn } = require("child_process");
@@ -15,6 +16,16 @@ const internalPort = Number(process.env.N8N_INTERNAL_PORT || 5678);
 const keepAliveEnabled = (process.env.KEEP_ALIVE_ENABLED || "true") === "true";
 const keepAliveIntervalMs = Number(process.env.KEEP_ALIVE_INTERVAL_MS || 300000);
 const webhookUrl = (process.env.WEBHOOK_URL || "").replace(/\/+$/, "");
+const authEnabled = (process.env.APP_AUTH_ENABLED || "true") === "true";
+const authUser = process.env.APP_AUTH_USER || process.env.N8N_BASIC_AUTH_USER || "admin";
+const authPassword = process.env.APP_AUTH_PASSWORD || process.env.N8N_BASIC_AUTH_PASSWORD || "securepassword";
+const authCookieName = process.env.APP_AUTH_COOKIE_NAME || "bot_videos_session";
+const authSecret =
+  process.env.APP_SESSION_SECRET ||
+  process.env.N8N_ENCRYPTION_KEY ||
+  process.env.N8N_BASIC_AUTH_PASSWORD ||
+  "change-me-in-render";
+const cookieSecure = webhookUrl.startsWith("https://");
 
 const proxy = httpProxy.createProxyServer({
   target: `http://${internalHost}:${internalPort}`,
@@ -29,6 +40,9 @@ const staticFiles = {
   "/dashboard/": "index.html",
   "/dashboard/styles.css": "styles.css",
   "/dashboard/app.js": "app.js",
+  "/login": path.join("..", "auth", "login.html"),
+  "/auth/login.css": path.join("..", "auth", "login.css"),
+  "/auth/login.js": path.join("..", "auth", "login.js"),
 };
 
 function log(message, meta = {}) {
@@ -46,6 +60,7 @@ function startN8n() {
     N8N_HOST: internalHost,
     N8N_PORT: String(internalPort),
     PORT: String(internalPort),
+    N8N_BASIC_AUTH_ACTIVE: "false",
   };
 
   const child = spawn("n8n", ["start"], {
@@ -100,6 +115,156 @@ function sendStaticFile(res, fileName) {
     "cache-control": fileName.endsWith(".html") ? "no-store" : "public, max-age=300",
   });
   res.end(fs.readFileSync(fullPath));
+}
+
+function sendHtml(res, statusCode, html) {
+  res.writeHead(statusCode, {
+    "content-type": "text/html; charset=utf-8",
+    "cache-control": "no-store",
+  });
+  res.end(html);
+}
+
+function parseCookies(cookieHeader) {
+  return String(cookieHeader || "")
+    .split(";")
+    .map((part) => part.trim())
+    .filter(Boolean)
+    .reduce((acc, pair) => {
+      const separatorIndex = pair.indexOf("=");
+      if (separatorIndex === -1) {
+        return acc;
+      }
+
+      const key = pair.slice(0, separatorIndex).trim();
+      const value = pair.slice(separatorIndex + 1).trim();
+      acc[key] = decodeURIComponent(value);
+      return acc;
+    }, {});
+}
+
+function safeEqual(a, b) {
+  const aBuffer = Buffer.from(String(a));
+  const bBuffer = Buffer.from(String(b));
+  if (aBuffer.length !== bBuffer.length) {
+    return false;
+  }
+  return crypto.timingSafeEqual(aBuffer, bBuffer);
+}
+
+function base64UrlEncode(value) {
+  return Buffer.from(value).toString("base64").replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/g, "");
+}
+
+function base64UrlDecode(value) {
+  const normalized = String(value).replace(/-/g, "+").replace(/_/g, "/");
+  const padding = normalized.length % 4 === 0 ? "" : "=".repeat(4 - (normalized.length % 4));
+  return Buffer.from(normalized + padding, "base64").toString("utf8");
+}
+
+function sign(value) {
+  return crypto.createHmac("sha256", authSecret).update(value).digest("hex");
+}
+
+function createSessionToken(username) {
+  const payload = {
+    username,
+    exp: Date.now() + 1000 * 60 * 60 * 24 * 14,
+  };
+  const encodedPayload = base64UrlEncode(JSON.stringify(payload));
+  return `${encodedPayload}.${sign(encodedPayload)}`;
+}
+
+function readSession(req) {
+  const cookies = parseCookies(req.headers.cookie);
+  const token = cookies[authCookieName];
+  if (!token || !token.includes(".")) {
+    return null;
+  }
+
+  const [encodedPayload, signature] = token.split(".");
+  if (!encodedPayload || !signature) {
+    return null;
+  }
+
+  const expectedSignature = sign(encodedPayload);
+  if (!safeEqual(signature, expectedSignature)) {
+    return null;
+  }
+
+  try {
+    const payload = JSON.parse(base64UrlDecode(encodedPayload));
+    if (!payload.username || payload.exp < Date.now()) {
+      return null;
+    }
+    return payload;
+  } catch (error) {
+    return null;
+  }
+}
+
+function setSessionCookie(res, username) {
+  const token = createSessionToken(username);
+  const cookieParts = [
+    `${authCookieName}=${encodeURIComponent(token)}`,
+    "Path=/",
+    "HttpOnly",
+    "SameSite=Lax",
+    "Max-Age=1209600",
+  ];
+
+  if (cookieSecure) {
+    cookieParts.push("Secure");
+  }
+
+  res.setHeader("Set-Cookie", cookieParts.join("; "));
+}
+
+function clearSessionCookie(res) {
+  const cookieParts = [`${authCookieName}=`, "Path=/", "HttpOnly", "SameSite=Lax", "Max-Age=0"];
+  if (cookieSecure) {
+    cookieParts.push("Secure");
+  }
+  res.setHeader("Set-Cookie", cookieParts.join("; "));
+}
+
+function isPublicPath(urlPath) {
+  return (
+    urlPath === "/health" ||
+    urlPath === "/login" ||
+    urlPath === "/auth/login" ||
+    urlPath === "/auth/logout" ||
+    urlPath === "/auth/login.css" ||
+    urlPath === "/auth/login.js"
+  );
+}
+
+function getRedirectTarget(rawUrl) {
+  const candidate = rawUrl && rawUrl.startsWith("/") && !rawUrl.startsWith("//") ? rawUrl : "/";
+  return candidate;
+}
+
+function redirectToLogin(req, res) {
+  const next = encodeURIComponent(getRedirectTarget(req.url));
+  res.writeHead(302, {
+    Location: `/login?next=${next}`,
+    "cache-control": "no-store",
+  });
+  res.end();
+}
+
+function readBody(req) {
+  return new Promise((resolve, reject) => {
+    const chunks = [];
+    req.on("data", (chunk) => {
+      chunks.push(chunk);
+      if (Buffer.concat(chunks).length > 1024 * 1024) {
+        reject(new Error("Request body too large"));
+      }
+    });
+    req.on("end", () => resolve(Buffer.concat(chunks).toString("utf8")));
+    req.on("error", reject);
+  });
 }
 
 function requestUrl(target) {
@@ -179,13 +344,53 @@ proxy.on("error", (error, req, res) => {
 });
 
 const server = http.createServer((req, res) => {
-  if (req.url === "/health") {
+  const hostHeader = req.headers.host || `${publicHost}:${publicPort}`;
+  const parsedUrl = new URL(req.url, `http://${hostHeader}`);
+  const pathname = parsedUrl.pathname;
+
+  if (pathname === "/health") {
     const body = getHealthPayload();
     sendJson(res, 200, JSON.parse(body));
     return;
   }
 
-  if (req.url === "/api/dashboard") {
+  if (pathname === "/auth/logout") {
+    clearSessionCookie(res);
+    res.writeHead(302, {
+      Location: "/login",
+      "cache-control": "no-store",
+    });
+    res.end();
+    return;
+  }
+
+  if (pathname === "/auth/login" && req.method === "POST") {
+    readBody(req)
+      .then((body) => {
+        const parsed = JSON.parse(body || "{}");
+        const username = String(parsed.username || "");
+        const password = String(parsed.password || "");
+        const next = getRedirectTarget(parsed.next);
+
+        if (!safeEqual(username, authUser) || !safeEqual(password, authPassword)) {
+          sendJson(res, 401, { error: "Usuario o contraseña incorrectos" });
+          return;
+        }
+
+        setSessionCookie(res, username);
+        sendJson(res, 200, { ok: true, redirect: next });
+      })
+      .catch((error) => {
+        sendJson(res, 400, { error: error.message });
+      });
+    return;
+  }
+
+  if (pathname === "/api/dashboard") {
+    if (authEnabled && !readSession(req)) {
+      sendJson(res, 401, { error: "Unauthorized" });
+      return;
+    }
     loadDashboardData()
       .then((payload) => sendJson(res, 200, payload))
       .catch((error) => {
@@ -195,15 +400,37 @@ const server = http.createServer((req, res) => {
     return;
   }
 
-  if (staticFiles[req.url]) {
-    sendStaticFile(res, staticFiles[req.url]);
+  if (pathname === "/login" && authEnabled && readSession(req)) {
+    res.writeHead(302, {
+      Location: "/",
+      "cache-control": "no-store",
+    });
+    res.end();
     return;
+  }
+
+  if (staticFiles[pathname]) {
+    sendStaticFile(res, staticFiles[pathname]);
+    return;
+  }
+
+  if (authEnabled && !isPublicPath(pathname)) {
+    const session = readSession(req);
+    if (!session) {
+      redirectToLogin(req, res);
+      return;
+    }
   }
 
   proxy.web(req, res);
 });
 
 server.on("upgrade", (req, socket, head) => {
+  if (authEnabled && !readSession(req)) {
+    socket.write("HTTP/1.1 401 Unauthorized\r\n\r\n");
+    socket.destroy();
+    return;
+  }
   proxy.ws(req, socket, head);
 });
 

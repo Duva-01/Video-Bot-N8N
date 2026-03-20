@@ -67,6 +67,27 @@ Incluye:
 
 Si `Neon` no esta configurado, el dashboard carga pero sin historico real.
 
+## Login
+
+El acceso ya no usa el popup incomodo de `basic auth` del navegador.
+
+Ahora el proxy publica:
+
+- `/login` para entrar con formulario
+- cookie de sesion persistente
+- `/auth/logout` para cerrar sesion
+
+Por defecto reutiliza:
+
+- `N8N_BASIC_AUTH_USER`
+- `N8N_BASIC_AUTH_PASSWORD`
+
+Opcionalmente puedes separar las credenciales del proxy con:
+
+- `APP_AUTH_USER`
+- `APP_AUTH_PASSWORD`
+- `APP_SESSION_SECRET`
+
 ## Archivos clave
 
 - `services/render-proxy.js`
