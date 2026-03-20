@@ -81,9 +81,9 @@ function splitNarration(text) {
 }
 
 async function main() {
-  const scriptPath = process.argv[2] || "/tmp-output/script.json";
-  const audioPath = process.argv[3] || "/tmp-output/narration.wav";
-  const outputPath = process.argv[4] || "/tmp-output/subtitles.srt";
+  const scriptPath = process.argv[2] || "/tmp/bot-videos/script.json";
+  const audioPath = process.argv[3] || "/tmp/bot-videos/narration.wav";
+  const outputPath = process.argv[4] || "/tmp/bot-videos/subtitles.srt";
 
   if (!fs.existsSync(scriptPath)) {
     fail(`Script file not found: ${scriptPath}`);
@@ -130,3 +130,4 @@ async function main() {
 main().catch((error) => {
   fail(error.message);
 });
+

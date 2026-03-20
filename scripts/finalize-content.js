@@ -31,8 +31,8 @@ async function main() {
     return;
   }
 
-  const scriptPath = process.argv[2] || "/tmp-output/script.json";
-  const youtubeResultPath = process.argv[3] || "/tmp-output/youtube-result.json";
+  const scriptPath = process.argv[2] || "/tmp/bot-videos/script.json";
+  const youtubeResultPath = process.argv[3] || "/tmp/bot-videos/youtube-result.json";
 
   const scriptData = readJsonIfExists(scriptPath);
   if (!scriptData?.topic_key) {
@@ -71,3 +71,4 @@ async function main() {
 main().catch((error) => {
   fail(error.message);
 });
+

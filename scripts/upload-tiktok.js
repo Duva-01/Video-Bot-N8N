@@ -73,9 +73,9 @@ async function fetchPublishStatus(token, publishId) {
 }
 
 async function main() {
-  const videoPath = process.argv[2] || "/tmp-output/final.mp4";
-  const scriptPath = process.argv[3] || "/tmp-output/script.json";
-  const resultPath = process.argv[4] || "/tmp-output/tiktok-result.json";
+  const videoPath = process.argv[2] || "/tmp/bot-videos/final.mp4";
+  const scriptPath = process.argv[3] || "/tmp/bot-videos/script.json";
+  const resultPath = process.argv[4] || "/tmp/bot-videos/tiktok-result.json";
   const accessToken = process.env.TIKTOK_ACCESS_TOKEN;
 
   if (!accessToken) {
@@ -166,3 +166,4 @@ async function main() {
 main().catch((error) => {
   fail(error.message);
 });
+

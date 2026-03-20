@@ -64,7 +64,7 @@ function getGeminiText(data) {
 }
 
 async function main() {
-  const outputPath = process.argv[2] || "/tmp-output/script.json";
+  const outputPath = process.argv[2] || "/tmp/bot-videos/script.json";
   const topicFilePath = process.argv[3] && process.argv[3].endsWith(".json") ? process.argv[3] : null;
   const topicFile = topicFilePath && fs.existsSync(topicFilePath) ? JSON.parse(fs.readFileSync(topicFilePath, "utf8")) : null;
   const topic = topicFile?.topic || process.argv[3] || process.env.VIDEO_DEFAULT_TOPIC || "hechos curiosos";
@@ -211,3 +211,4 @@ async function main() {
 main().catch((error) => {
   fail(error.message);
 });
+

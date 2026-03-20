@@ -37,8 +37,8 @@ function sanitizeTags(tagsValue) {
 
 async function main() {
   const videoPath = process.argv[2];
-  const scriptPath = process.argv[3] || "/tmp-output/script.json";
-  const resultPath = process.argv[4] || "/tmp-output/youtube-result.json";
+  const scriptPath = process.argv[3] || "/tmp/bot-videos/script.json";
+  const resultPath = process.argv[4] || "/tmp/bot-videos/youtube-result.json";
 
   if (!videoPath) {
     fail("Usage: node /app/scripts/upload-youtube.js <videoPath> [scriptPath] [resultPath]");
@@ -111,3 +111,4 @@ async function main() {
 main().catch((error) => {
   fail(error.message);
 });
+

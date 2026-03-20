@@ -153,14 +153,14 @@ npm start
 Prueba por pasos:
 
 ```bash
-node scripts/select-fact-topic.js ./tmp-output/topic.json
-node scripts/generate-script.js ./tmp-output/script.json ./tmp-output/topic.json
-node scripts/generate-voice.js ./tmp-output/script.json ./tmp-output/narration.wav
-node scripts/generate-subtitles.js ./tmp-output/script.json ./tmp-output/narration.wav ./tmp-output/subtitles.srt
-node scripts/fetch-pexels.js ./tmp-output/script.json ./tmp-output/clips
-bash scripts/build-short.sh ./tmp-output/final.mp4 ./tmp-output/narration.wav ./tmp-output/clips ./tmp-output/subtitles.srt
-node scripts/upload-youtube.js ./tmp-output/final.mp4 ./tmp-output/script.json ./tmp-output/youtube-result.json
-node scripts/finalize-content.js ./tmp-output/script.json ./tmp-output/youtube-result.json
+node scripts/select-fact-topic.js ./tmp/bot-videos/topic.json
+node scripts/generate-script.js ./tmp/bot-videos/script.json ./tmp/bot-videos/topic.json
+node scripts/generate-voice.js ./tmp/bot-videos/script.json ./tmp/bot-videos/narration.wav
+node scripts/generate-subtitles.js ./tmp/bot-videos/script.json ./tmp/bot-videos/narration.wav ./tmp/bot-videos/subtitles.srt
+node scripts/fetch-pexels.js ./tmp/bot-videos/script.json ./tmp/bot-videos/clips
+bash scripts/build-short.sh ./tmp/bot-videos/final.mp4 ./tmp/bot-videos/narration.wav ./tmp/bot-videos/clips ./tmp/bot-videos/subtitles.srt
+node scripts/upload-youtube.js ./tmp/bot-videos/final.mp4 ./tmp/bot-videos/script.json ./tmp/bot-videos/youtube-result.json
+node scripts/finalize-content.js ./tmp/bot-videos/script.json ./tmp/bot-videos/youtube-result.json
 ```
 
 ## Notas
@@ -168,3 +168,4 @@ node scripts/finalize-content.js ./tmp-output/script.json ./tmp-output/youtube-r
 - el workflow esta orientado a `facts only`
 - no mete CTA de portfolio ni de servicios
 - la subida a YouTube queda en `private` por defecto mientras pruebas
+

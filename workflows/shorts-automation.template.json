@@ -34,7 +34,7 @@
     },
     {
       "parameters": {
-        "command": "rm -rf /tmp-output && mkdir -p /tmp-output/clips"
+        "command": "rm -rf /tmp/bot-videos && mkdir -p /tmp/bot-videos/clips"
       },
       "id": "prepare-workspace",
       "name": "Prepare Workspace",
@@ -47,7 +47,7 @@
     },
     {
       "parameters": {
-        "command": "node /app/scripts/select-fact-topic.js /tmp-output/topic.json"
+        "command": "node /app/scripts/select-fact-topic.js /tmp/bot-videos/topic.json"
       },
       "id": "select-fact-topic",
       "name": "Select Fact Topic",
@@ -60,7 +60,7 @@
     },
     {
       "parameters": {
-        "command": "node /app/scripts/generate-script.js /tmp-output/script.json /tmp-output/topic.json"
+        "command": "node /app/scripts/generate-script.js /tmp/bot-videos/script.json /tmp/bot-videos/topic.json"
       },
       "id": "generate-script",
       "name": "Generate Script",
@@ -73,7 +73,7 @@
     },
     {
       "parameters": {
-        "command": "node /app/scripts/generate-voice.js /tmp-output/script.json /tmp-output/narration.wav"
+        "command": "node /app/scripts/generate-voice.js /tmp/bot-videos/script.json /tmp/bot-videos/narration.wav"
       },
       "id": "generate-voice",
       "name": "Generate Voice",
@@ -86,7 +86,7 @@
     },
     {
       "parameters": {
-        "command": "node /app/scripts/generate-subtitles.js /tmp-output/script.json /tmp-output/narration.wav /tmp-output/subtitles.srt"
+        "command": "node /app/scripts/generate-subtitles.js /tmp/bot-videos/script.json /tmp/bot-videos/narration.wav /tmp/bot-videos/subtitles.srt"
       },
       "id": "generate-subtitles",
       "name": "Generate Subtitles",
@@ -99,7 +99,7 @@
     },
     {
       "parameters": {
-        "command": "node /app/scripts/fetch-pexels.js /tmp-output/script.json /tmp-output/clips"
+        "command": "node /app/scripts/fetch-pexels.js /tmp/bot-videos/script.json /tmp/bot-videos/clips"
       },
       "id": "fetch-pexels",
       "name": "Fetch Pexels",
@@ -112,7 +112,7 @@
     },
     {
       "parameters": {
-        "command": "bash /app/scripts/build-short.sh /tmp-output/final.mp4 /tmp-output/narration.wav /tmp-output/clips /tmp-output/subtitles.srt"
+        "command": "bash /app/scripts/build-short.sh /tmp/bot-videos/final.mp4 /tmp/bot-videos/narration.wav /tmp/bot-videos/clips /tmp/bot-videos/subtitles.srt"
       },
       "id": "build-video",
       "name": "Build Video",
@@ -125,7 +125,7 @@
     },
     {
       "parameters": {
-        "command": "node /app/scripts/upload-youtube.js /tmp-output/final.mp4 /tmp-output/script.json /tmp-output/youtube-result.json"
+        "command": "node /app/scripts/upload-youtube.js /tmp/bot-videos/final.mp4 /tmp/bot-videos/script.json /tmp/bot-videos/youtube-result.json"
       },
       "id": "youtube-upload",
       "name": "YouTube Upload",
@@ -138,7 +138,7 @@
     },
     {
       "parameters": {
-        "command": "node /app/scripts/finalize-content.js /tmp-output/script.json /tmp-output/youtube-result.json"
+        "command": "node /app/scripts/finalize-content.js /tmp/bot-videos/script.json /tmp/bot-videos/youtube-result.json"
       },
       "id": "finalize-content",
       "name": "Finalize Content",
@@ -274,3 +274,4 @@
   },
   "tags": []
 }
+

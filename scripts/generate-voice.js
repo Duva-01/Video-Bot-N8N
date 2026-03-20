@@ -61,8 +61,8 @@ function getGeminiInlineAudio(data) {
 }
 
 async function main() {
-  const scriptPath = process.argv[2] || "/tmp-output/script.json";
-  const outputPath = process.argv[3] || "/tmp-output/narration.wav";
+  const scriptPath = process.argv[2] || "/tmp/bot-videos/script.json";
+  const outputPath = process.argv[3] || "/tmp/bot-videos/narration.wav";
 
   if (!fs.existsSync(scriptPath)) {
     fail(`Script file not found: ${scriptPath}`);
@@ -184,3 +184,4 @@ async function main() {
 main().catch((error) => {
   fail(error.message);
 });
+

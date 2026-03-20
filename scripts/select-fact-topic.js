@@ -277,7 +277,7 @@ function selectTopicWithoutDb(candidates) {
 }
 
 async function main() {
-  const outputPath = process.argv[2] || "/tmp-output/topic.json";
+  const outputPath = process.argv[2] || "/tmp/bot-videos/topic.json";
   const candidates = buildCandidateList();
 
   let selected;
@@ -326,3 +326,4 @@ async function main() {
 main().catch((error) => {
   fail(error.message);
 });
+

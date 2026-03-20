@@ -73,8 +73,8 @@ async function downloadFile(url, outputPath, apiKey) {
 }
 
 async function main() {
-  const scriptPath = process.argv[2] || "/tmp-output/script.json";
-  const clipsDir = process.argv[3] || "/tmp-output/clips";
+  const scriptPath = process.argv[2] || "/tmp/bot-videos/script.json";
+  const clipsDir = process.argv[3] || "/tmp/bot-videos/clips";
 
   if (!fs.existsSync(scriptPath)) {
     fail(`Script file not found: ${scriptPath}`);
@@ -162,3 +162,4 @@ async function main() {
 main().catch((error) => {
   fail(error.message);
 });
+
