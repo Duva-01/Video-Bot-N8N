@@ -1,5 +1,5 @@
 {
-  "name": "AI Shorts Automation Template",
+  "name": "Curious Facts Video Bot",
   "nodes": [
     {
       "parameters": {},
@@ -34,36 +34,11 @@
     },
     {
       "parameters": {
-        "keepOnlySet": false,
-        "values": {
-          "string": [
-            {
-              "name": "topic",
-              "value": "automatizacion, IA y productividad para negocios digitales"
-            },
-            {
-              "name": "cta",
-              "value": "Visita el portfolio o pide una automatizacion a medida"
-            },
-            {
-              "name": "duration_seconds",
-              "value": "15"
-            },
-            {
-              "name": "video_style",
-              "value": "tecnologico, claro, directo"
-            },
-            {
-              "name": "language",
-              "value": "es"
-            }
-          ]
-        },
-        "options": {}
+        "command": "rm -rf /tmp-output && mkdir -p /tmp-output/clips"
       },
-      "id": "set-topic",
-      "name": "Set Topic",
-      "type": "n8n-nodes-base.set",
+      "id": "prepare-workspace",
+      "name": "Prepare Workspace",
+      "type": "n8n-nodes-base.executeCommand",
       "typeVersion": 1,
       "position": [
         460,
@@ -72,27 +47,27 @@
     },
     {
       "parameters": {
-        "command": "rm -rf /tmp-output && mkdir -p /tmp-output/clips"
+        "command": "node /app/scripts/select-fact-topic.js /tmp-output/topic.json"
       },
-      "id": "prepare-workspace",
-      "name": "Prepare Workspace",
+      "id": "select-fact-topic",
+      "name": "Select Fact Topic",
       "type": "n8n-nodes-base.executeCommand",
       "typeVersion": 1,
       "position": [
-        740,
+        720,
         260
       ]
     },
     {
       "parameters": {
-        "command": "=node /app/scripts/generate-script.js /tmp-output/script.json \"{{$json[\"topic\"]}}\" \"{{$json[\"duration_seconds\"]}}\" \"{{$json[\"cta\"]}}\" \"{{$json[\"video_style\"]}}\" \"{{$json[\"language\"]}}\""
+        "command": "node /app/scripts/generate-script.js /tmp-output/script.json /tmp-output/topic.json"
       },
       "id": "generate-script",
       "name": "Generate Script",
       "type": "n8n-nodes-base.executeCommand",
       "typeVersion": 1,
       "position": [
-        1020,
+        980,
         260
       ]
     },
@@ -105,7 +80,20 @@
       "type": "n8n-nodes-base.executeCommand",
       "typeVersion": 1,
       "position": [
-        1300,
+        1240,
+        260
+      ]
+    },
+    {
+      "parameters": {
+        "command": "node /app/scripts/generate-subtitles.js /tmp-output/script.json /tmp-output/narration.wav /tmp-output/subtitles.srt"
+      },
+      "id": "generate-subtitles",
+      "name": "Generate Subtitles",
+      "type": "n8n-nodes-base.executeCommand",
+      "typeVersion": 1,
+      "position": [
+        1500,
         260
       ]
     },
@@ -118,33 +106,59 @@
       "type": "n8n-nodes-base.executeCommand",
       "typeVersion": 1,
       "position": [
-        1580,
+        1760,
         260
       ]
     },
     {
       "parameters": {
-        "command": "bash /app/scripts/build-short.sh /tmp-output/final.mp4 /tmp-output/narration.wav /tmp-output/clips"
+        "command": "bash /app/scripts/build-short.sh /tmp-output/final.mp4 /tmp-output/narration.wav /tmp-output/clips /tmp-output/subtitles.srt"
       },
       "id": "build-video",
       "name": "Build Video",
       "type": "n8n-nodes-base.executeCommand",
       "typeVersion": 1,
       "position": [
-        1860,
+        2020,
         260
       ]
     },
     {
       "parameters": {
-        "command": "node /app/scripts/upload-youtube.js /tmp-output/final.mp4"
+        "command": "node /app/scripts/upload-youtube.js /tmp-output/final.mp4 /tmp-output/script.json /tmp-output/youtube-result.json"
       },
       "id": "youtube-upload",
       "name": "YouTube Upload",
       "type": "n8n-nodes-base.executeCommand",
       "typeVersion": 1,
       "position": [
-        2140,
+        2280,
+        180
+      ]
+    },
+    {
+      "parameters": {
+        "command": "node /app/scripts/upload-tiktok.js /tmp-output/final.mp4 /tmp-output/script.json /tmp-output/tiktok-result.json"
+      },
+      "id": "tiktok-upload",
+      "name": "TikTok Upload",
+      "type": "n8n-nodes-base.executeCommand",
+      "typeVersion": 1,
+      "position": [
+        2280,
+        340
+      ]
+    },
+    {
+      "parameters": {
+        "command": "node /app/scripts/finalize-content.js /tmp-output/script.json /tmp-output/youtube-result.json /tmp-output/tiktok-result.json"
+      },
+      "id": "finalize-content",
+      "name": "Finalize Content",
+      "type": "n8n-nodes-base.executeCommand",
+      "typeVersion": 1,
+      "position": [
+        2540,
         260
       ]
     }
@@ -155,7 +169,7 @@
       "main": [
         [
           {
-            "node": "Set Topic",
+            "node": "Prepare Workspace",
             "type": "main",
             "index": 0
           }
@@ -163,17 +177,6 @@
       ]
     },
     "Schedule Trigger": {
-      "main": [
-        [
-          {
-            "node": "Set Topic",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Set Topic": {
       "main": [
         [
           {
@@ -185,6 +188,17 @@
       ]
     },
     "Prepare Workspace": {
+      "main": [
+        [
+          {
+            "node": "Select Fact Topic",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Select Fact Topic": {
       "main": [
         [
           {
@@ -207,6 +221,17 @@
       ]
     },
     "Generate Voice": {
+      "main": [
+        [
+          {
+            "node": "Generate Subtitles",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Generate Subtitles": {
       "main": [
         [
           {
@@ -235,6 +260,33 @@
             "node": "YouTube Upload",
             "type": "main",
             "index": 0
+          },
+          {
+            "node": "TikTok Upload",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "YouTube Upload": {
+      "main": [
+        [
+          {
+            "node": "Finalize Content",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "TikTok Upload": {
+      "main": [
+        [
+          {
+            "node": "Finalize Content",
+            "type": "main",
+            "index": 0
           }
         ]
       ]
@@ -244,10 +296,10 @@
   "settings": {
     "executionOrder": "v1"
   },
-  "versionId": "5fc91b0d-b1c0-4a18-96e0-botdevideos0001",
+  "versionId": "b3e7dc12-automation-facts-v1",
   "meta": {
     "template": true,
-    "description": "Workflow base compatible con n8n 0.222.0 para generar y subir un short automatizado."
+    "description": "Workflow para facts curiosos con subtitulos, historial en Neon, YouTube y TikTok."
   },
   "tags": []
 }

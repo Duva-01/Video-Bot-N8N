@@ -57,15 +57,19 @@ services:
       - key: OPENAI_MODEL
         value: gpt-4.1-mini
       - key: VIDEO_DEFAULT_TOPIC
-        value: automatizacion, IA y productividad para negocios digitales
+        value: hechos curiosos
       - key: VIDEO_DEFAULT_DURATION_SECONDS
-        value: "25"
+        value: "15"
       - key: VIDEO_DEFAULT_CTA
-        value: Visita el portfolio o pide una automatizacion a medida
+        value: Si quieres mas facts curiosos, sigue la cuenta
       - key: VIDEO_DEFAULT_STYLE
-        value: tecnologico, claro, directo
+        value: curioso, rapido, directo
       - key: VIDEO_DEFAULT_LANGUAGE
         value: es
+      - key: FACT_ALLOWED_CATEGORIES
+        value: space,science,history,technology,animals,psychology,geography,food,sports,culture,internet
+      - key: NEON_DATABASE_URL
+        sync: false
       - key: ELEVENLABS_API_KEY
         sync: false
       - key: ELEVENLABS_VOICE_ID
@@ -75,7 +79,7 @@ services:
       - key: PEXELS_API_KEY
         sync: false
       - key: PEXELS_CLIPS_COUNT
-        value: "3"
+        value: "1"
       - key: YOUTUBE_CLIENT_ID
         sync: false
       - key: YOUTUBE_CLIENT_SECRET
@@ -87,14 +91,14 @@ services:
       - key: YOUTUBE_CATEGORY_ID
         value: "28"
       - key: YOUTUBE_DEFAULT_TITLE
-        value: Short IA automatizado
+        value: Dato curioso del dia
       - key: YOUTUBE_DEFAULT_DESCRIPTION
         value: Video generado automaticamente con n8n.
       - key: YOUTUBE_DEFAULT_TAGS
-        value: ia,automatizacion,shorts
+        value: facts,curiosidades,shorts
       - key: TIKTOK_ACCESS_TOKEN
         sync: false
-      - key: TIKTOK_REFRESH_TOKEN
-        sync: false
-      - key: TIKTOK_OPEN_ID
-        sync: false
+      - key: TIKTOK_PRIVACY_LEVEL
+        value: SELF_ONLY
+      - key: TIKTOK_DEFAULT_TITLE
+        value: Dato curioso del dia

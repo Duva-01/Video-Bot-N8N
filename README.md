@@ -1,6 +1,6 @@
 # Bot de Videos
 
-Sistema automatizado para generar y publicar videos cortos con `n8n`, `Gemini`, `Pexels`, `FFmpeg` y despliegue en `Render`.
+Sistema automatizado para generar y publicar videos cortos de `facts` y `hechos curiosos` con `n8n`, `Gemini`, `Pexels`, `FFmpeg`, `Neon` y despliegue en `Render`.
 
 ## Arquitectura
 
@@ -8,6 +8,7 @@ Sistema automatizado para generar y publicar videos cortos con `n8n`, `Gemini`, 
 - `Gemini` genera ideas, guiones y narracion.
 - `Pexels` aporta clips o imagenes de apoyo.
 - `FFmpeg` monta el video vertical final.
+- `Neon` guarda historial para evitar repetir topics.
 - `YouTube` y `TikTok` reciben la publicacion automatica.
 - Un proxy Node.js expone `GET /health`, mantiene vivo Render y reenvia el resto del trafico a `n8n`.
 
@@ -17,22 +18,29 @@ Sistema automatizado para generar y publicar videos cortos con `n8n`, `Gemini`, 
 - `scripts/build-short.sh`: script reutilizable para el montaje del video en vertical.
 - `scripts/generate-script.js`: genera guion estructurado con Gemini y lo guarda en JSON.
 - `scripts/generate-voice.js`: sintetiza la narracion con Gemini TTS y la guarda en WAV.
+- `scripts/generate-subtitles.js`: crea subtitulos `.srt` a partir de la narracion.
 - `scripts/fetch-pexels.js`: busca y descarga clips verticales desde Pexels.
+- `scripts/select-fact-topic.js`: elige un topic de facts y evita repeticiones si Neon esta configurado.
+- `scripts/finalize-content.js`: actualiza el historial en Neon con el resultado final.
 - `scripts/upload-youtube.js`: subida a YouTube con OAuth usando `googleapis`.
+- `scripts/upload-tiktok.js`: subida a TikTok usando Content Posting API si la app y scopes estan aprobados.
 - `workflows/shorts-automation.template.json`: workflow base para importar y adaptar en `n8n`.
 - `render.yaml`: blueprint listo para desplegar en Render.
 - `.env`: variables necesarias para importar en Render desde tu maquina local.
+- `data/fact-topics.json`: catalogo base de topics para facts.
 
 ## Flujo previsto
 
-1. `Schedule Trigger` dispara la automatizacion.
-2. `Set` define el tema, CTA y duracion objetivo.
-3. `Execute Command` usa `scripts/generate-script.js` para generar un JSON con guion, titulo y keywords.
-4. `Execute Command` usa `scripts/generate-voice.js` para sintetizar el audio.
-5. `Execute Command` usa `scripts/fetch-pexels.js` para descargar clips.
-6. `Execute Command` usa `scripts/build-short.sh`.
-7. `Execute Command` usa `scripts/upload-youtube.js` para subir el resultado a YouTube.
-8. `TikTok` queda como siguiente integracion.
+1. `Schedule Trigger` o `Manual Trigger` dispara la automatizacion.
+2. `Select Fact Topic` elige un topic curioso y evita repeticiones si hay Neon.
+3. `Generate Script` crea el guion, titulo y keywords.
+4. `Generate Voice` genera la narracion.
+5. `Generate Subtitles` crea subtitulos `.srt`.
+6. `Fetch Pexels` descarga clips.
+7. `Build Video` monta el video vertical final con subtitulos.
+8. `YouTube Upload` sube el resultado.
+9. `TikTok Upload` intenta la subida si la app esta aprobada.
+10. `Finalize Content` guarda el resultado en Neon.
 
 ## Keep-alive para Render
 
@@ -82,6 +90,8 @@ Variables recomendadas para generacion:
 - `VIDEO_DEFAULT_CTA`
 - `VIDEO_DEFAULT_STYLE`
 - `VIDEO_DEFAULT_LANGUAGE`
+- `FACT_ALLOWED_CATEGORIES`
+- `NEON_DATABASE_URL`
 - `PEXELS_API_KEY`
 - `PEXELS_CLIPS_COUNT`
 
@@ -91,6 +101,36 @@ Para `Render Free`, usa valores conservadores:
 
 - `VIDEO_DEFAULT_DURATION_SECONDS=15`
 - `PEXELS_CLIPS_COUNT=1`
+
+## Neon
+
+Neon es la opcion recomendada para evitar repetir videos. Segun la documentacion oficial, la forma estandar de conectar una app es copiar la `connection string` desde la consola de Neon y usarla como `DATABASE_URL` o variable equivalente. Neon recomienda por defecto la cadena con `pooler` y `sslmode=require`.
+
+En este proyecto usa:
+
+- `NEON_DATABASE_URL=postgresql://...`
+
+Fuente oficial:
+
+- https://neon.com/docs/connect/connect-from-any-app
+
+## TikTok
+
+La Content Posting API de TikTok existe, pero no es libre de restricciones. La documentacion oficial indica que:
+
+- necesitas una app registrada
+- necesitas aprobacion del scope `video.publish`
+- el usuario final debe autorizar ese scope
+- los clientes no auditados publican solo en modo `private`
+
+Este repositorio deja la subida a TikTok implementada en modo `best effort`, pero no se considera cerrada hasta tener:
+
+- `TIKTOK_ACCESS_TOKEN`
+- la app aprobada para `video.publish`
+
+Fuente oficial:
+
+- https://developers.tiktok.com/doc/content-posting-api-get-started/
 
 ## Desarrollo local
 
@@ -125,9 +165,12 @@ Prueba local del pipeline por pasos:
 ```bash
 node scripts/generate-script.js ./tmp-output/script.json
 node scripts/generate-voice.js ./tmp-output/script.json ./tmp-output/narration.wav
+node scripts/generate-subtitles.js ./tmp-output/script.json ./tmp-output/narration.wav ./tmp-output/subtitles.srt
 node scripts/fetch-pexels.js ./tmp-output/script.json ./tmp-output/clips
-bash scripts/build-short.sh ./tmp-output/final.mp4 ./tmp-output/narration.wav ./tmp-output/clips
-node scripts/upload-youtube.js ./tmp-output/final.mp4
+bash scripts/build-short.sh ./tmp-output/final.mp4 ./tmp-output/narration.wav ./tmp-output/clips ./tmp-output/subtitles.srt
+node scripts/upload-youtube.js ./tmp-output/final.mp4 ./tmp-output/script.json ./tmp-output/youtube-result.json
+node scripts/upload-tiktok.js ./tmp-output/final.mp4 ./tmp-output/script.json ./tmp-output/tiktok-result.json
+node scripts/finalize-content.js ./tmp-output/script.json ./tmp-output/youtube-result.json ./tmp-output/tiktok-result.json
 ```
 
 ## FFmpeg
@@ -152,6 +195,8 @@ Comportamiento:
 - El proxy escribe logs de arranque, health-check y keep-alive.
 - El script de FFmpeg valida entradas antes de procesar.
 - Los scripts de Gemini y Pexels escriben logs simples por cada paso y fallan con mensajes utiles.
+- Los subtitulos se generan automaticamente en formato `.srt`.
+- Neon se usa para evitar topics repetidos cuando `NEON_DATABASE_URL` esta configurado.
 - La subida a YouTube usa la libreria oficial de Google y falla con errores claros si faltan credenciales o el fichero final no existe.
 
 ## Notas
@@ -159,3 +204,4 @@ Comportamiento:
 - Las subidas a YouTube y TikTok requieren credenciales reales y posiblemente aprobacion de scopes en cada plataforma.
 - El workflow incluido es una plantilla operativa; debes ajustar IDs de credenciales, prompts y rutas segun tu cuenta y tu estrategia de contenido.
 - La subida a YouTube queda en `private` por defecto mientras pruebas el flujo completo.
+- La subida a TikTok puede quedar limitada a `SELF_ONLY/private` hasta que la app pase la auditoria de TikTok.

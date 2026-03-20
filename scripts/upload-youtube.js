@@ -37,9 +37,11 @@ function sanitizeTags(tagsValue) {
 
 async function main() {
   const videoPath = process.argv[2];
+  const scriptPath = process.argv[3] || "/tmp-output/script.json";
+  const resultPath = process.argv[4] || "/tmp-output/youtube-result.json";
 
   if (!videoPath) {
-    fail("Usage: node /app/scripts/upload-youtube.js <videoPath> [title] [description] [tagsCsv]");
+    fail("Usage: node /app/scripts/upload-youtube.js <videoPath> [scriptPath] [resultPath]");
   }
 
   const resolvedVideoPath = path.resolve(videoPath);
@@ -51,15 +53,16 @@ async function main() {
   const clientId = getRequiredEnv("YOUTUBE_CLIENT_ID");
   const clientSecret = getRequiredEnv("YOUTUBE_CLIENT_SECRET");
   const refreshToken = getRequiredEnv("YOUTUBE_REFRESH_TOKEN");
-  const defaultTitle = process.env.YOUTUBE_DEFAULT_TITLE || `Short IA ${new Date().toISOString().slice(0, 10)}`;
-  const defaultDescription = process.env.YOUTUBE_DEFAULT_DESCRIPTION || "Video generado automaticamente con n8n.";
-  const defaultTags = process.env.YOUTUBE_DEFAULT_TAGS || "ia,automatizacion,shorts";
+  const scriptData = fs.existsSync(scriptPath) ? JSON.parse(fs.readFileSync(scriptPath, "utf8")) : {};
+  const defaultTitle = scriptData.title || process.env.YOUTUBE_DEFAULT_TITLE || `Short IA ${new Date().toISOString().slice(0, 10)}`;
+  const defaultDescription = scriptData.description || process.env.YOUTUBE_DEFAULT_DESCRIPTION || "Video generado automaticamente con n8n.";
+  const defaultTags = (scriptData.tags || []).join(",") || process.env.YOUTUBE_DEFAULT_TAGS || "ia,automatizacion,shorts";
   const privacyStatus = process.env.YOUTUBE_PRIVACY_STATUS || "private";
   const categoryId = process.env.YOUTUBE_CATEGORY_ID || "28";
 
-  const title = (process.argv[3] || defaultTitle).slice(0, 100);
-  const description = (process.argv[4] || defaultDescription).slice(0, 5000);
-  const tags = sanitizeTags(process.argv[5] || defaultTags);
+  const title = defaultTitle.slice(0, 100);
+  const description = defaultDescription.slice(0, 5000);
+  const tags = sanitizeTags(defaultTags);
 
   const auth = new google.auth.OAuth2(clientId, clientSecret);
   auth.setCredentials({ refresh_token: refreshToken });
@@ -96,10 +99,13 @@ async function main() {
   });
 
   const videoId = response.data.id;
-  log("youtube upload completed", {
+  const result = {
     videoId,
     url: videoId ? `https://www.youtube.com/watch?v=${videoId}` : null,
-  });
+  };
+  fs.writeFileSync(resultPath, JSON.stringify(result, null, 2));
+
+  log("youtube upload completed", result);
 }
 
 main().catch((error) => {
