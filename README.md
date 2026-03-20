@@ -21,7 +21,7 @@ Sistema automatizado para generar y publicar videos cortos con `n8n`, `Gemini`, 
 - `scripts/upload-youtube.js`: subida a YouTube con OAuth usando `googleapis`.
 - `workflows/shorts-automation.template.json`: workflow base para importar y adaptar en `n8n`.
 - `render.yaml`: blueprint listo para desplegar en Render.
-- `.env.example`: variables necesarias.
+- `.env`: variables necesarias para importar en Render desde tu maquina local.
 
 ## Flujo previsto
 
@@ -51,7 +51,7 @@ https://tu-app.onrender.com/health
 
 1. Crea un Web Service desde este repositorio.
 2. Usa el `Dockerfile` incluido, basado en `n8nio/n8n:latest-debian` para permitir `ffmpeg`, `bash` y `Execute Command`.
-3. Configura las variables de entorno de `.env.example`.
+3. Importa las variables de entorno desde tu archivo `.env`.
 4. Ajusta `WEBHOOK_URL` al dominio real de Render.
 5. Ajusta `N8N_EDITOR_BASE_URL` al mismo dominio publico y usa `N8N_PROXY_HOPS=1` al estar detras del proxy de Render.
 6. Importa el workflow plantilla en `n8n` y completa credenciales/OAuth.
@@ -86,6 +86,11 @@ Variables recomendadas para generacion:
 - `PEXELS_CLIPS_COUNT`
 
 `OpenAI` y `ElevenLabs` siguen contemplados como fallback de pago, pero la configuracion por defecto del proyecto queda en `Gemini`.
+
+Para `Render Free`, usa valores conservadores:
+
+- `VIDEO_DEFAULT_DURATION_SECONDS=15`
+- `PEXELS_CLIPS_COUNT=1`
 
 ## Desarrollo local
 

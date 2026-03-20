@@ -18,7 +18,6 @@ COPY services ./services
 COPY scripts ./scripts
 COPY workflows ./workflows
 COPY README.md ./
-COPY .env.example ./
 
 RUN chmod +x /app/scripts/build-short.sh
 
