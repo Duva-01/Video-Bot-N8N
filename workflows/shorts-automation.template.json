@@ -1,0 +1,299 @@
+{
+  "name": "AI Shorts Automation Template",
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "meta": {
+    "template": true,
+    "description": "Workflow base para generar y publicar videos cortos con OpenAI, ElevenLabs, Pexels y FFmpeg."
+  },
+  "nodes": [
+    {
+      "id": "schedule-trigger",
+      "name": "Schedule Trigger",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        200,
+        300
+      ],
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "hours",
+              "hoursInterval": 6
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "set-topic",
+      "name": "Set Topic",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        440,
+        300
+      ],
+      "parameters": {
+        "keepOnlySet": false,
+        "values": {
+          "string": [
+            {
+              "name": "topic",
+              "value": "automatizacion, IA y productividad para negocios digitales"
+            },
+            {
+              "name": "cta",
+              "value": "Visita el portfolio o pide una automatizacion a medida"
+            },
+            {
+              "name": "duration_seconds",
+              "value": "25"
+            },
+            {
+              "name": "aspect_ratio",
+              "value": "9:16"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "openai-script",
+      "name": "OpenAI Script",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        700,
+        300
+      ],
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 2000,
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.openai.com/v1/responses",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{$env.OPENAI_API_KEY}}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\"model\":\"{{$env.OPENAI_MODEL}}\",\"input\":\"Genera un guion para un video vertical de {{$json.duration_seconds}} segundos sobre {{$json.topic}}. Estructura: hook de 2 segundos, desarrollo claro, cierre con CTA: {{$json.cta}}. Devuelve tambien un titulo corto y una lista de palabras clave visuales para buscar clips.\"}"
+      }
+    },
+    {
+      "id": "elevenlabs-voice",
+      "name": "ElevenLabs Voice",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        960,
+        300
+      ],
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 2000,
+      "parameters": {
+        "method": "POST",
+        "url": "=https://api.elevenlabs.io/v1/text-to-speech/{{$env.ELEVENLABS_VOICE_ID}}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "xi-api-key",
+              "value": "={{$env.ELEVENLABS_API_KEY}}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\"text\":\"{{$json.output_text || $json.script || 'Sustituye esta expresion por el texto final del guion'}}\",\"model_id\":\"eleven_multilingual_v2\"}"
+      }
+    },
+    {
+      "id": "pexels-search",
+      "name": "Pexels Search",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1220,
+        300
+      ],
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 2000,
+      "parameters": {
+        "method": "GET",
+        "url": "=https://api.pexels.com/videos/search?query={{$json.topic}}&orientation=portrait&per_page=5",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "={{$env.PEXELS_API_KEY}}"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "build-video",
+      "name": "Build Video",
+      "type": "n8n-nodes-base.executeCommand",
+      "typeVersion": 1,
+      "position": [
+        1480,
+        300
+      ],
+      "parameters": {
+        "command": "bash /app/scripts/build-short.sh /tmp-output/final.mp4 /tmp-output/narration.mp3 /tmp-output/clips /tmp-output/subtitles.srt"
+      }
+    },
+    {
+      "id": "youtube-upload",
+      "name": "YouTube Upload",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1740,
+        220
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "https://www.googleapis.com/upload/youtube/v3/videos?part=snippet,status",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{$env.YOUTUBE_REFRESH_TOKEN}}"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "tiktok-upload",
+      "name": "TikTok Upload",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1740,
+        380
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "https://open.tiktokapis.com/v2/post/publish/video/init/",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{$env.TIKTOK_ACCESS_TOKEN}}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Schedule Trigger": {
+      "main": [
+        [
+          {
+            "node": "Set Topic",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Set Topic": {
+      "main": [
+        [
+          {
+            "node": "OpenAI Script",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OpenAI Script": {
+      "main": [
+        [
+          {
+            "node": "ElevenLabs Voice",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Pexels Search",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "ElevenLabs Voice": {
+      "main": [
+        [
+          {
+            "node": "Build Video",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Pexels Search": {
+      "main": [
+        [
+          {
+            "node": "Build Video",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Video": {
+      "main": [
+        [
+          {
+            "node": "YouTube Upload",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "TikTok Upload",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  }
+}

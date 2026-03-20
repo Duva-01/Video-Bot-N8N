@@ -1,0 +1,13 @@
+.git
+.gitignore
+node_modules
+npm-debug.log
+.env
+.env.local
+tmp
+tmp-output
+downloads
+clips
+exports
+.n8n
+n8n_data

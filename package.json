@@ -1,0 +1,17 @@
+{
+  "name": "bot-de-videos",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Automatizacion de shorts con n8n, OpenAI, ElevenLabs, Pexels y Render",
+  "scripts": {
+    "start": "node services/render-proxy.js",
+    "check": "node --check services/render-proxy.js"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "dependencies": {
+    "http-proxy": "^1.18.1"
+  }
+}
+
