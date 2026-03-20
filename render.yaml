@@ -28,6 +28,18 @@ services:
         value: "300000"
       - key: WEBHOOK_URL
         sync: false
+      - key: TEXT_PROVIDER
+        value: gemini
+      - key: TTS_PROVIDER
+        value: gemini
+      - key: GEMINI_API_KEY
+        sync: false
+      - key: GEMINI_TEXT_MODEL
+        value: gemini-2.5-flash-lite
+      - key: GEMINI_TTS_MODEL
+        value: gemini-2.5-flash-preview-tts
+      - key: GEMINI_TTS_VOICE
+        value: Kore
       - key: OPENAI_API_KEY
         sync: false
       - key: OPENAI_MODEL

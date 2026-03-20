@@ -6,7 +6,7 @@
   },
   "meta": {
     "template": true,
-    "description": "Workflow base para generar un short con OpenAI, ElevenLabs, Pexels, FFmpeg y subida automatica a YouTube."
+    "description": "Workflow base para generar un short con Gemini, Pexels, FFmpeg y subida automatica a YouTube."
   },
   "nodes": [
     {
@@ -102,7 +102,7 @@
         300
       ],
       "parameters": {
-        "command": "node /app/scripts/generate-voice.js /tmp-output/script.json /tmp-output/narration.mp3"
+        "command": "node /app/scripts/generate-voice.js /tmp-output/script.json /tmp-output/narration.wav"
       }
     },
     {
@@ -128,7 +128,7 @@
         300
       ],
       "parameters": {
-        "command": "bash /app/scripts/build-short.sh /tmp-output/final.mp4 /tmp-output/narration.mp3 /tmp-output/clips"
+        "command": "bash /app/scripts/build-short.sh /tmp-output/final.mp4 /tmp-output/narration.wav /tmp-output/clips"
       }
     },
     {

@@ -47,6 +47,20 @@ function extractJson(text) {
   fail("OpenAI response did not contain valid JSON text");
 }
 
+function getGeminiText(data) {
+  const parts = data.candidates?.[0]?.content?.parts || [];
+  const text = parts
+    .map((part) => part.text || "")
+    .join("")
+    .trim();
+
+  if (!text) {
+    fail("Gemini response did not include text output");
+  }
+
+  return text;
+}
+
 async function main() {
   const outputPath = process.argv[2] || "/tmp-output/script.json";
   const topic = process.argv[3] || process.env.VIDEO_DEFAULT_TOPIC || "automatizacion, IA y productividad para negocios digitales";
@@ -54,8 +68,11 @@ async function main() {
   const cta = process.argv[5] || process.env.VIDEO_DEFAULT_CTA || "Visita el portfolio o pide una automatizacion a medida";
   const style = process.argv[6] || process.env.VIDEO_DEFAULT_STYLE || "tecnologico, claro, directo";
   const language = process.argv[7] || process.env.VIDEO_DEFAULT_LANGUAGE || "es";
-  const model = process.env.OPENAI_MODEL || "gpt-4.1-mini";
-  const apiKey = getRequiredEnv("OPENAI_API_KEY");
+  const provider = process.env.TEXT_PROVIDER || (process.env.GEMINI_API_KEY ? "gemini" : "openai");
+  const model =
+    provider === "gemini"
+      ? process.env.GEMINI_TEXT_MODEL || "gemini-2.5-flash-lite"
+      : process.env.OPENAI_MODEL || "gpt-4.1-mini";
 
   const prompt = [
     "Genera un plan completo para un video corto vertical para YouTube Shorts y TikTok.",
@@ -81,29 +98,62 @@ async function main() {
     topic,
     durationSeconds,
     model,
+    provider,
   });
 
-  const response = await fetch("https://api.openai.com/v1/responses", {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${apiKey}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      model,
-      input: prompt,
-    }),
-  });
+  let outputText;
 
-  if (!response.ok) {
-    fail(`OpenAI request failed with status ${response.status}: ${await response.text()}`);
-  }
+  if (provider === "gemini") {
+    const apiKey = getRequiredEnv("GEMINI_API_KEY");
+    const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`, {
+      method: "POST",
+      headers: {
+        "x-goog-api-key": apiKey,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        contents: [
+          {
+            parts: [
+              {
+                text: prompt,
+              },
+            ],
+          },
+        ],
+      }),
+    });
 
-  const data = await response.json();
-  const outputText = data.output_text;
+    if (!response.ok) {
+      fail(`Gemini request failed with status ${response.status}: ${await response.text()}`);
+    }
 
-  if (!outputText) {
-    fail("OpenAI response did not include output_text");
+    const data = await response.json();
+    outputText = getGeminiText(data);
+  } else {
+    const apiKey = getRequiredEnv("OPENAI_API_KEY");
+    const response = await fetch("https://api.openai.com/v1/responses", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        model,
+        input: prompt,
+      }),
+    });
+
+    if (!response.ok) {
+      fail(`OpenAI request failed with status ${response.status}: ${await response.text()}`);
+    }
+
+    const data = await response.json();
+    outputText = data.output_text;
+
+    if (!outputText) {
+      fail("OpenAI response did not include output_text");
+    }
   }
 
   const parsed = JSON.parse(extractJson(outputText));
@@ -128,6 +178,7 @@ async function main() {
     outputPath,
     title: payload.title,
     searchQuery: payload.search_query,
+    provider,
   });
 }
 

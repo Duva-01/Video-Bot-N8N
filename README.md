@@ -1,12 +1,11 @@
 # Bot de Videos
 
-Sistema automatizado para generar y publicar videos cortos con `n8n`, `OpenAI`, `ElevenLabs`, `Pexels`, `FFmpeg` y despliegue en `Render`.
+Sistema automatizado para generar y publicar videos cortos con `n8n`, `Gemini`, `Pexels`, `FFmpeg` y despliegue en `Render`.
 
 ## Arquitectura
 
 - `n8n` orquesta el workflow completo.
-- `OpenAI` genera ideas y guiones.
-- `ElevenLabs` genera la narracion.
+- `Gemini` genera ideas, guiones y narracion.
 - `Pexels` aporta clips o imagenes de apoyo.
 - `FFmpeg` monta el video vertical final.
 - `YouTube` y `TikTok` reciben la publicacion automatica.
@@ -16,8 +15,8 @@ Sistema automatizado para generar y publicar videos cortos con `n8n`, `OpenAI`, 
 
 - `services/render-proxy.js`: proxy HTTP + keep-alive + arranque de `n8n`.
 - `scripts/build-short.sh`: script reutilizable para el montaje del video en vertical.
-- `scripts/generate-script.js`: genera guion estructurado con OpenAI y lo guarda en JSON.
-- `scripts/generate-voice.js`: sintetiza la narracion con ElevenLabs y la guarda en MP3.
+- `scripts/generate-script.js`: genera guion estructurado con Gemini y lo guarda en JSON.
+- `scripts/generate-voice.js`: sintetiza la narracion con Gemini TTS y la guarda en WAV.
 - `scripts/fetch-pexels.js`: busca y descarga clips verticales desde Pexels.
 - `scripts/upload-youtube.js`: subida a YouTube con OAuth usando `googleapis`.
 - `workflows/shorts-automation.template.json`: workflow base para importar y adaptar en `n8n`.
@@ -69,6 +68,12 @@ Variables recomendadas para YouTube:
 
 Variables recomendadas para generacion:
 
+- `TEXT_PROVIDER`
+- `TTS_PROVIDER`
+- `GEMINI_API_KEY`
+- `GEMINI_TEXT_MODEL`
+- `GEMINI_TTS_MODEL`
+- `GEMINI_TTS_VOICE`
 - `OPENAI_API_KEY`
 - `OPENAI_MODEL`
 - `VIDEO_DEFAULT_TOPIC`
@@ -76,11 +81,10 @@ Variables recomendadas para generacion:
 - `VIDEO_DEFAULT_CTA`
 - `VIDEO_DEFAULT_STYLE`
 - `VIDEO_DEFAULT_LANGUAGE`
-- `ELEVENLABS_API_KEY`
-- `ELEVENLABS_VOICE_ID`
-- `ELEVENLABS_MODEL_ID`
 - `PEXELS_API_KEY`
 - `PEXELS_CLIPS_COUNT`
+
+`OpenAI` y `ElevenLabs` siguen contemplados como fallback de pago, pero la configuracion por defecto del proyecto queda en `Gemini`.
 
 ## Desarrollo local
 
@@ -114,9 +118,9 @@ Prueba local del pipeline por pasos:
 
 ```bash
 node scripts/generate-script.js ./tmp-output/script.json
-node scripts/generate-voice.js ./tmp-output/script.json ./tmp-output/narration.mp3
+node scripts/generate-voice.js ./tmp-output/script.json ./tmp-output/narration.wav
 node scripts/fetch-pexels.js ./tmp-output/script.json ./tmp-output/clips
-bash scripts/build-short.sh ./tmp-output/final.mp4 ./tmp-output/narration.mp3 ./tmp-output/clips
+bash scripts/build-short.sh ./tmp-output/final.mp4 ./tmp-output/narration.wav ./tmp-output/clips
 node scripts/upload-youtube.js ./tmp-output/final.mp4
 ```
 
@@ -141,7 +145,7 @@ Comportamiento:
 - Los nodos HTTP del workflow plantilla ya incluyen reintentos.
 - El proxy escribe logs de arranque, health-check y keep-alive.
 - El script de FFmpeg valida entradas antes de procesar.
-- Los scripts de OpenAI, ElevenLabs y Pexels escriben logs simples por cada paso y fallan con mensajes utiles.
+- Los scripts de Gemini y Pexels escriben logs simples por cada paso y fallan con mensajes utiles.
 - La subida a YouTube usa la libreria oficial de Google y falla con errores claros si faltan credenciales o el fichero final no existe.
 
 ## Notas
