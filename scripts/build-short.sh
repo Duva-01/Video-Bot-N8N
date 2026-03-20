@@ -28,6 +28,7 @@ FPS="${SHORTS_FPS:-30}"
 
 TMP_DIR="$(mktemp -d)"
 CONCAT_FILE="$TMP_DIR/clips.txt"
+BASE_VIDEO="$TMP_DIR/base.mp4"
 
 cleanup() {
   rm -rf "$TMP_DIR"
@@ -44,6 +45,7 @@ while IFS= read -r clip; do
 done < "$TMP_DIR/found.txt"
 
 FILTER="scale=${WIDTH}:${HEIGHT}:force_original_aspect_ratio=increase,crop=${WIDTH}:${HEIGHT},fps=${FPS},format=yuv420p"
+VIDEO_FILTER="$FILTER"
 
 if [[ -n "$SUBTITLE_FILE" ]]; then
   [[ -f "$SUBTITLE_FILE" ]] || fail "No existe el archivo de subtitulos: $SUBTITLE_FILE"
@@ -57,10 +59,24 @@ log "Audio: $AUDIO_FILE"
 log "Clips: $CLIPS_DIR"
 log "Salida: $OUTPUT_FILE"
 
+log "Normalizando clips base"
 ffmpeg -y \
   -f concat \
   -safe 0 \
   -i "$CONCAT_FILE" \
+  -an \
+  -vf "$VIDEO_FILTER" \
+  -c:v libx264 \
+  -preset veryfast \
+  -crf 23 \
+  "$BASE_VIDEO"
+
+AUDIO_DURATION="$(ffprobe -v error -show_entries format=duration -of csv=p=0 "$AUDIO_FILE")"
+[[ -n "$AUDIO_DURATION" ]] || fail "No se pudo obtener la duracion del audio"
+
+ffmpeg -y \
+  -stream_loop -1 \
+  -i "$BASE_VIDEO" \
   -i "$AUDIO_FILE" \
   -vf "$FILTER" \
   -map 0:v:0 \
@@ -71,8 +87,7 @@ ffmpeg -y \
   -c:a aac \
   -b:a 192k \
   -ar 44100 \
-  -shortest \
+  -t "$AUDIO_DURATION" \
   "$OUTPUT_FILE"
 
 log "Video generado correctamente"
-
