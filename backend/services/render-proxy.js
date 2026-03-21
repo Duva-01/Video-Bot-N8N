@@ -37,7 +37,10 @@ const authSecret =
   process.env.N8N_BASIC_AUTH_PASSWORD ||
   "change-me-in-render";
 const n8nPath = (() => {
-  const raw = process.env.N8N_PATH || "/app/";
+  const raw = process.env.N8N_PATH || "/";
+  if (raw === "/") {
+    return "/";
+  }
   const withLeadingSlash = raw.startsWith("/") ? raw : `/${raw}`;
   return withLeadingSlash.endsWith("/") ? withLeadingSlash : `${withLeadingSlash}/`;
 })();
@@ -319,7 +322,7 @@ async function buildN8nEnv() {
     (!process.env.N8N_EDITOR_BASE_URL ||
       process.env.N8N_EDITOR_BASE_URL.replace(/\/+$/, "") === webhookUrl.replace(/\/+$/, ""))
   ) {
-    env.N8N_EDITOR_BASE_URL = `${webhookUrl}${n8nPath}`;
+    env.N8N_EDITOR_BASE_URL = n8nPath === "/" ? webhookUrl : `${webhookUrl}${n8nPath}`;
   }
 
   const connectionString = getN8nDatabaseUrl();
@@ -828,7 +831,7 @@ function getHealthPayload() {
       ffmpegThreads: Number(process.env.FFMPEG_THREADS || 1),
     },
     routing: {
-      adminLogin: "/login",
+      adminLogin: null,
       n8nPath,
       apiBase: "/api",
     },
@@ -1212,15 +1215,11 @@ const server = http.createServer((req, res) => {
 
 
   if (pathname === "/") {
-    res.writeHead(302, {
-      Location: n8nPath,
-      "cache-control": "no-store",
-    });
-    res.end();
+    proxy.web(req, res);
     return;
   }
 
-  if (pathname === n8nPath.slice(0, -1)) {
+  if (n8nPath !== "/" && pathname === n8nPath.slice(0, -1)) {
     res.writeHead(302, {
       Location: n8nPath,
       "cache-control": "no-store",
@@ -1239,26 +1238,16 @@ const server = http.createServer((req, res) => {
     return;
   }
 
-  if (pathname.startsWith(n8nPath)) {
+  if (n8nPath === "/" || pathname.startsWith(n8nPath)) {
     proxy.web(req, res);
     return;
   }
 
-  res.writeHead(302, {
-    Location: "/",
-    "cache-control": "no-store",
-  });
-  res.end();
+  proxy.web(req, res);
 });
 
 server.on("upgrade", (req, socket, head) => {
-  if (authEnabled && !readSession(req)) {
-    socket.write("HTTP/1.1 401 Unauthorized\r\n\r\n");
-    socket.destroy();
-    return;
-  }
-
-  if (!req.url.startsWith(n8nPath)) {
+  if (n8nPath !== "/" && !req.url.startsWith(n8nPath)) {
     const parsedUrl = new URL(req.url, `http://${req.headers.host || `${publicHost}:${publicPort}`}`);
     if (isN8nRootPassThrough(parsedUrl.pathname) || isN8nRootAsset(parsedUrl.pathname)) {
       proxy.ws(req, socket, head);

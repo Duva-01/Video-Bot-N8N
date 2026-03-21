@@ -467,7 +467,7 @@
     qs("healthPersistence").textContent = payload.persistence?.n8nDatabase ? "Neon" : "Local";
     qs("healthMode").textContent = payload.performance?.lowMemoryMode ? "Low memory" : "Standard";
     qs("healthService").textContent = payload.service || "-";
-    qs("healthN8nPath").textContent = payload.routing?.n8nPath || "/app/";
+    qs("healthN8nPath").textContent = payload.routing?.n8nPath || "/";
     qs("healthResolution").textContent = `${payload.performance?.shortsWidth || "-"}x${payload.performance?.shortsHeight || "-"}`;
     qs("healthThreads").textContent = String(payload.performance?.ffmpegThreads || "-");
     healthJsonNode.textContent = JSON.stringify(payload, null, 2);
@@ -533,7 +533,7 @@
   async function hydrateApp() {
     const apiBase = getApiBaseUrl();
     backendLabelNode.textContent = apiBase || "Backend not configured";
-    openN8nButton.href = `${apiBase}/app/`;
+    openN8nButton.href = `${apiBase}/`;
     await Promise.all([loadControlCenter(), loadLogs(), loadHealth()]);
   }
 
@@ -625,3 +625,4 @@
     closeLoginModal();
   }
 })();
+
