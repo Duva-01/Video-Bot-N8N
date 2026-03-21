@@ -16,6 +16,8 @@ services:
         sync: false
       - key: APP_AUTH_ENABLED
         value: "true"
+      - key: APP_FRONTEND_ORIGIN
+        sync: false
       - key: APP_SESSION_SECRET
         sync: false
       - key: N8N_ENCRYPTION_KEY
@@ -33,6 +35,10 @@ services:
       - key: N8N_EDITOR_BASE_URL
         sync: false
       - key: N8N_PROXY_HOPS
+        value: "1"
+      - key: N8N_SHELL_WORKFLOW_ID
+        value: "1"
+      - key: N8N_AUTO_ACTIVATE_WORKFLOW_ID
         value: "1"
       - key: N8N_DB_SCHEMA
         value: n8n

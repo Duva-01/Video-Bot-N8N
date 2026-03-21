@@ -4,7 +4,7 @@ const fs = require("fs");
 const path = require("path");
 const { spawn, spawnSync } = require("child_process");
 
-const rootDir = path.resolve(__dirname, "..");
+const rootDir = path.resolve(__dirname, "..", "..");
 const outputDir = path.join(rootDir, "tmp", "render-free-sim");
 const imageTag = process.env.SIM_DOCKER_IMAGE || "bot-videos-render-free-sim";
 const containerName = `bot-videos-render-free-${Date.now()}`;
@@ -78,12 +78,12 @@ async function startContainer() {
   const pipelineCommand = [
     `rm -rf ${workDirInContainer}/tmp/render-free-sim`,
     `mkdir -p ${workDirInContainer}/tmp/render-free-sim/clips`,
-    `node scripts/select-fact-topic.js ${workDirInContainer}/tmp/render-free-sim/topic.json`,
-    `node scripts/generate-script.js ${workDirInContainer}/tmp/render-free-sim/script.json ${workDirInContainer}/tmp/render-free-sim/topic.json`,
-    `node scripts/generate-voice.js ${workDirInContainer}/tmp/render-free-sim/script.json ${workDirInContainer}/tmp/render-free-sim/narration.wav`,
-    `node scripts/generate-subtitles.js ${workDirInContainer}/tmp/render-free-sim/script.json ${workDirInContainer}/tmp/render-free-sim/narration.wav ${workDirInContainer}/tmp/render-free-sim/subtitles.srt`,
-    `node scripts/fetch-pexels.js ${workDirInContainer}/tmp/render-free-sim/script.json ${workDirInContainer}/tmp/render-free-sim/clips`,
-    `bash scripts/build-short.sh ${workDirInContainer}/tmp/render-free-sim/final.mp4 ${workDirInContainer}/tmp/render-free-sim/narration.wav ${workDirInContainer}/tmp/render-free-sim/clips ${workDirInContainer}/tmp/render-free-sim/subtitles.srt`,
+    `node backend/scripts/select-fact-topic.js ${workDirInContainer}/tmp/render-free-sim/topic.json`,
+    `node backend/scripts/generate-script.js ${workDirInContainer}/tmp/render-free-sim/script.json ${workDirInContainer}/tmp/render-free-sim/topic.json`,
+    `node backend/scripts/generate-voice.js ${workDirInContainer}/tmp/render-free-sim/script.json ${workDirInContainer}/tmp/render-free-sim/narration.wav`,
+    `node backend/scripts/generate-subtitles.js ${workDirInContainer}/tmp/render-free-sim/script.json ${workDirInContainer}/tmp/render-free-sim/narration.wav ${workDirInContainer}/tmp/render-free-sim/subtitles.srt`,
+    `node backend/scripts/fetch-pexels.js ${workDirInContainer}/tmp/render-free-sim/script.json ${workDirInContainer}/tmp/render-free-sim/clips`,
+    `bash backend/scripts/build-short.sh ${workDirInContainer}/tmp/render-free-sim/final.mp4 ${workDirInContainer}/tmp/render-free-sim/narration.wav ${workDirInContainer}/tmp/render-free-sim/clips ${workDirInContainer}/tmp/render-free-sim/subtitles.srt`,
   ].join(" && ");
 
   const workspaceMount = `${rootDir.replace(/\\/g, "/")}:/workspace`;

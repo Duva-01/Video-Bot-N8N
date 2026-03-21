@@ -14,11 +14,12 @@ WORKDIR /app
 COPY package.json package-lock.json ./
 RUN npm ci --omit=dev
 
-COPY services ./services
-COPY public ./public
-COPY scripts ./scripts
-COPY data ./data
-COPY workflows ./workflows
+COPY backend/services ./services
+COPY backend/public ./public
+COPY backend/scripts ./scripts
+COPY backend/data ./data
+COPY backend/workflows ./workflows
+COPY backend/db ./db
 COPY README.md ./
 
 RUN chmod +x /app/scripts/build-short.sh

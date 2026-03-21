@@ -4,9 +4,9 @@
   "private": true,
   "description": "Automatizacion de shorts con n8n, OpenAI, ElevenLabs, Pexels y Render",
   "scripts": {
-    "start": "node services/render-proxy.js",
-    "check": "node --check services/render-proxy.js && node --check services/dashboard-data.js && node --check scripts/select-fact-topic.js && node --check scripts/generate-script.js && node --check scripts/generate-voice.js && node --check scripts/generate-subtitles.js && node --check scripts/fetch-pexels.js && node --check scripts/upload-youtube.js && node --check scripts/finalize-content.js && node --check scripts/simulate-render-free.js",
-    "simulate:render": "node scripts/simulate-render-free.js"
+    "start": "node backend/services/render-proxy.js",
+    "check": "node --check backend/services/render-proxy.js && node --check backend/services/dashboard-data.js && node --check backend/scripts/select-fact-topic.js && node --check backend/scripts/generate-script.js && node --check backend/scripts/generate-voice.js && node --check backend/scripts/generate-subtitles.js && node --check backend/scripts/fetch-pexels.js && node --check backend/scripts/upload-youtube.js && node --check backend/scripts/finalize-content.js && node --check backend/scripts/simulate-render-free.js && node --check frontend/app.js",
+    "simulate:render": "node backend/scripts/simulate-render-free.js"
   },
   "engines": {
     "node": ">=16"

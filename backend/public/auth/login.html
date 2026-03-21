@@ -3,7 +3,7 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Acceso | Facts Engine</title>
+    <title>Acceso | n8n Admin</title>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
@@ -17,38 +17,26 @@
     <div class="mesh mesh-b"></div>
     <main class="layout">
       <section class="intro">
-        <p class="eyebrow">PRIVATE CONTROL PANEL</p>
+        <p class="eyebrow">PRIVATE BACKEND ACCESS</p>
         <div class="brand-line">
           <div class="brand-mark" aria-hidden="true"></div>
-          <span>Facts Engine OS</span>
+          <span>Facts Engine Backend</span>
         </div>
-        <h1>Access Layer</h1>
-        <p class="copy">
-          Acceso persistente para entrar en `n8n` y el dashboard sin el popup incómodo del navegador.
-        </p>
+        <h1>n8n Admin</h1>
+        <p class="copy">Este acceso ya no carga dashboard ni shell. Solo autentica y redirige al editor de `n8n`.</p>
         <ul class="highlights">
-          <li>Sesión con cookie segura</li>
-          <li>Sin bucles de autenticación del navegador</li>
-          <li>Acceso a `n8n` y `/dashboard` desde el mismo login</li>
+          <li>Render queda dedicado al runtime</li>
+          <li>Neon persiste workflows, credenciales y ejecuciones</li>
+          <li>Frontend separado en Cloudflare</li>
         </ul>
-        <div class="mini-grid">
-          <div class="mini-card">
-            <span class="mini-label">Modo</span>
-            <strong>YouTube Facts</strong>
-          </div>
-          <div class="mini-card">
-            <span class="mini-label">Motor</span>
-            <strong>Gemini + Neon</strong>
-          </div>
-        </div>
       </section>
 
       <section class="panel">
         <form id="loginForm" class="form">
           <div class="panel-head">
-            <span class="badge">Secure Sign In</span>
-            <h2>Iniciar sesión</h2>
-            <p>Usa las mismas credenciales que estabas usando hasta ahora.</p>
+            <span class="badge">Backend Sign In</span>
+            <h2>Entrar a n8n</h2>
+            <p>Usa las credenciales del backend para abrir `/app/`.</p>
           </div>
 
           <label class="field">
@@ -63,7 +51,7 @@
 
           <input id="next" name="next" type="hidden" />
 
-          <button type="submit" class="submit">Entrar al panel</button>
+          <button type="submit" class="submit">Abrir n8n</button>
           <p id="message" class="message" aria-live="polite"></p>
         </form>
       </section>

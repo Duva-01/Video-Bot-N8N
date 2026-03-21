@@ -1,4 +1,6 @@
 const { Pool } = require("pg");
+const fs = require("fs");
+const path = require("path");
 
 function getDatabaseUrl() {
   return process.env.NEON_DATABASE_URL || process.env.DATABASE_URL || "";
@@ -21,26 +23,9 @@ function createPool() {
 }
 
 async function ensureSchema(pool) {
-  await pool.query(`
-    CREATE TABLE IF NOT EXISTS content_runs (
-      id BIGSERIAL PRIMARY KEY,
-      topic_key TEXT NOT NULL UNIQUE,
-      category TEXT NOT NULL,
-      topic TEXT NOT NULL,
-      angle TEXT NOT NULL,
-      title TEXT,
-      description TEXT,
-      status TEXT NOT NULL DEFAULT 'selected',
-      selected_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-      published_at TIMESTAMPTZ,
-      youtube_video_id TEXT,
-      youtube_url TEXT,
-      tiktok_publish_id TEXT,
-      tiktok_status TEXT,
-      metadata JSONB NOT NULL DEFAULT '{}'::jsonb
-    )
-  `);
+  const schemaPath = path.resolve(__dirname, "..", "..", "db", "schema.sql");
+  const schemaSql = fs.readFileSync(schemaPath, "utf8");
+  await pool.query(schemaSql);
 }
 
 async function upsertSelection(pool, item, metadata = {}) {

@@ -21,6 +21,133 @@ body {
   min-height: 100%;
 }
 
+.login-layout--hidden,
+.app-shell--hidden {
+  display: none;
+}
+
+.login-layout {
+  position: relative;
+  z-index: 1;
+  min-height: 100vh;
+  display: grid;
+  grid-template-columns: minmax(0, 1.1fr) minmax(360px, 460px);
+  gap: 18px;
+  padding: 18px;
+}
+
+.login-copy,
+.login-panel {
+  border-radius: 30px;
+  padding: 28px;
+}
+
+.login-copy {
+  display: grid;
+  align-content: center;
+  gap: 16px;
+}
+
+.login-copy h1 {
+  margin: 0;
+  font-size: 56px;
+  letter-spacing: -0.06em;
+}
+
+.mini-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.mini-card {
+  display: grid;
+  gap: 8px;
+  padding: 16px;
+  border-radius: 22px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.form {
+  display: grid;
+  gap: 18px;
+}
+
+.panel-head {
+  display: grid;
+  gap: 8px;
+}
+
+.panel-head h2 {
+  margin: 0;
+  font-size: 34px;
+  letter-spacing: -0.05em;
+}
+
+.panel-head p {
+  margin: 0;
+  color: var(--muted);
+}
+
+.badge {
+  display: inline-flex;
+  width: fit-content;
+  min-height: 30px;
+  align-items: center;
+  padding: 0 12px;
+  border-radius: 999px;
+  background: rgba(114, 247, 255, 0.12);
+  color: var(--cyan);
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 11px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.field {
+  display: grid;
+  gap: 8px;
+}
+
+.field span {
+  color: var(--muted);
+  font-size: 14px;
+}
+
+.field input {
+  min-height: 52px;
+  border-radius: 16px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--text);
+  padding: 0 16px;
+  font: inherit;
+}
+
+.submit {
+  min-height: 54px;
+  border: 0;
+  border-radius: 18px;
+  background: linear-gradient(135deg, var(--cyan), var(--lime));
+  color: #07111f;
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.message {
+  min-height: 24px;
+  margin: 0;
+  color: var(--coral);
+}
+
+.dashboard-shell {
+  display: grid;
+  gap: 18px;
+  padding: 20px 22px 24px;
+}
+
 body {
   color: var(--text);
   font-family: "Space Grotesk", "Segoe UI", sans-serif;
@@ -546,6 +673,10 @@ body {
 }
 
 @media (max-width: 1120px) {
+  .login-layout {
+    grid-template-columns: 1fr;
+  }
+
   .workspace {
     grid-template-columns: 1fr;
   }

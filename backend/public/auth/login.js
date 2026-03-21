@@ -4,7 +4,7 @@
   const submit = form.querySelector("button[type='submit']");
   const nextField = document.getElementById("next");
   const params = new URLSearchParams(window.location.search);
-  const next = params.get("next") || "/?view=dashboard";
+  const next = params.get("next") || "/app/";
   nextField.value = next;
 
   form.addEventListener("submit", async (event) => {

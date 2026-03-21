@@ -10,20 +10,69 @@
       href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&family=IBM+Plex+Mono:wght@400;500&display=swap"
       rel="stylesheet"
     />
-    <link rel="stylesheet" href="/shell/styles.css" />
+    <link rel="stylesheet" href="./styles.css" />
   </head>
   <body>
     <div class="shell-bg shell-bg-a"></div>
     <div class="shell-bg shell-bg-b"></div>
 
-    <div class="app-shell">
+    <main class="login-layout" id="loginView">
+      <section class="login-copy panel">
+        <p class="eyebrow">Cloudflare Control Surface</p>
+        <h1>Facts Engine OS</h1>
+        <p class="sidebar-copy">
+          Frontend ligero desplegable en Cloudflare. El backend de Render queda solo para `n8n`, workflow runtime,
+          persistencia y APIs.
+        </p>
+        <div class="mini-grid">
+          <article class="mini-card">
+            <span class="metric-label">Backend</span>
+            <strong>Render + n8n</strong>
+          </article>
+          <article class="mini-card">
+            <span class="metric-label">Persistencia</span>
+            <strong>Neon</strong>
+          </article>
+        </div>
+      </section>
+
+      <section class="login-panel panel">
+        <form id="loginForm" class="form">
+          <div class="panel-head">
+            <span class="badge">API Sign In</span>
+            <h2>Entrar al panel</h2>
+            <p>El token se guarda solo en este navegador.</p>
+          </div>
+
+          <label class="field">
+            <span>Backend URL</span>
+            <input id="apiBaseUrl" type="url" required />
+          </label>
+
+          <label class="field">
+            <span>Usuario</span>
+            <input id="username" type="text" autocomplete="username" required />
+          </label>
+
+          <label class="field">
+            <span>Contraseña</span>
+            <input id="password" type="password" autocomplete="current-password" required />
+          </label>
+
+          <button type="submit" class="submit">Conectar</button>
+          <p id="loginMessage" class="message" aria-live="polite"></p>
+        </form>
+      </section>
+    </main>
+
+    <div class="app-shell app-shell--hidden" id="appView">
       <header class="topbar">
         <div class="brand">
           <div class="brand-mark" aria-hidden="true"></div>
           <div class="brand-copy">
             <span class="eyebrow">Official Control Surface</span>
             <strong>Facts Engine OS</strong>
-            <span class="brand-subtitle">YouTube Shorts facts automation</span>
+            <span class="brand-subtitle">Frontend ligero separado del runtime de n8n</span>
           </div>
         </div>
 
@@ -33,37 +82,37 @@
             <strong id="headerPublishedCount">0</strong>
           </article>
           <article class="header-chip header-chip--wide">
-            <span class="metric-label">Ultimo short</span>
+            <span class="metric-label">Último short</span>
             <strong id="headerLatestTitle">Sin datos</strong>
           </article>
           <article class="header-chip">
-            <span class="metric-label">Ultima publicacion</span>
+            <span class="metric-label">Última publicación</span>
             <strong id="headerLastPublished">-</strong>
           </article>
         </div>
 
-        <nav class="topbar-actions" aria-label="Navegacion principal">
+        <nav class="topbar-actions" aria-label="Navegación principal">
           <button class="nav-button nav-button--active" type="button" data-view="dashboard">Dashboard</button>
           <button class="nav-button" type="button" data-view="logs">Logs</button>
           <button class="nav-button" type="button" data-view="health">Health</button>
-          <button class="nav-button" type="button" data-view="n8n">n8n</button>
+          <a class="nav-button" id="openN8nButton" href="#" target="_blank" rel="noreferrer">n8n</a>
           <button class="nav-button nav-button--primary" type="button" id="runNowButton">Run now</button>
           <button class="nav-button" type="button" id="toggleAutomationButton">Automation OFF</button>
-          <a class="nav-button nav-button--danger" href="/auth/logout">Salir</a>
+          <button class="nav-button nav-button--danger" type="button" id="logoutButton">Salir</button>
         </nav>
       </header>
 
       <main class="workspace">
         <aside class="sidebar panel">
           <div class="sidebar-block">
-            <span class="eyebrow">Seccion actual</span>
+            <span class="eyebrow">Sección actual</span>
             <h1 id="viewTitle">Dashboard</h1>
             <p id="viewDescription" class="sidebar-copy">
               Vista principal con actividad, estado del pipeline y resumen operativo.
             </p>
           </div>
 
-          <div class="sidebar-block metrics" id="healthSummary">
+          <div class="sidebar-block metrics">
             <article class="metric-card">
               <span class="metric-label">Estado</span>
               <strong id="healthStatus">-</strong>
@@ -73,20 +122,20 @@
               <strong id="healthPersistence">-</strong>
             </article>
             <article class="metric-card">
-              <span class="metric-label">Modo video</span>
+              <span class="metric-label">Modo vídeo</span>
               <strong id="healthMode">-</strong>
             </article>
           </div>
 
           <div class="sidebar-block">
-            <span class="eyebrow">Ultimo short</span>
+            <span class="eyebrow">Último short</span>
             <article class="latest-card" id="latestCard">
-              <div class="latest-card__empty">Todavia no hay Shorts publicados.</div>
+              <div class="latest-card__empty">Todavía no hay Shorts publicados.</div>
             </article>
           </div>
 
           <div class="sidebar-block">
-            <span class="eyebrow">Ejecucion</span>
+            <span class="eyebrow">Ejecución</span>
             <article class="runner-card">
               <div class="runner-card__top">
                 <strong id="runnerStatus">Idle</strong>
@@ -97,43 +146,56 @@
               <pre class="runner-logs" id="runnerLogs">Sin logs recientes.</pre>
             </article>
           </div>
-
-          <div class="sidebar-block">
-            <span class="eyebrow">Acciones</span>
-            <div class="sidebar-actions">
-              <button class="sidebar-link" type="button" data-view="dashboard">Ver dashboard</button>
-              <button class="sidebar-link" type="button" data-view="logs">Ver logs</button>
-              <button class="sidebar-link" type="button" data-view="health">Ver health</button>
-              <button class="sidebar-link" type="button" data-view="n8n">Abrir n8n</button>
-            </div>
-          </div>
         </aside>
 
         <section class="content panel">
-          <section class="view view--active" id="view-dashboard" data-view-panel="dashboard">
+          <section class="view view--active" data-view-panel="dashboard">
             <div class="view-head">
               <div>
                 <span class="eyebrow">Operations</span>
                 <h2>Dashboard</h2>
               </div>
-              <span class="status-pill">Live</span>
+              <span class="status-pill" id="backendLabel">Backend desconectado</span>
             </div>
-            <iframe
-              id="dashboardFrame"
-              class="embedded-frame embedded-frame--dashboard"
-              src="/dashboard"
-              title="Dashboard"
-              loading="eager"
-            ></iframe>
+            <div class="dashboard-shell">
+              <div class="logs-grid">
+                <article class="health-card">
+                  <span class="metric-label">Total vídeos</span>
+                  <strong id="totalVideos">0</strong>
+                </article>
+                <article class="health-card">
+                  <span class="metric-label">Generados</span>
+                  <strong id="generatedVideos">0</strong>
+                </article>
+                <article class="health-card">
+                  <span class="metric-label">Publicados</span>
+                  <strong id="publishedVideos">0</strong>
+                </article>
+                <article class="health-card">
+                  <span class="metric-label">Categorías</span>
+                  <strong id="categoriesCovered">0</strong>
+                </article>
+              </div>
+
+              <section class="logs-panel">
+                <div class="logs-panel__head">
+                  <span class="eyebrow">Recent Runs</span>
+                  <strong>Últimos topics</strong>
+                </div>
+                <div class="execution-list" id="recentRunsList">
+                  <div class="execution-empty">Sin histórico todavía.</div>
+                </div>
+              </section>
+            </div>
           </section>
 
-          <section class="view" id="view-logs" data-view-panel="logs">
+          <section class="view" data-view-panel="logs">
             <div class="view-head">
               <div>
                 <span class="eyebrow">Execution Trace</span>
                 <h2>Logs</h2>
               </div>
-              <button class="inline-action" type="button" id="refreshLogs">Refrescar logs</button>
+              <button class="inline-action" type="button" id="refreshLogsButton">Refrescar logs</button>
             </div>
             <div class="logs-shell">
               <div class="logs-grid">
@@ -166,22 +228,22 @@
               <section class="logs-panel">
                 <div class="logs-panel__head">
                   <span class="eyebrow">n8n</span>
-                  <strong>Ultimas ejecuciones</strong>
+                  <strong>Últimas ejecuciones</strong>
                 </div>
                 <div class="execution-list" id="executionList">
-                  <div class="execution-empty">Todavia no hay ejecuciones registradas.</div>
+                  <div class="execution-empty">Todavía no hay ejecuciones registradas.</div>
                 </div>
               </section>
             </div>
           </section>
 
-          <section class="view" id="view-health" data-view-panel="health">
+          <section class="view" data-view-panel="health">
             <div class="view-head">
               <div>
                 <span class="eyebrow">Service State</span>
                 <h2>Health</h2>
               </div>
-              <button class="inline-action" type="button" id="refreshHealth">Refrescar</button>
+              <button class="inline-action" type="button" id="refreshHealthButton">Refrescar</button>
             </div>
             <div class="health-grid">
               <article class="health-card">
@@ -193,7 +255,7 @@
                 <strong id="healthN8nPath">-</strong>
               </article>
               <article class="health-card">
-                <span class="metric-label">Resolucion</span>
+                <span class="metric-label">Resolución</span>
                 <strong id="healthResolution">-</strong>
               </article>
               <article class="health-card">
@@ -203,41 +265,11 @@
             </div>
             <pre class="health-json" id="healthJson">Cargando health...</pre>
           </section>
-
-          <section class="view" id="view-n8n" data-view-panel="n8n">
-            <div class="view-head">
-              <div>
-                <span class="eyebrow">Workflow Builder</span>
-                <h2>n8n</h2>
-              </div>
-              <a class="inline-action inline-action--ghost" href="/app/" target="_blank" rel="noreferrer">Abrir en pestaña</a>
-            </div>
-            <iframe
-              id="n8nFrame"
-              class="embedded-frame embedded-frame--n8n"
-              src="/app/"
-              title="n8n editor"
-              loading="lazy"
-            ></iframe>
-          </section>
         </section>
       </main>
-
-      <footer class="footer">
-        <div class="footer-copy">
-          <span class="eyebrow">Identity Layer</span>
-          <strong>La navegacion privada ya no pierde el contexto visual de tu pagina.</strong>
-        </div>
-        <div class="footer-links">
-          <button type="button" class="footer-link" data-view="dashboard">Dashboard</button>
-          <button type="button" class="footer-link" data-view="logs">Logs</button>
-          <button type="button" class="footer-link" data-view="health">Health</button>
-          <button type="button" class="footer-link" data-view="n8n">n8n</button>
-        </div>
-      </footer>
     </div>
 
-    <script src="/shell/app.js"></script>
+    <script src="./config.js"></script>
+    <script src="./app.js"></script>
   </body>
 </html>
-

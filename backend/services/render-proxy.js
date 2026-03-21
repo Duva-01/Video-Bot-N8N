@@ -21,6 +21,7 @@ const authEnabled = (process.env.APP_AUTH_ENABLED || "true") === "true";
 const authUser = process.env.APP_AUTH_USER || process.env.N8N_BASIC_AUTH_USER || "admin";
 const authPassword = process.env.APP_AUTH_PASSWORD || process.env.N8N_BASIC_AUTH_PASSWORD || "securepassword";
 const authCookieName = process.env.APP_AUTH_COOKIE_NAME || "bot_videos_session";
+const frontendOrigin = process.env.APP_FRONTEND_ORIGIN || process.env.FRONTEND_ORIGIN || "*";
 const authSecret =
   process.env.APP_SESSION_SECRET ||
   process.env.N8N_ENCRYPTION_KEY ||
@@ -65,18 +66,9 @@ let runnerState = {
 };
 const publicRoot = path.join(__dirname, "..", "public");
 const staticFiles = {
-  "/": path.join("shell", "index.html"),
-  "/shell/styles.css": path.join("shell", "styles.css"),
-  "/shell/app.js": path.join("shell", "app.js"),
-  "/dashboard": path.join("dashboard", "index.html"),
-  "/dashboard/": path.join("dashboard", "index.html"),
-  "/dashboard/styles.css": path.join("dashboard", "styles.css"),
-  "/dashboard/app.js": path.join("dashboard", "app.js"),
   "/login": path.join("auth", "login.html"),
   "/auth/login.css": path.join("auth", "login.css"),
   "/auth/login.js": path.join("auth", "login.js"),
-  "/ui/chrome.css": path.join("ui", "chrome.css"),
-  "/ui/chrome.js": path.join("ui", "chrome.js"),
 };
 const n8nRootPassThroughPrefixes = [
   "/rest",
@@ -181,6 +173,33 @@ function getRunnerSnapshot() {
 
 function invalidateWorkflowCache() {
   cachedWorkflow = null;
+}
+
+function getAllowedOrigin(requestOrigin) {
+  const allowedOrigins = String(frontendOrigin || "*")
+    .split(",")
+    .map((value) => value.trim())
+    .filter(Boolean);
+
+  if (allowedOrigins.length === 0 || allowedOrigins.includes("*")) {
+    return "*";
+  }
+
+  if (requestOrigin && allowedOrigins.includes(requestOrigin)) {
+    return requestOrigin;
+  }
+
+  return allowedOrigins[0];
+}
+
+function applyCorsHeaders(req, res) {
+  const origin = getAllowedOrigin(req.headers.origin || "");
+  res.setHeader("Access-Control-Allow-Origin", origin);
+  res.setHeader("Access-Control-Allow-Methods", "GET,POST,OPTIONS");
+  res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization");
+  if (origin !== "*") {
+    res.setHeader("Vary", "Origin");
+  }
 }
 
 async function buildN8nEnv() {
@@ -467,6 +486,31 @@ async function setWorkflowAutomation(active) {
   return getWorkflowAutomationState();
 }
 
+async function ensureWorkflowAutoActivation() {
+  const workflowId =
+    process.env.N8N_AUTO_ACTIVATE_WORKFLOW_ID ||
+    process.env.N8N_SHELL_WORKFLOW_ID ||
+    process.env.SHELL_WORKFLOW_ID ||
+    "";
+
+  if (!workflowId) {
+    return;
+  }
+
+  const schema = getN8nSchema();
+  await queryN8nDatabase(
+    `update "${schema}".workflow_entity
+        set active = true
+      where id = $1 and active = false`,
+    [workflowId],
+  );
+
+  invalidateWorkflowCache();
+  log("workflow auto-activation ensured", {
+    workflowId,
+  });
+}
+
 async function triggerWorkflowExecution() {
   if (runnerState.running) {
     const error = new Error("A workflow execution is already running");
@@ -625,9 +669,9 @@ function getHealthPayload() {
       ffmpegThreads: Number(process.env.FFMPEG_THREADS || 1),
     },
     routing: {
-      shell: "/",
+      adminLogin: "/login",
       n8nPath,
-      dashboard: "/dashboard",
+      apiBase: "/api",
     },
     timestamp: new Date().toISOString(),
   });
@@ -639,6 +683,11 @@ function sendJson(res, statusCode, payload) {
     "cache-control": "no-store",
   });
   res.end(JSON.stringify(payload));
+}
+
+function sendApiJson(req, res, statusCode, payload) {
+  applyCorsHeaders(req, res);
+  sendJson(res, statusCode, payload);
 }
 
 function sendStaticFile(res, fileName) {
@@ -714,9 +763,7 @@ function createSessionToken(username) {
   return `${encodedPayload}.${sign(encodedPayload)}`;
 }
 
-function readSession(req) {
-  const cookies = parseCookies(req.headers.cookie);
-  const token = cookies[authCookieName];
+function readSessionToken(token) {
   if (!token || !token.includes(".")) {
     return null;
   }
@@ -740,6 +787,25 @@ function readSession(req) {
   } catch (error) {
     return null;
   }
+}
+
+function readBearerToken(req) {
+  const authHeader = String(req.headers.authorization || "");
+  if (!authHeader.startsWith("Bearer ")) {
+    return null;
+  }
+
+  return authHeader.slice("Bearer ".length).trim();
+}
+
+function readSession(req) {
+  const bearerPayload = readSessionToken(readBearerToken(req));
+  if (bearerPayload) {
+    return bearerPayload;
+  }
+
+  const cookies = parseCookies(req.headers.cookie);
+  return readSessionToken(cookies[authCookieName]);
 }
 
 function setSessionCookie(res, username) {
@@ -886,10 +952,18 @@ const server = http.createServer((req, res) => {
   const hostHeader = req.headers.host || `${publicHost}:${publicPort}`;
   const parsedUrl = new URL(req.url, `http://${hostHeader}`);
   const pathname = parsedUrl.pathname;
+  const isApiRequest = pathname.startsWith("/api/") || pathname === "/health";
+
+  if (req.method === "OPTIONS" && isApiRequest) {
+    applyCorsHeaders(req, res);
+    res.writeHead(204);
+    res.end();
+    return;
+  }
 
   if (pathname === "/health") {
     const body = getHealthPayload();
-    sendJson(res, 200, JSON.parse(body));
+    sendApiJson(req, res, 200, JSON.parse(body));
     return;
   }
 
@@ -925,106 +999,137 @@ const server = http.createServer((req, res) => {
     return;
   }
 
+  if (pathname === "/api/auth/login" && req.method === "POST") {
+    readBody(req)
+      .then((body) => {
+        const parsed = JSON.parse(body || "{}");
+        const username = String(parsed.username || "");
+        const password = String(parsed.password || "");
+
+        if (!safeEqual(username, authUser) || !safeEqual(password, authPassword)) {
+          sendApiJson(req, res, 401, { error: "Usuario o contraseña incorrectos" });
+          return;
+        }
+
+        sendApiJson(req, res, 200, {
+          ok: true,
+          token: createSessionToken(username),
+          backendUrl: webhookUrl || "",
+          healthUrl: `${webhookUrl}/health`,
+          n8nUrl: `${webhookUrl}${n8nPath}`,
+        });
+      })
+      .catch((error) => {
+        sendApiJson(req, res, 400, { error: error.message });
+      });
+    return;
+  }
+
+  if (pathname === "/api/auth/logout") {
+    sendApiJson(req, res, 200, { ok: true });
+    return;
+  }
+
   if (pathname === "/api/dashboard") {
     if (authEnabled && !readSession(req)) {
-      sendJson(res, 401, { error: "Unauthorized" });
+      sendApiJson(req, res, 401, { error: "Unauthorized" });
       return;
     }
     loadDashboardData()
-      .then((payload) => sendJson(res, 200, payload))
+      .then((payload) => sendApiJson(req, res, 200, payload))
       .catch((error) => {
         log("dashboard api error", { error: error.message });
-        sendJson(res, 500, { error: error.message });
+        sendApiJson(req, res, 500, { error: error.message });
       });
     return;
   }
 
   if (pathname === "/api/control-center") {
     if (authEnabled && !readSession(req)) {
-      sendJson(res, 401, { error: "Unauthorized" });
+      sendApiJson(req, res, 401, { error: "Unauthorized" });
       return;
     }
 
     loadShellData()
-      .then((payload) => sendJson(res, 200, payload))
+      .then((payload) => sendApiJson(req, res, 200, payload))
       .catch((error) => {
         log("control center api error", { error: error.message });
-        sendJson(res, 500, { error: error.message });
+        sendApiJson(req, res, 500, { error: error.message });
       });
     return;
   }
 
   if (pathname === "/api/logs") {
     if (authEnabled && !readSession(req)) {
-      sendJson(res, 401, { error: "Unauthorized" });
+      sendApiJson(req, res, 401, { error: "Unauthorized" });
       return;
     }
 
     loadShellData()
-      .then((payload) => sendJson(res, 200, payload))
+      .then((payload) => sendApiJson(req, res, 200, payload))
       .catch((error) => {
         log("logs api error", { error: error.message });
-        sendJson(res, 500, { error: error.message });
+        sendApiJson(req, res, 500, { error: error.message });
       });
     return;
   }
 
   if (pathname === "/api/run-now") {
     if (authEnabled && !readSession(req)) {
-      sendJson(res, 401, { error: "Unauthorized" });
+      sendApiJson(req, res, 401, { error: "Unauthorized" });
       return;
     }
 
     if (req.method === "GET") {
-      sendJson(res, 200, getRunnerSnapshot());
+      sendApiJson(req, res, 200, getRunnerSnapshot());
       return;
     }
 
     if (req.method !== "POST") {
-      sendJson(res, 405, { error: "Method not allowed" });
+      sendApiJson(req, res, 405, { error: "Method not allowed" });
       return;
     }
 
     triggerWorkflowExecution()
-      .then((payload) => sendJson(res, 202, payload))
+      .then((payload) => sendApiJson(req, res, 202, payload))
       .catch((error) => {
-        sendJson(res, error.statusCode || 500, { error: error.message, runner: getRunnerSnapshot() });
+        sendApiJson(req, res, error.statusCode || 500, { error: error.message, runner: getRunnerSnapshot() });
       });
     return;
   }
 
   if (pathname === "/api/workflow-automation") {
     if (authEnabled && !readSession(req)) {
-      sendJson(res, 401, { error: "Unauthorized" });
+      sendApiJson(req, res, 401, { error: "Unauthorized" });
       return;
     }
 
     if (req.method === "GET") {
       getWorkflowAutomationState()
-        .then((payload) => sendJson(res, 200, payload))
-        .catch((error) => sendJson(res, 500, { error: error.message }));
+        .then((payload) => sendApiJson(req, res, 200, payload))
+        .catch((error) => sendApiJson(req, res, 500, { error: error.message }));
       return;
     }
 
     if (req.method !== "POST") {
-      sendJson(res, 405, { error: "Method not allowed" });
+      sendApiJson(req, res, 405, { error: "Method not allowed" });
       return;
     }
 
     readBody(req)
       .then((body) => JSON.parse(body || "{}"))
       .then((payload) => setWorkflowAutomation(Boolean(payload.active)))
-      .then((payload) => sendJson(res, 200, payload))
+      .then((payload) => sendApiJson(req, res, 200, payload))
       .catch((error) => {
         log("workflow automation api error", { error: error.message });
-        sendJson(res, 500, { error: error.message });
+        sendApiJson(req, res, 500, { error: error.message });
       });
     return;
   }
 
   if (pathname === "/login" && authEnabled && readSession(req)) {
     res.writeHead(302, {
-      Location: "/",
+      Location: n8nPath,
       "cache-control": "no-store",
     });
     res.end();
@@ -1041,6 +1146,15 @@ const server = http.createServer((req, res) => {
 
   if (staticFiles[pathname]) {
     sendStaticFile(res, staticFiles[pathname]);
+    return;
+  }
+
+  if (pathname === "/") {
+    res.writeHead(302, {
+      Location: n8nPath,
+      "cache-control": "no-store",
+    });
+    res.end();
     return;
   }
 
@@ -1093,6 +1207,11 @@ server.on("upgrade", (req, socket, head) => {
 async function main() {
   const n8nEnv = await buildN8nEnv();
   currentN8nEnv = n8nEnv;
+  await ensureWorkflowAutoActivation().catch((error) => {
+    log("workflow auto-activation skipped", {
+      error: error.message,
+    });
+  });
   n8nProcess = startN8n(n8nEnv);
 
   server.listen(publicPort, publicHost, () => {
