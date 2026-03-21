@@ -59,11 +59,19 @@ services:
       - key: TEXT_PROVIDER
         value: groq
       - key: TTS_PROVIDER
-        value: azure
+        value: cloudflare
       - key: GROQ_API_KEY
         sync: false
       - key: GROQ_TEXT_MODEL
         value: llama-3.1-8b-instant
+      - key: CLOUDFLARE_AI_API_TOKEN
+        sync: false
+      - key: CLOUDFLARE_ACCOUNT_ID
+        sync: false
+      - key: CLOUDFLARE_TTS_MODEL
+        value: "@cf/myshell-ai/melotts"
+      - key: CLOUDFLARE_TTS_LANG
+        value: es
       - key: AZURE_SPEECH_KEY
         sync: false
       - key: AZURE_SPEECH_REGION

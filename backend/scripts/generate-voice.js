@@ -80,7 +80,15 @@ async function main() {
     fail(`Missing narration text in ${scriptPath}`);
   }
 
-  const provider = process.env.TTS_PROVIDER || (process.env.AZURE_SPEECH_KEY ? "azure" : process.env.GEMINI_API_KEY ? "gemini" : "elevenlabs");
+  const provider =
+    process.env.TTS_PROVIDER ||
+    (process.env.CLOUDFLARE_AI_API_TOKEN
+      ? "cloudflare"
+      : process.env.AZURE_SPEECH_KEY
+        ? "azure"
+        : process.env.GEMINI_API_KEY
+          ? "gemini"
+          : "elevenlabs");
 
   log("voice generation starting", { scriptPath, outputPath, provider });
 
@@ -98,6 +106,67 @@ async function main() {
   fs.mkdirSync(path.dirname(outputPath), { recursive: true });
 
   try {
+    if (provider === "cloudflare") {
+      const apiToken = getRequiredEnv("CLOUDFLARE_AI_API_TOKEN");
+      const accountId = getRequiredEnv("CLOUDFLARE_ACCOUNT_ID");
+      const model = process.env.CLOUDFLARE_TTS_MODEL || "@cf/myshell-ai/melotts";
+      const language = process.env.CLOUDFLARE_TTS_LANG || "es";
+
+      const response = await fetch(`https://api.cloudflare.com/client/v4/accounts/${accountId}/ai/run/${encodeURIComponent(model)}`, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${apiToken}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          prompt: text,
+          lang: language,
+        }),
+      });
+
+      if (!response.ok) {
+        fail(`Cloudflare Workers AI TTS request failed with status ${response.status}: ${await response.text()}`);
+      }
+
+      const contentType = String(response.headers.get("content-type") || "");
+      let buffer;
+
+      if (contentType.includes("application/json")) {
+        const payload = await response.json();
+        const audioBase64 = payload?.result?.audio || payload?.audio || null;
+        if (!audioBase64) {
+          fail("Cloudflare Workers AI TTS response did not include audio data");
+        }
+        buffer = Buffer.from(audioBase64, "base64");
+      } else {
+        buffer = Buffer.from(await response.arrayBuffer());
+      }
+
+      fs.writeFileSync(outputPath, buffer);
+
+      await withOptionalPool(async (pool) => {
+        await logArtifact(pool, {
+          topic_key: topicKey,
+          artifact_type: "voice_track",
+          label: "Narration audio",
+          file_path: outputPath,
+          mime_type: "audio/mpeg",
+          metadata: { provider, model, language },
+        });
+        await logStepEvent(pool, {
+          topic_key: topicKey,
+          event_type: "step_completed",
+          stage: "generate_voice",
+          source: "generate-voice",
+          message: "Voice generated",
+          metadata: { provider, model, language, bytes: buffer.length },
+        });
+      });
+
+      log("voice generation completed", { outputPath, bytes: buffer.length, provider, model, language });
+      return;
+    }
+
     if (provider === "azure") {
       const subscriptionKey = getRequiredEnv("AZURE_SPEECH_KEY");
       const region = getRequiredEnv("AZURE_SPEECH_REGION");
