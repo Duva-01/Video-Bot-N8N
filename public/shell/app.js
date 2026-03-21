@@ -4,6 +4,10 @@
       title: "Dashboard",
       description: "Vista principal con actividad, estado del pipeline y resumen operativo.",
     },
+    logs: {
+      title: "Logs",
+      description: "Estado del workflow, ejecuciones recientes de n8n y salida del runner de shell.",
+    },
     health: {
       title: "Health",
       description: "Estado del servicio, persistencia, modo low-memory y parametros activos del runtime.",
@@ -18,12 +22,15 @@
   const descriptionNode = document.getElementById("viewDescription");
   const healthJsonNode = document.getElementById("healthJson");
   const refreshHealthButton = document.getElementById("refreshHealth");
+  const refreshLogsButton = document.getElementById("refreshLogs");
   const runNowButton = document.getElementById("runNowButton");
+  const toggleAutomationButton = document.getElementById("toggleAutomationButton");
   const runnerStatusNode = document.getElementById("runnerStatus");
   const runnerCopyNode = document.getElementById("runnerCopy");
   const runnerDotNode = document.getElementById("runnerDot");
   const runnerMetaNode = document.getElementById("runnerMeta");
   const runnerLogsNode = document.getElementById("runnerLogs");
+  const logsConsoleNode = document.getElementById("logsConsole");
   let refreshTimer = null;
 
   function formatDate(value) {
@@ -46,6 +53,23 @@
       })();
 
     return id ? `https://www.youtube.com/embed/${id}` : null;
+  }
+
+  function escapeHtml(value) {
+    return String(value || "")
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;")
+      .replace(/'/g, "&#39;");
+  }
+
+  function formatDuration(value) {
+    if (value == null) return "-";
+    const totalSeconds = Math.max(0, Math.round(Number(value) / 1000));
+    const minutes = Math.floor(totalSeconds / 60);
+    const seconds = totalSeconds % 60;
+    return minutes > 0 ? `${minutes}m ${seconds}s` : `${seconds}s`;
   }
 
   function renderLatestPublished(item) {
@@ -115,8 +139,59 @@
       "Sin logs recientes.";
 
     runnerLogsNode.textContent = logText;
+    if (logsConsoleNode) {
+      logsConsoleNode.textContent = logText;
+    }
     runNowButton.disabled = Boolean(isRunning);
     runNowButton.textContent = isRunning ? "Running..." : "Run now";
+  }
+
+  function renderWorkflowState(workflow) {
+    const state = workflow || {};
+    document.getElementById("workflowName").textContent = state.name || "-";
+    document.getElementById("workflowActive").textContent = state.active ? "ON" : "OFF";
+    document.getElementById("workflowTriggerCount").textContent = state.triggerCount ?? "-";
+    document.getElementById("workflowUpdatedAt").textContent = formatDate(state.updatedAt);
+
+    toggleAutomationButton.textContent = state.active ? "Automation ON" : "Automation OFF";
+    toggleAutomationButton.classList.toggle("nav-button--active", Boolean(state.active));
+  }
+
+  function renderExecutions(executions) {
+    const list = document.getElementById("executionList");
+    if (!list) return;
+
+    if (!Array.isArray(executions) || executions.length === 0) {
+      list.innerHTML = '<div class="execution-empty">Todavia no hay ejecuciones registradas.</div>';
+      return;
+    }
+
+    list.innerHTML = executions
+      .map((item) => {
+        const statusClass =
+          item.status === "success"
+            ? "execution-status execution-status--success"
+            : item.status === "running"
+              ? "execution-status execution-status--running"
+              : "execution-status execution-status--error";
+
+        const staleCopy = item.staleRunning ? " · stale" : "";
+        return `
+          <article class="execution-item">
+            <div class="execution-item__top">
+              <strong>#${escapeHtml(item.id)}</strong>
+              <span class="${statusClass}">${escapeHtml(item.status || "unknown")}${staleCopy}</span>
+            </div>
+            <div class="execution-item__meta">
+              <span>Inicio: ${escapeHtml(formatDate(item.startedAt))}</span>
+              <span>Fin: ${escapeHtml(formatDate(item.stoppedAt))}</span>
+              <span>Duracion: ${escapeHtml(formatDuration(item.durationMs))}</span>
+              <span>Modo: ${escapeHtml(item.mode || "-")}</span>
+            </div>
+          </article>
+        `;
+      })
+      .join("");
   }
 
   function renderControlCenter(data) {
@@ -135,6 +210,8 @@
 
     renderLatestPublished(latest);
     renderRunnerState(data.runner);
+    renderWorkflowState(data.workflow);
+    renderExecutions(data.executions);
   }
 
   function setActiveButtons(activeView) {
@@ -165,6 +242,10 @@
 
     if (selected === "health") {
       loadHealth();
+    }
+
+    if (selected === "logs") {
+      loadLogs();
     }
   }
 
@@ -216,6 +297,61 @@
     return payload;
   }
 
+  async function loadLogs() {
+    const response = await fetch("/api/logs", {
+      credentials: "same-origin",
+      headers: {
+        accept: "application/json",
+      },
+    });
+
+    if (!response.ok) {
+      throw new Error(`Logs request failed with status ${response.status}`);
+    }
+
+    const payload = await response.json();
+    renderWorkflowState(payload.workflow);
+    renderExecutions(payload.executions);
+    renderRunnerState(payload.runner);
+    return payload;
+  }
+
+  async function toggleAutomation() {
+    const currentLabel = toggleAutomationButton.textContent || "";
+    const nextActive = currentLabel.includes("OFF");
+
+    toggleAutomationButton.disabled = true;
+    toggleAutomationButton.textContent = nextActive ? "Activating..." : "Deactivating...";
+
+    try {
+      const response = await fetch("/api/workflow-automation", {
+        method: "POST",
+        credentials: "same-origin",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ active: nextActive }),
+      });
+
+      const payload = await response.json();
+      if (!response.ok) {
+        throw new Error(payload.error || "No se pudo actualizar la automatizacion");
+      }
+
+      renderWorkflowState(payload);
+      await loadControlCenter();
+      if (document.querySelector("[data-view-panel='logs'].view--active")) {
+        await loadLogs();
+      }
+    } catch (error) {
+      if (logsConsoleNode) {
+        logsConsoleNode.textContent = error.message;
+      }
+    } finally {
+      toggleAutomationButton.disabled = false;
+    }
+  }
+
   async function triggerRunNow() {
     runNowButton.disabled = true;
     runNowButton.textContent = "Starting...";
@@ -253,6 +389,9 @@
             window.clearInterval(refreshTimer);
             refreshTimer = null;
             await loadControlCenter();
+            if (document.querySelector("[data-view-panel='logs'].view--active")) {
+              await loadLogs();
+            }
             if (document.querySelector("[data-view-panel='health'].view--active")) {
               await loadHealth();
             }
@@ -282,8 +421,20 @@
     loadHealth();
   });
 
+  refreshLogsButton.addEventListener("click", function () {
+    loadLogs().catch((error) => {
+      if (logsConsoleNode) {
+        logsConsoleNode.textContent = error.message;
+      }
+    });
+  });
+
   runNowButton.addEventListener("click", function () {
     triggerRunNow();
+  });
+
+  toggleAutomationButton.addEventListener("click", function () {
+    toggleAutomation();
   });
 
   window.addEventListener("popstate", function () {

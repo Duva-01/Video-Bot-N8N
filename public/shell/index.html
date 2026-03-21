@@ -44,9 +44,11 @@
 
         <nav class="topbar-actions" aria-label="Navegacion principal">
           <button class="nav-button nav-button--active" type="button" data-view="dashboard">Dashboard</button>
+          <button class="nav-button" type="button" data-view="logs">Logs</button>
           <button class="nav-button" type="button" data-view="health">Health</button>
           <button class="nav-button" type="button" data-view="n8n">n8n</button>
           <button class="nav-button nav-button--primary" type="button" id="runNowButton">Run now</button>
+          <button class="nav-button" type="button" id="toggleAutomationButton">Automation OFF</button>
           <a class="nav-button nav-button--danger" href="/auth/logout">Salir</a>
         </nav>
       </header>
@@ -100,6 +102,7 @@
             <span class="eyebrow">Acciones</span>
             <div class="sidebar-actions">
               <button class="sidebar-link" type="button" data-view="dashboard">Ver dashboard</button>
+              <button class="sidebar-link" type="button" data-view="logs">Ver logs</button>
               <button class="sidebar-link" type="button" data-view="health">Ver health</button>
               <button class="sidebar-link" type="button" data-view="n8n">Abrir n8n</button>
             </div>
@@ -122,6 +125,54 @@
               title="Dashboard"
               loading="eager"
             ></iframe>
+          </section>
+
+          <section class="view" id="view-logs" data-view-panel="logs">
+            <div class="view-head">
+              <div>
+                <span class="eyebrow">Execution Trace</span>
+                <h2>Logs</h2>
+              </div>
+              <button class="inline-action" type="button" id="refreshLogs">Refrescar logs</button>
+            </div>
+            <div class="logs-shell">
+              <div class="logs-grid">
+                <article class="health-card">
+                  <span class="metric-label">Workflow</span>
+                  <strong id="workflowName">-</strong>
+                </article>
+                <article class="health-card">
+                  <span class="metric-label">Automation</span>
+                  <strong id="workflowActive">-</strong>
+                </article>
+                <article class="health-card">
+                  <span class="metric-label">Trigger count</span>
+                  <strong id="workflowTriggerCount">-</strong>
+                </article>
+                <article class="health-card">
+                  <span class="metric-label">Actualizado</span>
+                  <strong id="workflowUpdatedAt">-</strong>
+                </article>
+              </div>
+
+              <section class="logs-panel">
+                <div class="logs-panel__head">
+                  <span class="eyebrow">Runner</span>
+                  <strong>Salida reciente</strong>
+                </div>
+                <pre class="health-json logs-console" id="logsConsole">Sin logs recientes.</pre>
+              </section>
+
+              <section class="logs-panel">
+                <div class="logs-panel__head">
+                  <span class="eyebrow">n8n</span>
+                  <strong>Ultimas ejecuciones</strong>
+                </div>
+                <div class="execution-list" id="executionList">
+                  <div class="execution-empty">Todavia no hay ejecuciones registradas.</div>
+                </div>
+              </section>
+            </div>
           </section>
 
           <section class="view" id="view-health" data-view-panel="health">
@@ -179,6 +230,7 @@
         </div>
         <div class="footer-links">
           <button type="button" class="footer-link" data-view="dashboard">Dashboard</button>
+          <button type="button" class="footer-link" data-view="logs">Logs</button>
           <button type="button" class="footer-link" data-view="health">Health</button>
           <button type="button" class="footer-link" data-view="n8n">n8n</button>
         </div>

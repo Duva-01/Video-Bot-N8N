@@ -46,6 +46,9 @@ const proxy = httpProxy.createProxyServer({
 
 let shuttingDown = false;
 let currentN8nEnv = null;
+let restartingN8n = false;
+let restartResolve = null;
+let restartReject = null;
 let runnerState = {
   running: false,
   startedAt: null,
@@ -87,6 +90,10 @@ function getN8nDatabaseUrl() {
   return process.env.N8N_DATABASE_URL || process.env.NEON_DATABASE_URL || process.env.DATABASE_URL || "";
 }
 
+function getN8nSchema() {
+  return process.env.N8N_DB_SCHEMA || process.env.DB_POSTGRESDB_SCHEMA || "n8n";
+}
+
 function parsePostgresConnectionString(connectionString) {
   const parsed = new URL(connectionString);
 
@@ -109,6 +116,24 @@ async function ensureN8nDatabaseSchema(connectionString, schema) {
 
   try {
     await pool.query(`CREATE SCHEMA IF NOT EXISTS "${safeSchema}"`);
+  } finally {
+    await pool.end();
+  }
+}
+
+async function queryN8nDatabase(queryText, params = []) {
+  const connectionString = getN8nDatabaseUrl();
+  if (!connectionString) {
+    throw new Error("N8N database url is not configured");
+  }
+
+  const pool = new Pool({
+    connectionString,
+    ssl: { rejectUnauthorized: false },
+  });
+
+  try {
+    return await pool.query(queryText, params);
   } finally {
     await pool.end();
   }
@@ -277,6 +302,131 @@ async function resolveShellWorkflow() {
   };
 }
 
+async function getWorkflowAutomationState() {
+  const workflow = await resolveShellWorkflow();
+  const schema = getN8nSchema();
+  const result = await queryN8nDatabase(
+    `select id, name, active, "createdAt", "updatedAt", "triggerCount"
+       from "${schema}".workflow_entity
+      where id = $1
+      limit 1`,
+    [workflow.id],
+  );
+
+  if (!result.rows[0]) {
+    throw new Error(`Workflow ${workflow.id} not found`);
+  }
+
+  return {
+    id: String(result.rows[0].id),
+    name: result.rows[0].name || workflow.name || "workflow",
+    active: Boolean(result.rows[0].active),
+    createdAt: result.rows[0].createdAt,
+    updatedAt: result.rows[0].updatedAt,
+    triggerCount: Number(result.rows[0].triggerCount || 0),
+  };
+}
+
+async function getRecentWorkflowExecutions(limit = 12) {
+  const workflow = await resolveShellWorkflow();
+  const schema = getN8nSchema();
+  const result = await queryN8nDatabase(
+    `select id, status, finished, mode, "startedAt", "stoppedAt", "workflowId"
+       from "${schema}".execution_entity
+      where "workflowId" = $1
+      order by "startedAt" desc
+      limit $2`,
+    [workflow.id, limit],
+  );
+
+  return result.rows.map((row) => {
+    const startedAt = row.startedAt ? new Date(row.startedAt) : null;
+    const stoppedAt = row.stoppedAt ? new Date(row.stoppedAt) : null;
+    const durationMs =
+      startedAt && stoppedAt && !Number.isNaN(startedAt.getTime()) && !Number.isNaN(stoppedAt.getTime())
+        ? Math.max(0, stoppedAt.getTime() - startedAt.getTime())
+        : null;
+
+    return {
+      id: Number(row.id),
+      workflowId: String(row.workflowId),
+      status: row.status || (row.finished ? "success" : "running"),
+      finished: Boolean(row.finished),
+      mode: row.mode || "unknown",
+      startedAt: row.startedAt,
+      stoppedAt: row.stoppedAt,
+      durationMs,
+      staleRunning:
+        !row.finished &&
+        startedAt &&
+        !Number.isNaN(startedAt.getTime()) &&
+        Date.now() - startedAt.getTime() > 1000 * 60 * 10,
+    };
+  });
+}
+
+async function waitForInternalN8nReady(timeoutMs = 30000) {
+  const startedAt = Date.now();
+  const target = `http://${internalHost}:${internalPort}/rest/settings`;
+
+  while (Date.now() - startedAt < timeoutMs) {
+    try {
+      const response = await requestUrl(target);
+      if (response.statusCode === 200) {
+        return;
+      }
+    } catch (error) {
+      // keep polling until timeout
+    }
+
+    await new Promise((resolve) => setTimeout(resolve, 1000));
+  }
+
+  throw new Error("Timed out waiting for n8n to become ready after restart");
+}
+
+async function restartN8nChild() {
+  if (!n8nProcess) {
+    n8nProcess = startN8n(currentN8nEnv || process.env);
+    await waitForInternalN8nReady();
+    return;
+  }
+
+  if (restartingN8n) {
+    throw new Error("n8n restart already in progress");
+  }
+
+  await new Promise((resolve, reject) => {
+    restartingN8n = true;
+    restartResolve = resolve;
+    restartReject = reject;
+
+    try {
+      n8nProcess.kill("SIGTERM");
+    } catch (error) {
+      restartingN8n = false;
+      restartResolve = null;
+      restartReject = null;
+      reject(error);
+    }
+  });
+
+  await waitForInternalN8nReady();
+}
+
+async function setWorkflowAutomation(active) {
+  const workflow = await resolveShellWorkflow();
+  await runN8nCli(["update:workflow", `--id=${workflow.id}`, `--active=${active ? "true" : "false"}`]);
+
+  log("workflow automation updated", {
+    workflowId: workflow.id,
+    active,
+  });
+
+  await restartN8nChild();
+  return getWorkflowAutomationState();
+}
+
 async function triggerWorkflowExecution() {
   if (runnerState.running) {
     const error = new Error("A workflow execution is already running");
@@ -355,11 +505,17 @@ async function triggerWorkflowExecution() {
 }
 
 async function loadShellData() {
-  const [dashboard] = await Promise.all([loadDashboardData()]);
+  const [dashboard, workflow, executions] = await Promise.all([
+    loadDashboardData(),
+    getWorkflowAutomationState().catch(() => null),
+    getRecentWorkflowExecutions().catch(() => []),
+  ]);
   return {
     dashboard,
     health: JSON.parse(getHealthPayload()),
     runner: getRunnerSnapshot(),
+    workflow,
+    executions,
   };
 }
 
@@ -378,6 +534,27 @@ function startN8n(env) {
 
   child.on("exit", (code, signal) => {
     log("n8n process exited", { code, signal });
+    n8nProcess = null;
+
+    if (restartingN8n) {
+      restartingN8n = false;
+
+      try {
+        n8nProcess = startN8n(currentN8nEnv || env);
+        if (restartResolve) {
+          restartResolve();
+        }
+      } catch (error) {
+        if (restartReject) {
+          restartReject(error);
+        }
+      } finally {
+        restartResolve = null;
+        restartReject = null;
+      }
+      return;
+    }
+
     if (!shuttingDown) {
       process.exit(code ?? 1);
     }
@@ -737,6 +914,21 @@ const server = http.createServer((req, res) => {
     return;
   }
 
+  if (pathname === "/api/logs") {
+    if (authEnabled && !readSession(req)) {
+      sendJson(res, 401, { error: "Unauthorized" });
+      return;
+    }
+
+    loadShellData()
+      .then((payload) => sendJson(res, 200, payload))
+      .catch((error) => {
+        log("logs api error", { error: error.message });
+        sendJson(res, 500, { error: error.message });
+      });
+    return;
+  }
+
   if (pathname === "/api/run-now") {
     if (authEnabled && !readSession(req)) {
       sendJson(res, 401, { error: "Unauthorized" });
@@ -757,6 +949,35 @@ const server = http.createServer((req, res) => {
       .then((payload) => sendJson(res, 202, payload))
       .catch((error) => {
         sendJson(res, error.statusCode || 500, { error: error.message, runner: getRunnerSnapshot() });
+      });
+    return;
+  }
+
+  if (pathname === "/api/workflow-automation") {
+    if (authEnabled && !readSession(req)) {
+      sendJson(res, 401, { error: "Unauthorized" });
+      return;
+    }
+
+    if (req.method === "GET") {
+      getWorkflowAutomationState()
+        .then((payload) => sendJson(res, 200, payload))
+        .catch((error) => sendJson(res, 500, { error: error.message }));
+      return;
+    }
+
+    if (req.method !== "POST") {
+      sendJson(res, 405, { error: "Method not allowed" });
+      return;
+    }
+
+    readBody(req)
+      .then((body) => JSON.parse(body || "{}"))
+      .then((payload) => setWorkflowAutomation(Boolean(payload.active)))
+      .then((payload) => sendJson(res, 200, payload))
+      .catch((error) => {
+        log("workflow automation api error", { error: error.message });
+        sendJson(res, 500, { error: error.message });
       });
     return;
   }
