@@ -4,7 +4,14 @@ const { createPool, ensureSchema, getDashboardSummary, getOperationsLog, hasData
 
 function pickLatestPublished(recentRuns) {
   const items = Array.isArray(recentRuns) ? recentRuns : [];
-  return items.find((item) => item.youtube_url || item.youtube_video_id || item.status === "published") || null;
+  return (
+    items.find((item) => {
+      const isPublished = item.status === "published";
+      const hasVideo = item.youtube_url || item.youtube_video_id;
+      const privacyStatus = String(item?.metadata?.privacy_status || "").toLowerCase();
+      return isPublished && hasVideo && privacyStatus !== "private";
+    }) || null
+  );
 }
 
 async function loadDashboardData() {

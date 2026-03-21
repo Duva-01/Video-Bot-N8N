@@ -41,6 +41,7 @@ async function main() {
         category: scriptData.category,
         topic: scriptData.topic,
         search_query: scriptData.search_query,
+        privacy_status: youtubeResult.privacyStatus || null,
       },
     });
 
@@ -53,6 +54,7 @@ async function main() {
       metadata: {
         youtube_video_id: youtubeResult.videoId || null,
         youtube_url: youtubeResult.url || null,
+        privacy_status: youtubeResult.privacyStatus || null,
       },
     });
 
@@ -65,6 +67,7 @@ async function main() {
       metadata: {
         youtube_video_id: youtubeResult.videoId || null,
         title: scriptData.title,
+        privacy_status: youtubeResult.privacyStatus || null,
       },
     });
   } catch (error) {

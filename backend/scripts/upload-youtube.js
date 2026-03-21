@@ -145,6 +145,7 @@ async function main() {
     const result = {
       videoId,
       url: videoId ? `https://www.youtube.com/watch?v=${videoId}` : null,
+      privacyStatus,
     };
     fs.writeFileSync(resultPath, JSON.stringify(result, null, 2));
 
