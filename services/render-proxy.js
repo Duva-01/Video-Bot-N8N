@@ -45,6 +45,20 @@ const proxy = httpProxy.createProxyServer({
 });
 
 let shuttingDown = false;
+let currentN8nEnv = null;
+let runnerState = {
+  running: false,
+  startedAt: null,
+  finishedAt: null,
+  workflowId: null,
+  workflowName: null,
+  exitCode: null,
+  signal: null,
+  stdoutTail: "",
+  stderrTail: "",
+  lastResult: null,
+  lastError: null,
+};
 const publicRoot = path.join(__dirname, "..", "public");
 const staticFiles = {
   "/": path.join("shell", "index.html"),
@@ -99,6 +113,36 @@ function log(message, meta = {}) {
     ...meta,
   };
   console.log(JSON.stringify(payload));
+}
+
+function appendTail(previous, chunk) {
+  const next = `${previous}${chunk}`;
+  return next.length > 20000 ? next.slice(next.length - 20000) : next;
+}
+
+function extractLastJsonBlock(text) {
+  const trimmed = String(text || "").trim();
+  if (!trimmed) {
+    return null;
+  }
+
+  const firstBrace = trimmed.indexOf("{");
+  const lastBrace = trimmed.lastIndexOf("}");
+  if (firstBrace === -1 || lastBrace === -1 || lastBrace <= firstBrace) {
+    return null;
+  }
+
+  try {
+    return JSON.parse(trimmed.slice(firstBrace, lastBrace + 1));
+  } catch (error) {
+    return null;
+  }
+}
+
+function getRunnerSnapshot() {
+  return {
+    ...runnerState,
+  };
 }
 
 async function buildN8nEnv() {
@@ -158,6 +202,157 @@ async function buildN8nEnv() {
   });
 
   return env;
+}
+
+function runN8nCli(args) {
+  return new Promise((resolve, reject) => {
+    const child = spawn("n8n", args, {
+      env: currentN8nEnv || process.env,
+      stdio: ["ignore", "pipe", "pipe"],
+    });
+
+    let stdout = "";
+    let stderr = "";
+
+    child.stdout.on("data", (chunk) => {
+      stdout += chunk.toString();
+    });
+
+    child.stderr.on("data", (chunk) => {
+      stderr += chunk.toString();
+    });
+
+    child.on("error", reject);
+    child.on("close", (code) => {
+      if (code !== 0) {
+        const error = new Error(stderr || stdout || `n8n ${args.join(" ")} failed`);
+        error.code = code;
+        error.stdout = stdout;
+        error.stderr = stderr;
+        reject(error);
+        return;
+      }
+
+      resolve({ stdout, stderr });
+    });
+  });
+}
+
+async function resolveShellWorkflow() {
+  if (process.env.N8N_SHELL_WORKFLOW_ID || process.env.SHELL_WORKFLOW_ID) {
+    return {
+      id: String(process.env.N8N_SHELL_WORKFLOW_ID || process.env.SHELL_WORKFLOW_ID),
+      name: process.env.N8N_SHELL_WORKFLOW_NAME || process.env.SHELL_WORKFLOW_NAME || "workflow",
+    };
+  }
+
+  const targetName = process.env.N8N_SHELL_WORKFLOW_NAME || process.env.SHELL_WORKFLOW_NAME || "";
+  const { stdout } = await runN8nCli(["export:workflow", "--all"]);
+  const workflows = JSON.parse(stdout || "[]");
+  if (!Array.isArray(workflows) || workflows.length === 0) {
+    throw new Error("No workflows found in n8n database");
+  }
+
+  const chosen =
+    workflows.find((item) => targetName && item.name === targetName) ||
+    workflows.find((item) => item.active) ||
+    workflows.find((item) => Array.isArray(item.nodes) && item.nodes.some((node) => node.name === "YouTube Upload")) ||
+    workflows[0];
+
+  if (!chosen?.id) {
+    throw new Error("Unable to resolve workflow id");
+  }
+
+  return {
+    id: String(chosen.id),
+    name: chosen.name || "workflow",
+  };
+}
+
+async function triggerWorkflowExecution() {
+  if (runnerState.running) {
+    const error = new Error("A workflow execution is already running");
+    error.statusCode = 409;
+    throw error;
+  }
+
+  const workflow = await resolveShellWorkflow();
+  runnerState = {
+    running: true,
+    startedAt: new Date().toISOString(),
+    finishedAt: null,
+    workflowId: workflow.id,
+    workflowName: workflow.name,
+    exitCode: null,
+    signal: null,
+    stdoutTail: "",
+    stderrTail: "",
+    lastResult: null,
+    lastError: null,
+  };
+
+  log("shell run requested", {
+    workflowId: workflow.id,
+    workflowName: workflow.name,
+  });
+
+  const child = spawn("n8n", ["execute", "--id", workflow.id], {
+    env: currentN8nEnv || process.env,
+    stdio: ["ignore", "pipe", "pipe"],
+  });
+
+  child.stdout.on("data", (chunk) => {
+    runnerState.stdoutTail = appendTail(runnerState.stdoutTail, chunk.toString());
+  });
+
+  child.stderr.on("data", (chunk) => {
+    runnerState.stderrTail = appendTail(runnerState.stderrTail, chunk.toString());
+  });
+
+  child.on("error", (error) => {
+    runnerState.running = false;
+    runnerState.finishedAt = new Date().toISOString();
+    runnerState.lastError = error.message;
+    log("shell run failed to start", {
+      workflowId: workflow.id,
+      error: error.message,
+    });
+  });
+
+  child.on("close", (code, signal) => {
+    runnerState.running = false;
+    runnerState.finishedAt = new Date().toISOString();
+    runnerState.exitCode = code;
+    runnerState.signal = signal || null;
+    runnerState.lastResult = extractLastJsonBlock(runnerState.stdoutTail);
+
+    if (code !== 0) {
+      runnerState.lastError = runnerState.stderrTail || `Execution exited with code ${code}`;
+      log("shell run completed with error", {
+        workflowId: workflow.id,
+        exitCode: code,
+      });
+      return;
+    }
+
+    runnerState.lastError = null;
+    log("shell run completed", {
+      workflowId: workflow.id,
+      workflowName: workflow.name,
+      exitCode: code,
+    });
+  });
+
+  return getRunnerSnapshot();
+}
+
+async function loadShellData() {
+  const [dashboard] = await Promise.all([loadDashboardData()]);
+  return {
+    dashboard,
+    health: JSON.parse(getHealthPayload()),
+    runner: getRunnerSnapshot(),
+  };
 }
 
 function startN8n(env) {
@@ -513,6 +708,45 @@ const server = http.createServer((req, res) => {
     return;
   }
 
+  if (pathname === "/api/control-center") {
+    if (authEnabled && !readSession(req)) {
+      sendJson(res, 401, { error: "Unauthorized" });
+      return;
+    }
+
+    loadShellData()
+      .then((payload) => sendJson(res, 200, payload))
+      .catch((error) => {
+        log("control center api error", { error: error.message });
+        sendJson(res, 500, { error: error.message });
+      });
+    return;
+  }
+
+  if (pathname === "/api/run-now") {
+    if (authEnabled && !readSession(req)) {
+      sendJson(res, 401, { error: "Unauthorized" });
+      return;
+    }
+
+    if (req.method === "GET") {
+      sendJson(res, 200, getRunnerSnapshot());
+      return;
+    }
+
+    if (req.method !== "POST") {
+      sendJson(res, 405, { error: "Method not allowed" });
+      return;
+    }
+
+    triggerWorkflowExecution()
+      .then((payload) => sendJson(res, 202, payload))
+      .catch((error) => {
+        sendJson(res, error.statusCode || 500, { error: error.message, runner: getRunnerSnapshot() });
+      });
+    return;
+  }
+
   if (pathname === "/login" && authEnabled && readSession(req)) {
     res.writeHead(302, {
       Location: "/",
@@ -573,6 +807,7 @@ server.on("upgrade", (req, socket, head) => {
 
 async function main() {
   const n8nEnv = await buildN8nEnv();
+  currentN8nEnv = n8nEnv;
   n8nProcess = startN8n(n8nEnv);
 
   server.listen(publicPort, publicHost, () => {

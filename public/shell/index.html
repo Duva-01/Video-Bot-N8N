@@ -27,10 +27,26 @@
           </div>
         </div>
 
+        <div class="header-metrics">
+          <article class="header-chip">
+            <span class="metric-label">Publicados</span>
+            <strong id="headerPublishedCount">0</strong>
+          </article>
+          <article class="header-chip header-chip--wide">
+            <span class="metric-label">Ultimo short</span>
+            <strong id="headerLatestTitle">Sin datos</strong>
+          </article>
+          <article class="header-chip">
+            <span class="metric-label">Ultima publicacion</span>
+            <strong id="headerLastPublished">-</strong>
+          </article>
+        </div>
+
         <nav class="topbar-actions" aria-label="Navegacion principal">
           <button class="nav-button nav-button--active" type="button" data-view="dashboard">Dashboard</button>
           <button class="nav-button" type="button" data-view="health">Health</button>
           <button class="nav-button" type="button" data-view="n8n">n8n</button>
+          <button class="nav-button nav-button--primary" type="button" id="runNowButton">Run now</button>
           <a class="nav-button nav-button--danger" href="/auth/logout">Salir</a>
         </nav>
       </header>
@@ -57,6 +73,24 @@
             <article class="metric-card">
               <span class="metric-label">Modo video</span>
               <strong id="healthMode">-</strong>
+            </article>
+          </div>
+
+          <div class="sidebar-block">
+            <span class="eyebrow">Ultimo short</span>
+            <article class="latest-card" id="latestCard">
+              <div class="latest-card__empty">Todavia no hay Shorts publicados.</div>
+            </article>
+          </div>
+
+          <div class="sidebar-block">
+            <span class="eyebrow">Ejecucion</span>
+            <article class="runner-card">
+              <div class="runner-card__top">
+                <strong id="runnerStatus">Idle</strong>
+                <span class="runner-dot" id="runnerDot"></span>
+              </div>
+              <p class="sidebar-copy" id="runnerCopy">Sin ejecuciones recientes desde la shell.</p>
             </article>
           </div>
 

@@ -140,6 +140,35 @@ body {
   gap: 10px;
 }
 
+.header-metrics {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex: 1;
+  justify-content: center;
+}
+
+.header-chip {
+  min-width: 120px;
+  min-height: 72px;
+  display: grid;
+  align-content: space-between;
+  gap: 6px;
+  padding: 12px 14px;
+  border-radius: 20px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.header-chip--wide {
+  min-width: 240px;
+}
+
+.header-chip strong {
+  font-size: 15px;
+  line-height: 1.25;
+}
+
 .nav-button,
 .footer-link,
 .sidebar-link,
@@ -255,6 +284,74 @@ body {
   flex: 1 1 100%;
 }
 
+.latest-card,
+.runner-card {
+  display: grid;
+  gap: 12px;
+  padding: 16px;
+  border-radius: 22px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.latest-card__empty {
+  color: var(--muted);
+}
+
+.latest-card iframe {
+  width: 100%;
+  aspect-ratio: 9 / 16;
+  border: 0;
+  border-radius: 18px;
+  background: #000;
+}
+
+.latest-card h3 {
+  margin: 0;
+  font-size: 18px;
+  line-height: 1.25;
+}
+
+.latest-card p {
+  margin: 0;
+}
+
+.latest-card__meta {
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.runner-card__top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.runner-dot {
+  width: 12px;
+  height: 12px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.2);
+  box-shadow: 0 0 0 4px rgba(255, 255, 255, 0.04);
+}
+
+.runner-dot.is-running {
+  background: var(--lime);
+  box-shadow: 0 0 0 6px rgba(217, 255, 99, 0.12);
+}
+
+.runner-dot.is-error {
+  background: var(--coral);
+  box-shadow: 0 0 0 6px rgba(255, 127, 107, 0.12);
+}
+
+.runner-dot.is-success {
+  background: var(--cyan);
+  box-shadow: 0 0 0 6px rgba(114, 247, 255, 0.12);
+}
+
 .content {
   display: grid;
   grid-template-rows: 1fr;
@@ -334,6 +431,18 @@ body {
 @media (max-width: 1120px) {
   .workspace {
     grid-template-columns: 1fr;
+  }
+
+  .header-metrics {
+    order: 3;
+    justify-content: stretch;
+    flex-wrap: wrap;
+  }
+
+  .header-chip,
+  .header-chip--wide {
+    flex: 1 1 180px;
+    min-width: 0;
   }
 
   .sidebar-link,

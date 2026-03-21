@@ -2,6 +2,14 @@ require("dotenv").config();
 
 const { createPool, ensureSchema, getDashboardSummary, hasDatabase } = require("../scripts/lib/content-db");
 
+function pickLatestPublished(recentRuns) {
+  const items = Array.isArray(recentRuns) ? recentRuns : [];
+  return (
+    items.find((item) => item.youtube_url || item.youtube_video_id || item.status === "published") ||
+    null
+  );
+}
+
 async function loadDashboardData() {
   const basePayload = {
     service: "bot-de-videos",
@@ -33,6 +41,7 @@ async function loadDashboardData() {
       byCategory: [],
       recentRuns: [],
       timeline: [],
+      latestPublished: null,
     };
   }
 
@@ -44,6 +53,7 @@ async function loadDashboardData() {
     return {
       ...basePayload,
       ...summary,
+      latestPublished: pickLatestPublished(summary.recentRuns),
     };
   } finally {
     await pool.end();
