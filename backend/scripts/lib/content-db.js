@@ -401,12 +401,24 @@ async function getDashboardSummary(pool) {
     pool.query(
       `
         SELECT
-          COUNT(*)::int AS total_videos,
+          COUNT(*) FILTER (WHERE youtube_url IS NOT NULL OR youtube_video_id IS NOT NULL)::int AS total_videos,
           COUNT(*) FILTER (WHERE status = 'published')::int AS published_videos,
-          COUNT(*) FILTER (WHERE status = 'generated')::int AS generated_videos,
-          COUNT(*) FILTER (WHERE status = 'selected')::int AS selected_videos,
+          COUNT(*) FILTER (
+            WHERE status = 'generated'
+              AND youtube_url IS NULL
+              AND youtube_video_id IS NULL
+          )::int AS generated_videos,
+          COUNT(*) FILTER (
+            WHERE status = 'selected'
+              AND youtube_url IS NULL
+              AND youtube_video_id IS NULL
+          )::int AS selected_videos,
           COUNT(*) FILTER (WHERE status = 'failed')::int AS failed_videos,
-          COUNT(DISTINCT category)::int AS categories_covered,
+          COUNT(DISTINCT category) FILTER (
+            WHERE status IN ('generated', 'published')
+              OR youtube_url IS NOT NULL
+              OR youtube_video_id IS NOT NULL
+          )::int AS categories_covered,
           MAX(published_at) AS last_published_at
         FROM content_runs
       `,

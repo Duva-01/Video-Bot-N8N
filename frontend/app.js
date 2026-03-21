@@ -175,28 +175,38 @@
     }
   }
 
-  function renderLatest(item) {
-    const card = qs("latestCard");
-    const embed = qs("latestEmbed");
+  function renderLatest(item, options = {}) {
+    const card = qs(options.cardId || "latestCard");
+    const embed = options.embedId ? qs(options.embedId) : null;
+    const emptyCardText = options.emptyCardText || "No short available yet.";
+    const emptyEmbedText = options.emptyEmbedText || "No video yet.";
+
     if (!item) {
-      card.innerHTML = '<div class="empty-state">No published short yet.</div>';
-      embed.innerHTML = '<div class="empty-state">No video yet.</div>';
+      card.innerHTML = `<div class="empty-state">${escapeHtml(emptyCardText)}</div>`;
+      if (embed) {
+        embed.innerHTML = `<div class="empty-state">${escapeHtml(emptyEmbedText)}</div>`;
+      }
       return;
     }
 
     const embedUrl = extractYouTubeEmbed(item);
-    const meta = `${escapeHtml(item.category || "general")} � ${escapeHtml(item.source || "catalog")} � ${escapeHtml(formatDate(item.published_at || item.selected_at))}`;
+    const privacyStatus = String(item?.metadata?.privacy_status || item?.status || "unknown").trim() || "unknown";
+    const isPrivate = privacyStatus.toLowerCase() === "private";
+    const meta = `${escapeHtml(item.category || "general")} | ${escapeHtml(item.source || "catalog")} | ${escapeHtml(formatDate(item.published_at || item.selected_at || item.updated_at))}`;
     card.innerHTML = `
       <div class="latest-card__body">
         <h3>${escapeHtml(item.title || item.topic || "Latest short")}</h3>
         <p>${meta}</p>
+        <p style="margin-top:12px"><span class="${getStatusClass(isPrivate ? "error" : "success")}">${escapeHtml(privacyStatus)}</span></p>
         ${item.youtube_url ? `<p style="margin-top:12px"><a class="nav-button nav-button--primary" href="${item.youtube_url}" target="_blank" rel="noreferrer">Open on YouTube</a></p>` : ""}
       </div>
     `;
 
-    embed.innerHTML = embedUrl
-      ? `<iframe src="${embedUrl}" title="Latest short" loading="lazy" allowfullscreen></iframe>`
-      : '<div class="empty-state">Published item without embed URL.</div>';
+    if (embed) {
+      embed.innerHTML = embedUrl
+        ? `<iframe src="${embedUrl}" title="Latest short" loading="lazy" allowfullscreen></iframe>`
+        : '<div class="empty-state">Published item without embed URL.</div>';
+    }
   }
 
   function renderBarList(nodeId, items, labelKey, valueKey) {
@@ -421,7 +431,7 @@
     const health = data.health || {};
     const operations = dashboard.operations || {};
 
-    qs("headerPublishedCount").textContent = String(totals.published_videos || 0);
+    qs("headerPublishedCount").textContent = String(totals.total_videos || 0);
     qs("headerLatestTitle").textContent = latestGenerated?.title || latestGenerated?.topic || "No data";
     qs("headerLastPublished").textContent = formatDate(totals.last_published_at);
     qs("totalVideos").textContent = String(totals.total_videos || 0);
