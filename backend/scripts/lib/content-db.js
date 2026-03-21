@@ -52,6 +52,21 @@ function fileSize(filePath) {
   return fs.statSync(filePath).size;
 }
 
+function buildTopicFallback(payload = {}) {
+  const topicKey = payload.topic_key || payload.key || null;
+  if (!topicKey) {
+    return null;
+  }
+
+  return {
+    key: topicKey,
+    category: payload.category || "unknown",
+    topic: payload.topic || payload.title || topicKey,
+    angle: payload.angle || payload.stage || payload.message || "pipeline event",
+    source: payload.source || payload.topic_source || "recovered",
+  };
+}
+
 async function upsertSelection(pool, item, metadata = {}) {
   await pool.query(
     `
@@ -81,25 +96,61 @@ async function upsertSelection(pool, item, metadata = {}) {
   );
 }
 
+async function ensureContentRun(pool, payload, metadata = {}) {
+  const fallback = buildTopicFallback(payload);
+  if (!fallback) {
+    return;
+  }
+
+  await upsertSelection(pool, fallback, {
+    recovered: true,
+    ...metadata,
+  });
+}
+
 async function markGenerated(pool, payload) {
+  await ensureContentRun(pool, payload, {
+    title: payload.title || null,
+    description: payload.description || null,
+    search_query: payload.search_query || null,
+  });
+
   await pool.query(
     `
-      UPDATE content_runs
-      SET
-        title = $2,
-        description = $3,
+      INSERT INTO content_runs (
+        topic_key,
+        category,
+        topic,
+        angle,
+        title,
+        description,
+        status,
+        current_stage,
+        source,
+        metadata
+      )
+      VALUES ($1, $2, $3, $4, $5, $6, 'generated', 'script_generated', $7, $8::jsonb)
+      ON CONFLICT (topic_key)
+      DO UPDATE SET
+        category = COALESCE(EXCLUDED.category, content_runs.category),
+        topic = COALESCE(EXCLUDED.topic, content_runs.topic),
+        angle = COALESCE(EXCLUDED.angle, content_runs.angle),
+        title = COALESCE(EXCLUDED.title, content_runs.title),
+        description = COALESCE(EXCLUDED.description, content_runs.description),
         status = 'generated',
         current_stage = 'script_generated',
-        source = COALESCE($4, source),
+        source = COALESCE(EXCLUDED.source, content_runs.source),
         updated_at = NOW(),
-        metadata = content_runs.metadata || $5::jsonb
-      WHERE topic_key = $1
+        metadata = content_runs.metadata || EXCLUDED.metadata
     `,
     [
       payload.topic_key,
+      payload.category || "unknown",
+      payload.topic || payload.title || payload.topic_key,
+      payload.angle || "generated script",
       payload.title || null,
       payload.description || null,
-      payload.topic_source || null,
+      payload.topic_source || payload.source || "generated",
       json({
         search_query: payload.search_query,
         tags: payload.tags || [],
@@ -110,6 +161,11 @@ async function markGenerated(pool, payload) {
 }
 
 async function markPublished(pool, payload) {
+  await ensureContentRun(pool, payload, {
+    youtube_video_id: payload.youtube_video_id || null,
+    youtube_url: payload.youtube_url || null,
+  });
+
   await pool.query(
     `
       UPDATE content_runs
@@ -141,6 +197,11 @@ async function markPublished(pool, payload) {
 }
 
 async function markFailed(pool, payload) {
+  await ensureContentRun(pool, payload, {
+    error: payload.error || null,
+    stage: payload.stage || null,
+  });
+
   await pool.query(
     `
       UPDATE content_runs
@@ -166,6 +227,11 @@ async function markFailed(pool, payload) {
 }
 
 async function recordEvent(pool, payload) {
+  await ensureContentRun(pool, payload, {
+    event_type: payload.event_type || "info",
+    stage: payload.stage || "unknown",
+  });
+
   await pool.query(
     `
       INSERT INTO content_events (topic_key, event_type, stage, level, source, message, metadata)
@@ -184,6 +250,12 @@ async function recordEvent(pool, payload) {
 }
 
 async function recordArtifact(pool, payload) {
+  await ensureContentRun(pool, payload, {
+    artifact_type: payload.artifact_type || "artifact",
+    file_path: payload.file_path || null,
+    external_url: payload.external_url || null,
+  });
+
   const sizeBytes = payload.size_bytes ?? fileSize(payload.file_path);
   const checksum = payload.checksum ?? checksumFromFile(payload.file_path);
 
@@ -217,6 +289,11 @@ async function recordArtifact(pool, payload) {
 }
 
 async function recordExecutionLog(pool, payload) {
+  await ensureContentRun(pool, payload, {
+    workflow_id: payload.workflow_id || null,
+    execution_id: payload.execution_id || null,
+  });
+
   await pool.query(
     `
       INSERT INTO execution_logs (topic_key, workflow_id, execution_id, source, level, message, context)
@@ -488,6 +565,7 @@ async function getOperationsLog(pool, limit = 40) {
 
 module.exports = {
   createPool,
+  ensureContentRun,
   ensureSchema,
   getDashboardSummary,
   getOperationsLog,

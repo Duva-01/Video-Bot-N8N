@@ -40,7 +40,11 @@ async function logStepEvent(pool, payload) {
     return;
   }
 
-  await recordEvent(pool, payload);
+  try {
+    await recordEvent(pool, payload);
+  } catch (error) {
+    console.warn(`[script-observer][warn] event logging skipped: ${error.message}`);
+  }
 }
 
 async function logArtifact(pool, payload) {
@@ -48,7 +52,11 @@ async function logArtifact(pool, payload) {
     return;
   }
 
-  await recordArtifact(pool, payload);
+  try {
+    await recordArtifact(pool, payload);
+  } catch (error) {
+    console.warn(`[script-observer][warn] artifact logging skipped: ${error.message}`);
+  }
 }
 
 async function logFailure(pool, payload) {
@@ -56,16 +64,20 @@ async function logFailure(pool, payload) {
     return;
   }
 
-  await markFailed(pool, payload);
-  await recordEvent(pool, {
-    topic_key: payload.topic_key,
-    event_type: "step_failed",
-    stage: payload.stage || "unknown",
-    level: "error",
-    source: payload.source || "script",
-    message: payload.error || "Step failed",
-    metadata: payload.metadata || {},
-  });
+  try {
+    await markFailed(pool, payload);
+    await recordEvent(pool, {
+      topic_key: payload.topic_key,
+      event_type: "step_failed",
+      stage: payload.stage || "unknown",
+      level: "error",
+      source: payload.source || "script",
+      message: payload.error || "Step failed",
+      metadata: payload.metadata || {},
+    });
+  } catch (error) {
+    console.warn(`[script-observer][warn] failure logging skipped: ${error.message}`);
+  }
 }
 
 function topicKeyFromWorkspacePath(filePath) {
