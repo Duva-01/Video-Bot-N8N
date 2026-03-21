@@ -30,6 +30,59 @@ function sanitizeTags(tagsValue) {
     .slice(0, 15);
 }
 
+function toHashtag(value) {
+  const normalized = String(value || "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-zA-Z0-9]+/g, " ")
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 3)
+    .join("");
+
+  if (!normalized) {
+    return null;
+  }
+
+  return `#${normalized.slice(0, 30)}`;
+}
+
+function buildHashtagBlock(scriptData, tags) {
+  const configured = sanitizeTags(process.env.YOUTUBE_DEFAULT_HASHTAGS || "");
+  const candidates = [
+    "shorts",
+    ...(Array.isArray(tags) ? tags : []),
+    ...configured,
+    scriptData.topic || "",
+    scriptData.category || "",
+  ];
+
+  const seen = new Set();
+  const hashtags = [];
+
+  for (const candidate of candidates) {
+    const hashtag = toHashtag(candidate);
+    if (!hashtag) {
+      continue;
+    }
+
+    const key = hashtag.toLowerCase();
+    if (seen.has(key)) {
+      continue;
+    }
+
+    seen.add(key);
+    hashtags.push(hashtag);
+
+    if (hashtags.length >= 5) {
+      break;
+    }
+  }
+
+  return hashtags.join(" ");
+}
+
 async function main() {
   const videoPath = process.argv[2];
   const scriptPath = process.argv[3] || "/tmp/bot-videos/script.json";
@@ -55,8 +108,9 @@ async function main() {
   const privacyStatus = process.env.YOUTUBE_PRIVACY_STATUS || "private";
   const categoryId = process.env.YOUTUBE_CATEGORY_ID || "28";
   const title = defaultTitle.slice(0, 100);
-  const description = defaultDescription.slice(0, 5000);
   const tags = sanitizeTags(defaultTags);
+  const hashtagBlock = buildHashtagBlock(scriptData, tags);
+  const description = [defaultDescription.trim(), hashtagBlock].filter(Boolean).join("\n\n").slice(0, 5000);
 
   await withOptionalPool(async (pool) => {
     await logStepEvent(pool, {
