@@ -74,6 +74,14 @@ const staticFiles = {
   "/ui/chrome.css": path.join("ui", "chrome.css"),
   "/ui/chrome.js": path.join("ui", "chrome.js"),
 };
+const n8nRootPassThroughPrefixes = [
+  "/rest",
+  "/types",
+  "/assets",
+  "/icons",
+  "/static",
+  "/binary-data",
+];
 
 function getN8nDatabaseUrl() {
   return process.env.N8N_DATABASE_URL || process.env.NEON_DATABASE_URL || process.env.DATABASE_URL || "";
@@ -433,6 +441,12 @@ function sendStaticFile(res, fileName) {
   res.end(fs.readFileSync(fullPath));
 }
 
+function isN8nRootPassThrough(pathname) {
+  return n8nRootPassThroughPrefixes.some(
+    (prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`) || pathname.startsWith(`${prefix}?`),
+  );
+}
+
 function parseCookies(cookieHeader) {
   return String(cookieHeader || "")
     .split(";")
@@ -778,6 +792,11 @@ const server = http.createServer((req, res) => {
     return;
   }
 
+  if (isN8nRootPassThrough(pathname)) {
+    proxy.web(req, res);
+    return;
+  }
+
   if (pathname.startsWith(n8nPath)) {
     proxy.web(req, res);
     return;
@@ -798,6 +817,11 @@ server.on("upgrade", (req, socket, head) => {
   }
 
   if (!req.url.startsWith(n8nPath)) {
+    const parsedUrl = new URL(req.url, `http://${req.headers.host || `${publicHost}:${publicPort}`}`);
+    if (isN8nRootPassThrough(parsedUrl.pathname)) {
+      proxy.ws(req, socket, head);
+      return;
+    }
     socket.destroy();
     return;
   }

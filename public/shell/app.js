@@ -22,6 +22,8 @@
   const runnerStatusNode = document.getElementById("runnerStatus");
   const runnerCopyNode = document.getElementById("runnerCopy");
   const runnerDotNode = document.getElementById("runnerDot");
+  const runnerMetaNode = document.getElementById("runnerMeta");
+  const runnerLogsNode = document.getElementById("runnerLogs");
   let refreshTimer = null;
 
   function formatDate(value) {
@@ -95,6 +97,24 @@
       runnerCopyNode.textContent = "Sin ejecuciones recientes desde la shell.";
     }
 
+    runnerMetaNode.textContent = [
+      `Workflow: ${state.workflowName || "-"}`,
+      `Inicio: ${formatDate(state.startedAt)}`,
+      `Fin: ${formatDate(state.finishedAt)}`,
+      `Exit: ${state.exitCode ?? "-"}`,
+    ].join(" | ");
+
+    const stderrTail = String(state.stderrTail || "").trim();
+    const stdoutTail = String(state.stdoutTail || "").trim();
+    const lastError = String(state.lastError || "").trim();
+    const logText =
+      (isError && (lastError || stderrTail || stdoutTail)) ||
+      (isRunning && (stderrTail || stdoutTail)) ||
+      stdoutTail ||
+      stderrTail ||
+      "Sin logs recientes.";
+
+    runnerLogsNode.textContent = logText;
     runNowButton.disabled = Boolean(isRunning);
     runNowButton.textContent = isRunning ? "Running..." : "Run now";
   }

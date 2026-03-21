@@ -294,6 +294,29 @@ body {
   background: rgba(255, 255, 255, 0.04);
 }
 
+.runner-meta {
+  color: var(--muted);
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 11px;
+  line-height: 1.5;
+}
+
+.runner-logs {
+  max-height: 240px;
+  margin: 0;
+  overflow: auto;
+  padding: 12px;
+  border-radius: 16px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(0, 0, 0, 0.24);
+  color: #dbe6f4;
+  font-size: 12px;
+  line-height: 1.55;
+  font-family: "IBM Plex Mono", ui-monospace, monospace;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
 .latest-card__empty {
   color: var(--muted);
 }
