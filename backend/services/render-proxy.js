@@ -78,6 +78,8 @@ const n8nRootPassThroughPrefixes = [
   "/static",
   "/binary-data",
 ];
+const n8nRootAssetPattern =
+  /^\/(?:posthog-hooks|manifest|sw|workbox-[^/]+|registerSW|favicon|robots)(?:[-.][^/]+)?\.(?:js|css|json|map|ico|txt)$|^\/[^/]+\.(?:js|css|map|woff2?|ttf|eot|svg|png|jpe?g|gif|webp|json)$/i;
 
 function getN8nDatabaseUrl() {
   return process.env.N8N_DATABASE_URL || process.env.NEON_DATABASE_URL || process.env.DATABASE_URL || "";
@@ -713,6 +715,10 @@ function isN8nRootPassThrough(pathname) {
   );
 }
 
+function isN8nRootAsset(pathname) {
+  return n8nRootAssetPattern.test(pathname);
+}
+
 function parseCookies(cookieHeader) {
   return String(cookieHeader || "")
     .split(";")
@@ -1172,6 +1178,11 @@ const server = http.createServer((req, res) => {
     return;
   }
 
+  if (isN8nRootAsset(pathname)) {
+    proxy.web(req, res);
+    return;
+  }
+
   if (pathname.startsWith(n8nPath)) {
     proxy.web(req, res);
     return;
@@ -1193,7 +1204,7 @@ server.on("upgrade", (req, socket, head) => {
 
   if (!req.url.startsWith(n8nPath)) {
     const parsedUrl = new URL(req.url, `http://${req.headers.host || `${publicHost}:${publicPort}`}`);
-    if (isN8nRootPassThrough(parsedUrl.pathname)) {
+    if (isN8nRootPassThrough(parsedUrl.pathname) || isN8nRootAsset(parsedUrl.pathname)) {
       proxy.ws(req, socket, head);
       return;
     }
