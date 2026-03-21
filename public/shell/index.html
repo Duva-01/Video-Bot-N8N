@@ -1,0 +1,91 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Facts Engine OS</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&family=IBM+Plex+Mono:wght@400;500&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="/shell/styles.css" />
+  </head>
+  <body>
+    <div class="shell-bg shell-bg-a"></div>
+    <div class="shell-bg shell-bg-b"></div>
+
+    <div class="app-shell">
+      <header class="topbar">
+        <div class="brand">
+          <div class="brand-mark" aria-hidden="true"></div>
+          <div class="brand-copy">
+            <span class="eyebrow">Official Control Surface</span>
+            <strong>Facts Engine OS</strong>
+          </div>
+        </div>
+
+        <nav class="topbar-actions">
+          <button class="nav-button nav-button--primary" type="button" data-shell-panel="dashboard">Dashboard</button>
+          <button class="nav-button" type="button" data-shell-panel="health">Health</button>
+          <a class="nav-button" href="/app/" target="n8n-frame">Abrir n8n</a>
+          <a class="nav-button nav-button--danger" href="/auth/logout">Salir</a>
+        </nav>
+      </header>
+
+      <main class="workspace">
+        <section class="frame-shell">
+          <div class="frame-shell__head">
+            <div>
+              <span class="eyebrow">Embedded Workspace</span>
+              <h1>n8n Editor</h1>
+            </div>
+            <div class="frame-shell__meta">
+              <span class="status-pill">Private</span>
+              <span class="status-pill status-pill--soft">YouTube Shorts</span>
+            </div>
+          </div>
+
+          <div class="frame-shell__body">
+            <iframe
+              id="n8nFrame"
+              class="n8n-frame"
+              src="/app/"
+              title="n8n editor"
+              name="n8n-frame"
+              loading="eager"
+            ></iframe>
+          </div>
+        </section>
+      </main>
+
+      <footer class="footer">
+        <div class="footer-copy">
+          <span class="eyebrow">Routing</span>
+          <strong>Toda la capa privada entra por esta shell y `n8n` vive embebido en `/app/`.</strong>
+        </div>
+        <div class="footer-links">
+          <button type="button" class="footer-link" data-shell-panel="dashboard">Ver dashboard</button>
+          <button type="button" class="footer-link" data-shell-panel="health">Ver health</button>
+        </div>
+      </footer>
+    </div>
+
+    <div class="overlay" id="overlay">
+      <div class="overlay-backdrop" data-close-overlay="true"></div>
+      <aside class="overlay-panel">
+        <div class="overlay-panel__head">
+          <div>
+            <span class="eyebrow">Inline Panel</span>
+            <strong id="overlayTitle">Dashboard</strong>
+          </div>
+          <button class="overlay-close" type="button" aria-label="Cerrar" data-close-overlay="true">×</button>
+        </div>
+        <div class="overlay-panel__body" id="overlayBody"></div>
+      </aside>
+    </div>
+
+    <script src="/shell/app.js"></script>
+  </body>
+</html>

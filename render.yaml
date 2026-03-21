@@ -28,6 +28,8 @@ services:
         value: 127.0.0.1
       - key: N8N_INTERNAL_PORT
         value: "5678"
+      - key: N8N_PATH
+        value: /app/
       - key: N8N_EDITOR_BASE_URL
         sync: false
       - key: N8N_PROXY_HOPS

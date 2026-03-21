@@ -49,6 +49,17 @@ Variables relacionadas:
 - `FACT_TOPIC_MODE=dynamic-first`
 - `FACT_DYNAMIC_TOPIC_ATTEMPTS=4`
 
+## Shell oficial
+
+La raiz `/` ya no expone `n8n` directamente.
+
+Ahora funciona asi:
+
+- cualquier acceso privado entra por el login
+- al autenticar, entras a una shell propia en `/`
+- esa shell tiene `header`, `footer` y un `iframe` con `n8n` embebido en `/app/`
+- `Dashboard` y `Health` se abren inline sin sacarte de la pagina
+
 ## Dashboard
 
 La app publica un panel visual en:
@@ -76,6 +87,8 @@ Ahora el proxy publica:
 - `/login` para entrar con formulario
 - cookie de sesion persistente
 - `/auth/logout` para cerrar sesion
+- `/` como shell oficial
+- `/app/` como editor embebido de `n8n`
 
 Dentro de `n8n`:
 
@@ -114,6 +127,7 @@ Opcionalmente puedes separar las credenciales del proxy con:
 - `PEXELS_API_KEY`
 - `NEON_DATABASE_URL`
 - `N8N_ENCRYPTION_KEY`
+- `N8N_PATH`
 - `YOUTUBE_CLIENT_ID`
 - `YOUTUBE_CLIENT_SECRET`
 - `YOUTUBE_REFRESH_TOKEN`
@@ -129,7 +143,8 @@ Opcionalmente puedes separar las credenciales del proxy con:
 3. importa variables desde `.env`
 4. define:
    - `WEBHOOK_URL=https://tu-app.onrender.com`
-   - `N8N_EDITOR_BASE_URL=https://tu-app.onrender.com`
+   - `N8N_EDITOR_BASE_URL=https://tu-app.onrender.com/app/`
+   - `N8N_PATH=/app/`
 5. importa el workflow JSON en `n8n`
 
 Para `Render Free`, mantien:
@@ -195,6 +210,30 @@ Sirve para ver:
 - donde cae el proceso
 - uso de memoria del contenedor
 - si el MP4 final se llego a construir
+
+## Mantener Render despierto
+
+Un keep-alive interno con `setInterval` no sirve si Render ya ha suspendido el proceso.
+
+Para mantener el servicio funcional en `Free`, hace falta trafico externo.
+
+El repo incluye:
+
+- `.github/workflows/keep-render-awake.yml`
+
+Esa GitHub Action hace ping a:
+
+```text
+https://video-bot-n8n.onrender.com/health
+```
+
+cada `5` minutos.
+
+Alternativas igual de validas:
+
+- `UptimeRobot`
+- `GitHub Actions`
+- `Cron job` externo en otra plataforma
 
 ## Pexels
 

@@ -26,6 +26,11 @@ const authSecret =
   process.env.N8N_ENCRYPTION_KEY ||
   process.env.N8N_BASIC_AUTH_PASSWORD ||
   "change-me-in-render";
+const n8nPath = (() => {
+  const raw = process.env.N8N_PATH || "/app/";
+  const withLeadingSlash = raw.startsWith("/") ? raw : `/${raw}`;
+  return withLeadingSlash.endsWith("/") ? withLeadingSlash : `${withLeadingSlash}/`;
+})();
 const cookieSecure =
   process.env.APP_AUTH_COOKIE_SECURE === "true"
     ? true
@@ -40,17 +45,20 @@ const proxy = httpProxy.createProxyServer({
 });
 
 let shuttingDown = false;
-const dashboardRoot = path.join(__dirname, "..", "public", "dashboard");
+const publicRoot = path.join(__dirname, "..", "public");
 const staticFiles = {
-  "/dashboard": "index.html",
-  "/dashboard/": "index.html",
-  "/dashboard/styles.css": "styles.css",
-  "/dashboard/app.js": "app.js",
-  "/login": path.join("..", "auth", "login.html"),
-  "/auth/login.css": path.join("..", "auth", "login.css"),
-  "/auth/login.js": path.join("..", "auth", "login.js"),
-  "/ui/chrome.css": path.join("..", "ui", "chrome.css"),
-  "/ui/chrome.js": path.join("..", "ui", "chrome.js"),
+  "/": path.join("shell", "index.html"),
+  "/shell/styles.css": path.join("shell", "styles.css"),
+  "/shell/app.js": path.join("shell", "app.js"),
+  "/dashboard": path.join("dashboard", "index.html"),
+  "/dashboard/": path.join("dashboard", "index.html"),
+  "/dashboard/styles.css": path.join("dashboard", "styles.css"),
+  "/dashboard/app.js": path.join("dashboard", "app.js"),
+  "/login": path.join("auth", "login.html"),
+  "/auth/login.css": path.join("auth", "login.css"),
+  "/auth/login.js": path.join("auth", "login.js"),
+  "/ui/chrome.css": path.join("ui", "chrome.css"),
+  "/ui/chrome.js": path.join("ui", "chrome.js"),
 };
 
 function getN8nDatabaseUrl() {
@@ -99,6 +107,7 @@ async function buildN8nEnv() {
     N8N_HOST: internalHost,
     N8N_PORT: String(internalPort),
     PORT: String(internalPort),
+    N8N_PATH: n8nPath,
     N8N_BASIC_AUTH_ACTIVE: "false",
     N8N_ENCRYPTION_KEY:
       process.env.N8N_ENCRYPTION_KEY ||
@@ -106,6 +115,14 @@ async function buildN8nEnv() {
       process.env.N8N_BASIC_AUTH_PASSWORD ||
       authSecret,
   };
+
+  if (
+    webhookUrl &&
+    (!process.env.N8N_EDITOR_BASE_URL ||
+      process.env.N8N_EDITOR_BASE_URL.replace(/\/+$/, "") === webhookUrl.replace(/\/+$/, ""))
+  ) {
+    env.N8N_EDITOR_BASE_URL = `${webhookUrl}${n8nPath}`;
+  }
 
   const connectionString = getN8nDatabaseUrl();
 
@@ -187,6 +204,11 @@ function getHealthPayload() {
       shortsFps: Number(process.env.SHORTS_FPS || 20),
       ffmpegThreads: Number(process.env.FFMPEG_THREADS || 1),
     },
+    routing: {
+      shell: "/",
+      n8nPath,
+      dashboard: "/dashboard",
+    },
     timestamp: new Date().toISOString(),
   });
 }
@@ -200,7 +222,7 @@ function sendJson(res, statusCode, payload) {
 }
 
 function sendStaticFile(res, fileName) {
-  const fullPath = path.join(dashboardRoot, fileName);
+  const fullPath = path.join(publicRoot, fileName);
   if (!fs.existsSync(fullPath)) {
     sendJson(res, 404, { error: "file not found" });
     return;
@@ -214,97 +236,6 @@ function sendStaticFile(res, fileName) {
     "cache-control": fileName.endsWith(".html") ? "no-store" : "public, max-age=300",
   });
   res.end(fs.readFileSync(fullPath));
-}
-
-function shouldDecorateHtml(req, pathname) {
-  if (req.method !== "GET") {
-    return false;
-  }
-
-  if (pathname.startsWith("/dashboard") || pathname.startsWith("/auth") || pathname === "/login") {
-    return false;
-  }
-
-  const accept = String(req.headers.accept || "");
-  return accept.includes("text/html") || pathname === "/";
-}
-
-function injectChrome(html) {
-  const assets = [
-    '<link rel="stylesheet" href="/ui/chrome.css" />',
-    '<script src="/ui/chrome.js" defer></script>',
-  ].join("");
-
-  if (html.includes("/ui/chrome.js")) {
-    return html;
-  }
-
-  if (html.includes("</head>")) {
-    return html.replace("</head>", `${assets}</head>`);
-  }
-
-  return `${assets}${html}`;
-}
-
-function proxyDecoratedHtml(req, res) {
-  const headers = {
-    ...req.headers,
-    host: `${internalHost}:${internalPort}`,
-  };
-
-  delete headers["accept-encoding"];
-
-  const upstream = http.request(
-    {
-      hostname: internalHost,
-      port: internalPort,
-      method: req.method,
-      path: req.url,
-      headers,
-    },
-    (upstreamRes) => {
-      const chunks = [];
-      upstreamRes.on("data", (chunk) => chunks.push(chunk));
-      upstreamRes.on("end", () => {
-        const bodyBuffer = Buffer.concat(chunks);
-        const contentType = String(upstreamRes.headers["content-type"] || "");
-        const responseHeaders = { ...upstreamRes.headers };
-
-        if (contentType.includes("text/html")) {
-          const html = injectChrome(bodyBuffer.toString("utf8"));
-          responseHeaders["content-length"] = Buffer.byteLength(html);
-          delete responseHeaders["content-encoding"];
-          res.writeHead(upstreamRes.statusCode || 200, responseHeaders);
-          res.end(html);
-          return;
-        }
-
-        res.writeHead(upstreamRes.statusCode || 200, responseHeaders);
-        res.end(bodyBuffer);
-      });
-    },
-  );
-
-  upstream.on("error", (error) => {
-    log("decorated proxy error", {
-      error: error.message,
-      method: req.method,
-      url: req.url,
-    });
-    if (!res.headersSent) {
-      sendJson(res, 502, { error: "n8n upstream unavailable" });
-    }
-  });
-
-  req.pipe(upstream);
-}
-
-function sendHtml(res, statusCode, html) {
-  res.writeHead(statusCode, {
-    "content-type": "text/html; charset=utf-8",
-    "cache-control": "no-store",
-  });
-  res.end(html);
 }
 
 function parseCookies(cookieHeader) {
@@ -591,11 +522,6 @@ const server = http.createServer((req, res) => {
     return;
   }
 
-  if (staticFiles[pathname]) {
-    sendStaticFile(res, staticFiles[pathname]);
-    return;
-  }
-
   if (authEnabled && !isPublicPath(pathname)) {
     const session = readSession(req);
     if (!session) {
@@ -604,12 +530,30 @@ const server = http.createServer((req, res) => {
     }
   }
 
-  if (shouldDecorateHtml(req, pathname)) {
-    proxyDecoratedHtml(req, res);
+  if (staticFiles[pathname]) {
+    sendStaticFile(res, staticFiles[pathname]);
     return;
   }
 
-  proxy.web(req, res);
+  if (pathname === n8nPath.slice(0, -1)) {
+    res.writeHead(302, {
+      Location: n8nPath,
+      "cache-control": "no-store",
+    });
+    res.end();
+    return;
+  }
+
+  if (pathname.startsWith(n8nPath)) {
+    proxy.web(req, res);
+    return;
+  }
+
+  res.writeHead(302, {
+    Location: "/",
+    "cache-control": "no-store",
+  });
+  res.end();
 });
 
 server.on("upgrade", (req, socket, head) => {
@@ -618,6 +562,12 @@ server.on("upgrade", (req, socket, head) => {
     socket.destroy();
     return;
   }
+
+  if (!req.url.startsWith(n8nPath)) {
+    socket.destroy();
+    return;
+  }
+
   proxy.ws(req, socket, head);
 });
 

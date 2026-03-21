@@ -1,0 +1,17 @@
+name: Keep Render Awake
+
+on:
+  schedule:
+    - cron: "*/5 * * * *"
+  workflow_dispatch:
+
+jobs:
+  ping-health:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ping Render health endpoint
+        env:
+          KEEPALIVE_URL: https://video-bot-n8n.onrender.com/health
+        run: |
+          echo "Pinging $KEEPALIVE_URL"
+          curl --fail --show-error --silent --location --max-time 30 "$KEEPALIVE_URL"
