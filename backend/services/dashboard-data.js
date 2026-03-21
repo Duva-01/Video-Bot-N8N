@@ -14,6 +14,11 @@ function pickLatestPublished(recentRuns) {
   );
 }
 
+function pickLatestGenerated(recentRuns) {
+  const items = Array.isArray(recentRuns) ? recentRuns : [];
+  return items.find((item) => item.youtube_url || item.youtube_video_id || item.status === "published" || item.status === "generated") || null;
+}
+
 async function loadDashboardData() {
   const basePayload = {
     service: "bot-de-videos",
@@ -68,6 +73,7 @@ async function loadDashboardData() {
     return {
       ...basePayload,
       ...summary,
+      latestGenerated: pickLatestGenerated(summary.recentRuns),
       latestPublished: pickLatestPublished(summary.recentRuns),
       operations,
     };

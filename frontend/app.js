@@ -5,15 +5,15 @@
   const views = {
     dashboard: {
       title: "Dashboard",
-      description: "Overview operativo del bot: últimos runs, cobertura de categorías, vídeo reciente y telemetría.",
+      description: "Overview operativo del bot: ï¿½ltimos runs, cobertura de categorï¿½as, vï¿½deo reciente y telemetrï¿½a.",
     },
     console: {
       title: "Console",
-      description: "Eventos persistidos en Neon: eventos de pipeline, ejecuciones, artefactos, auditoría y runner logs.",
+      description: "Eventos persistidos en Neon: eventos de pipeline, ejecuciones, artefactos, auditorï¿½a y runner logs.",
     },
     health: {
       title: "Health",
-      description: "Estado técnico del backend, persistencia, perfil low-memory y salida cruda del endpoint health.",
+      description: "Estado tï¿½cnico del backend, persistencia, perfil low-memory y salida cruda del endpoint health.",
     },
   };
 
@@ -185,7 +185,7 @@
     }
 
     const embedUrl = extractYouTubeEmbed(item);
-    const meta = `${escapeHtml(item.category || "general")} · ${escapeHtml(item.source || "catalog")} · ${escapeHtml(formatDate(item.published_at || item.selected_at))}`;
+    const meta = `${escapeHtml(item.category || "general")} ï¿½ ${escapeHtml(item.source || "catalog")} ï¿½ ${escapeHtml(formatDate(item.published_at || item.selected_at))}`;
     card.innerHTML = `
       <div class="latest-card__body">
         <h3>${escapeHtml(item.title || item.topic || "Latest short")}</h3>
@@ -416,12 +416,13 @@
   function renderControlCenter(data) {
     const dashboard = data.dashboard || {};
     const totals = dashboard.totals || {};
-    const latest = dashboard.latestPublished || null;
+    const latestGenerated = dashboard.latestGenerated || null;
+    const latestPublished = dashboard.latestPublished || null;
     const health = data.health || {};
     const operations = dashboard.operations || {};
 
     qs("headerPublishedCount").textContent = String(totals.published_videos || 0);
-    qs("headerLatestTitle").textContent = latest?.title || latest?.topic || "No data";
+    qs("headerLatestTitle").textContent = latestGenerated?.title || latestGenerated?.topic || "No data";
     qs("headerLastPublished").textContent = formatDate(totals.last_published_at);
     qs("totalVideos").textContent = String(totals.total_videos || 0);
     qs("generatedVideos").textContent = String(totals.generated_videos || 0);
@@ -434,7 +435,17 @@
     qs("healthMode").textContent = health.performance?.lowMemoryMode ? "Low memory" : "Standard";
     backendLabelNode.textContent = getApiBaseUrl() || "Backend not set";
 
-    renderLatest(latest);
+    renderLatest(latestGenerated, {
+      cardId: "latestCard",
+      embedId: "latestEmbed",
+      emptyCardText: "No generated short yet.",
+      emptyEmbedText: "No video yet.",
+    });
+    renderLatest(latestPublished, {
+      cardId: "latestPublicCard",
+      embedId: null,
+      emptyCardText: "No public short yet.",
+    });
     renderBarList("categoryBars", dashboard.byCategory || [], "category", "total");
     renderBarList("artifactBars", dashboard.artifactSummary || [], "artifact_type", "total");
     renderTimeline("recentRunsList", dashboard.recentRuns || [], "runs");
