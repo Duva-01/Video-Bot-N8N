@@ -5,19 +5,20 @@
   const views = {
     dashboard: {
       title: "Dashboard",
-      description: "Overview operativo del bot: ultimos runs, cobertura de categorias, video reciente y telemetria.",
+      description: "Overview operativo del bot: últimos runs, cobertura de categorías, vídeo reciente y telemetría.",
     },
     console: {
       title: "Console",
-      description: "Eventos persistidos en Neon: eventos de pipeline, ejecuciones, artefactos, auditoria y runner logs.",
+      description: "Eventos persistidos en Neon: eventos de pipeline, ejecuciones, artefactos, auditoría y runner logs.",
     },
     health: {
       title: "Health",
-      description: "Estado tecnico del backend, persistencia, perfil low-memory y salida cruda del endpoint health.",
+      description: "Estado técnico del backend, persistencia, perfil low-memory y salida cruda del endpoint health.",
     },
   };
 
-  const loginView = document.getElementById("loginView");
+  const landingView = document.getElementById("landingView");
+  const loginModal = document.getElementById("loginModal");
   const appView = document.getElementById("appView");
   const loginForm = document.getElementById("loginForm");
   const loginMessage = document.getElementById("loginMessage");
@@ -71,9 +72,23 @@
     window.localStorage.removeItem(TOKEN_KEY);
   }
 
+  function openLoginModal() {
+    loginModal.classList.remove("login-modal--hidden");
+    loginModal.setAttribute("aria-hidden", "false");
+    loginMessage.textContent = "";
+  }
+
+  function closeLoginModal() {
+    loginModal.classList.add("login-modal--hidden");
+    loginModal.setAttribute("aria-hidden", "true");
+  }
+
   function setViewMode(authenticated) {
-    loginView.classList.toggle("login-layout--hidden", authenticated);
+    landingView.classList.toggle("landing-shell--hidden", authenticated);
     appView.classList.toggle("app-shell--hidden", !authenticated);
+    if (authenticated) {
+      closeLoginModal();
+    }
   }
 
   function formatDate(value) {
@@ -102,7 +117,7 @@
 
   function getStatusClass(status) {
     if (["published", "success", "completed"].includes(String(status))) return "status-chip status-chip--success";
-    if (["running", "generated", "selected", "active"].includes(String(status))) return "status-chip status-chip--running";
+    if (["running", "generated", "selected", "active", "info"].includes(String(status))) return "status-chip status-chip--running";
     if (["failed", "error", "inactive"].includes(String(status))) return "status-chip status-chip--error";
     return "status-chip status-chip--info";
   }
@@ -512,12 +527,13 @@
     runnerCopyNode.textContent = message;
     runnerLogsNode.textContent = message;
     logsConsoleNode.textContent = message;
+    loginMessage.textContent = message;
   }
 
   async function hydrateApp() {
     const apiBase = getApiBaseUrl();
     backendLabelNode.textContent = apiBase || "Backend not configured";
-    openN8nButton.href = `${apiBase}/login?next=/app/`;
+    openN8nButton.href = `${apiBase}/app/`;
     await Promise.all([loadControlCenter(), loadLogs(), loadHealth()]);
   }
 
@@ -535,7 +551,7 @@
     autoRefreshTimer = null;
   }
 
-  loginForm.addEventListener("submit", async (event) => {
+  async function handleLogin(event) {
     event.preventDefault();
     loginMessage.textContent = "";
     try {
@@ -555,19 +571,27 @@
     } catch (error) {
       loginMessage.textContent = error.message;
     }
-  });
+  }
 
+  loginForm.addEventListener("submit", handleLogin);
   logoutButton.addEventListener("click", () => {
     clearSession();
     stopAllTimers();
     setViewMode(false);
+    openLoginModal();
   });
-
   refreshDashboardButton.addEventListener("click", () => loadControlCenter().catch(renderFatalError));
   refreshHealthButton.addEventListener("click", () => loadHealth().catch(renderFatalError));
   refreshLogsButton.addEventListener("click", () => loadLogs().catch(renderFatalError));
   runNowButton.addEventListener("click", () => triggerRunNow());
   toggleAutomationButton.addEventListener("click", () => toggleAutomation());
+
+  ["openLoginButton", "openLoginButtonHero", "openLoginButtonFooter"].forEach((id) => {
+    const node = qs(id);
+    if (node) node.addEventListener("click", openLoginModal);
+  });
+  qs("closeLoginButton").addEventListener("click", closeLoginModal);
+  qs("loginBackdrop").addEventListener("click", closeLoginModal);
 
   document.addEventListener("click", (event) => {
     const trigger = event.target.closest("[data-view]");
@@ -598,5 +622,6 @@
       });
   } else {
     setViewMode(false);
+    closeLoginModal();
   }
 })();

@@ -75,12 +75,6 @@ let runnerState = {
   lastResult: null,
   lastError: null,
 };
-const publicRoot = path.join(__dirname, "..", "public");
-const staticFiles = {
-  "/login": path.join("auth", "login.html"),
-  "/auth/login.css": path.join("auth", "login.css"),
-  "/auth/login.js": path.join("auth", "login.js"),
-};
 const n8nRootPassThroughPrefixes = [
   "/rest",
   "/types",
@@ -855,23 +849,6 @@ function sendApiJson(req, res, statusCode, payload) {
   sendJson(res, statusCode, payload);
 }
 
-function sendStaticFile(res, fileName) {
-  const fullPath = path.join(publicRoot, fileName);
-  if (!fs.existsSync(fullPath)) {
-    sendJson(res, 404, { error: "file not found" });
-    return;
-  }
-
-  const contentType =
-    fileName.endsWith(".css") ? "text/css; charset=utf-8" : fileName.endsWith(".js") ? "application/javascript; charset=utf-8" : "text/html; charset=utf-8";
-
-  res.writeHead(200, {
-    "content-type": contentType,
-    "cache-control": fileName.endsWith(".html") ? "no-store" : "public, max-age=300",
-  });
-  res.end(fs.readFileSync(fullPath));
-}
-
 function isN8nRootPassThrough(pathname) {
   return n8nRootPassThroughPrefixes.some(
     (prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`) || pathname.startsWith(`${prefix}?`),
@@ -977,55 +954,6 @@ function readSession(req) {
   return readSessionToken(cookies[authCookieName]);
 }
 
-function setSessionCookie(res, username) {
-  const token = createSessionToken(username);
-  const cookieParts = [
-    `${authCookieName}=${encodeURIComponent(token)}`,
-    "Path=/",
-    "HttpOnly",
-    "SameSite=Lax",
-    "Max-Age=1209600",
-  ];
-
-  if (cookieSecure) {
-    cookieParts.push("Secure");
-  }
-
-  res.setHeader("Set-Cookie", cookieParts.join("; "));
-}
-
-function clearSessionCookie(res) {
-  const cookieParts = [`${authCookieName}=`, "Path=/", "HttpOnly", "SameSite=Lax", "Max-Age=0"];
-  if (cookieSecure) {
-    cookieParts.push("Secure");
-  }
-  res.setHeader("Set-Cookie", cookieParts.join("; "));
-}
-
-function isPublicPath(urlPath) {
-  return (
-    urlPath === "/health" ||
-    urlPath === "/login" ||
-    urlPath === "/auth/login" ||
-    urlPath === "/auth/logout" ||
-    urlPath === "/auth/login.css" ||
-    urlPath === "/auth/login.js"
-  );
-}
-
-function getRedirectTarget(rawUrl) {
-  const candidate = rawUrl && rawUrl.startsWith("/") && !rawUrl.startsWith("//") ? rawUrl : "/";
-  return candidate;
-}
-
-function redirectToLogin(req, res) {
-  const next = encodeURIComponent(getRedirectTarget(req.url));
-  res.writeHead(302, {
-    Location: `/login?next=${next}`,
-    "cache-control": "no-store",
-  });
-  res.end();
-}
 
 function readBody(req) {
   return new Promise((resolve, reject) => {
@@ -1143,39 +1071,6 @@ const server = http.createServer((req, res) => {
     return;
   }
 
-  if (pathname === "/auth/logout") {
-    clearSessionCookie(res);
-    res.writeHead(302, {
-      Location: "/login",
-      "cache-control": "no-store",
-    });
-    res.end();
-    return;
-  }
-
-  if (pathname === "/auth/login" && req.method === "POST") {
-    readBody(req)
-      .then((body) => {
-        const parsed = JSON.parse(body || "{}");
-        const username = String(parsed.username || "");
-        const password = String(parsed.password || "");
-        const next = getRedirectTarget(parsed.next);
-
-        if (!safeEqual(username, authUser) || !safeEqual(password, authPassword)) {
-          void writeApiAudit(req, "login_form_failed", 401, { username });
-          sendJson(res, 401, { error: "Usuario o contraseña incorrectos" });
-          return;
-        }
-
-        setSessionCookie(res, username);
-        void writeApiAudit(req, "login_form_success", 200, { username });
-        sendJson(res, 200, { ok: true, redirect: next });
-      })
-      .catch((error) => {
-        sendJson(res, 400, { error: error.message });
-      });
-    return;
-  }
 
   if (pathname === "/api/auth/login" && req.method === "POST") {
     readBody(req)
@@ -1315,27 +1210,6 @@ const server = http.createServer((req, res) => {
     return;
   }
 
-  if (pathname === "/login" && authEnabled && readSession(req)) {
-    res.writeHead(302, {
-      Location: n8nPath,
-      "cache-control": "no-store",
-    });
-    res.end();
-    return;
-  }
-
-  if (authEnabled && !isPublicPath(pathname)) {
-    const session = readSession(req);
-    if (!session) {
-      redirectToLogin(req, res);
-      return;
-    }
-  }
-
-  if (staticFiles[pathname]) {
-    sendStaticFile(res, staticFiles[pathname]);
-    return;
-  }
 
   if (pathname === "/") {
     res.writeHead(302, {
@@ -1446,6 +1320,7 @@ main().catch((error) => {
   });
   process.exit(1);
 });
+
 
 
 

@@ -14,54 +14,140 @@
     <div class="orb orb-b"></div>
     <div class="grid-noise"></div>
 
-    <main class="login-screen" id="loginView">
-      <section class="login-hero panel glass">
-        <p class="eyebrow">Cloudflare control surface</p>
-        <h1>Facts Engine Control</h1>
-        <p class="hero-copy">
-          Operaciones para Shorts automaticos de facts. Render ejecuta n8n y FFmpeg. Neon guarda runs, eventos,
-          artefactos, auditoria y metricas. Cloudflare sirve la capa visual.
-        </p>
-
-        <div class="hero-metrics">
-          <article class="hero-metric">
-            <span>Runtime</span>
-            <strong>Render + n8n</strong>
-          </article>
-          <article class="hero-metric">
-            <span>Persistence</span>
-            <strong>Neon telemetry</strong>
-          </article>
-          <article class="hero-metric">
-            <span>Surface</span>
-            <strong>Cloudflare Pages</strong>
-          </article>
+    <div class="landing-shell" id="landingView">
+      <header class="landing-header glass panel">
+        <div class="brand">
+          <div class="brand-mark"></div>
+          <div>
+            <span class="eyebrow">YouTube facts automation</span>
+            <strong>Facts Engine Control</strong>
+            <p>Frontend en Cloudflare, runtime en Render, persistencia en Neon.</p>
+          </div>
         </div>
 
-        <div class="signal-stack">
-          <div class="signal-card signal-card--pulse">
+        <nav class="landing-nav">
+          <a href="#features">Features</a>
+          <a href="#stack">Stack</a>
+          <a href="#ops">Ops</a>
+          <button class="button button--ghost" type="button" id="openLoginButton">Login</button>
+        </nav>
+      </header>
+
+      <main class="landing-main">
+        <section class="landing-hero glass panel">
+          <div class="landing-copy">
+            <p class="eyebrow">Autonomous Shorts pipeline</p>
+            <h1>Controla facts automáticos con una superficie seria y separada del runtime.</h1>
+            <p class="hero-copy">
+              El frontend vive en Cloudflare Pages. El backend en Render queda reducido a n8n, REST API, FFmpeg y persistencia en Neon. Menos carga visual en el runtime, más estabilidad y mejor observabilidad.
+            </p>
+            <div class="landing-actions">
+              <button class="button button--primary button--glow" type="button" id="openLoginButtonHero">Entrar al panel</button>
+              <a class="button button--ghost" href="#stack">Ver arquitectura</a>
+            </div>
+          </div>
+
+          <div class="landing-stage">
+            <article class="floating-card floating-card--primary">
+              <span class="badge">Publishing</span>
+              <strong>Facts Shorts</strong>
+              <p>Topic dinámico, guion, voz, subtítulos, montaje y subida automática.</p>
+            </article>
+            <article class="floating-card">
+              <span class="badge">Observability</span>
+              <strong>Neon telemetry</strong>
+              <p>Runs, eventos, artefactos, snapshots y auditoría persistidos.</p>
+            </article>
+            <article class="floating-card">
+              <span class="badge">Runtime</span>
+              <strong>Render low-memory</strong>
+              <p>Backend aligerado para que Render Free se encargue de lo importante.</p>
+            </article>
+          </div>
+        </section>
+
+        <section class="landing-grid" id="features">
+          <article class="feature-card glass panel">
+            <p class="eyebrow">Frontend</p>
+            <h2>Landing pública con identidad propia</h2>
+            <p>Header, footer, narrativa clara y acceso al panel privado sin mezclarlo con la UI de n8n.</p>
+          </article>
+          <article class="feature-card glass panel">
+            <p class="eyebrow">Backend</p>
+            <h2>n8n + API + Neon</h2>
+            <p>Render deja de servir frontend complejo. Se centra en ejecutar workflows, exponer REST y guardar telemetría.</p>
+          </article>
+          <article class="feature-card glass panel">
+            <p class="eyebrow">Observabilidad</p>
+            <h2>Consola persistente</h2>
+            <p>Todo lo interesante se queda en Neon: eventos, artefactos, memoria, auditoría y ejecución.</p>
+          </article>
+        </section>
+
+        <section class="stack-band glass panel" id="stack">
+          <div>
+            <p class="eyebrow">Stack split</p>
+            <h2>Arquitectura separada para no tumbar Render</h2>
+          </div>
+          <div class="hero-metrics">
+            <article class="hero-metric">
+              <span>Frontend</span>
+              <strong>Cloudflare Pages</strong>
+            </article>
+            <article class="hero-metric">
+              <span>Runtime</span>
+              <strong>Render + n8n</strong>
+            </article>
+            <article class="hero-metric">
+              <span>Database</span>
+              <strong>Neon PostgreSQL</strong>
+            </article>
+          </div>
+        </section>
+
+        <section class="ops-grid" id="ops">
+          <article class="signal-card signal-card--pulse glass panel">
             <span class="signal-dot"></span>
             <div>
               <strong>Workflow automation</strong>
-              <p>Control manual y scheduler desde una sola superficie.</p>
+              <p>Scheduler y ejecución manual desde el panel, con snapshots de estado en Neon.</p>
             </div>
-          </div>
-          <div class="signal-card">
+          </article>
+          <article class="signal-card glass panel">
             <span class="signal-dot signal-dot--warm"></span>
             <div>
-              <strong>Neon logging</strong>
-              <p>Eventos, artefactos, auditoria, snapshots y muestras del sistema.</p>
+              <strong>Execution tracing</strong>
+              <p>Los pasos del pipeline quedan registrados por stage y topic_key.</p>
             </div>
-          </div>
-        </div>
-      </section>
+          </article>
+          <article class="signal-card glass panel">
+            <span class="signal-dot"></span>
+            <div>
+              <strong>Artifact indexing</strong>
+              <p>Audio, subtítulos, clips, resultados y vídeo final quedan trazados como artefactos.</p>
+            </div>
+          </article>
+        </section>
+      </main>
 
+      <footer class="landing-footer glass panel">
+        <div>
+          <span class="eyebrow">Facts Engine</span>
+          <strong>Cloudflare frontend · Render backend · Neon telemetry</strong>
+        </div>
+        <button class="button button--ghost" type="button" id="openLoginButtonFooter">Abrir login</button>
+      </footer>
+    </div>
+
+    <div class="login-modal login-modal--hidden" id="loginModal" aria-hidden="true">
+      <div class="login-backdrop" id="loginBackdrop"></div>
       <section class="login-card panel glass">
+        <button class="login-close" type="button" id="closeLoginButton" aria-label="Cerrar">×</button>
         <form id="loginForm" class="login-form">
           <div class="panel-head">
             <span class="badge">Secure access</span>
             <h2>Entrar al control center</h2>
-            <p>Autenticacion por token contra el backend de Render.</p>
+            <p>Token login contra el backend de Render.</p>
           </div>
 
           <label class="field">
@@ -83,7 +169,7 @@
           <p id="loginMessage" class="message" aria-live="polite"></p>
         </form>
       </section>
-    </main>
+    </div>
 
     <div class="app-shell app-shell--hidden" id="appView">
       <header class="topbar glass panel">
@@ -183,86 +269,41 @@
             </div>
 
             <div class="hero-strip">
-              <article class="hero-stat">
-                <span>Total videos</span>
-                <strong id="totalVideos">0</strong>
-              </article>
-              <article class="hero-stat">
-                <span>Generated</span>
-                <strong id="generatedVideos">0</strong>
-              </article>
-              <article class="hero-stat">
-                <span>Published</span>
-                <strong id="publishedVideos">0</strong>
-              </article>
-              <article class="hero-stat">
-                <span>Failed</span>
-                <strong id="failedVideos">0</strong>
-              </article>
-              <article class="hero-stat">
-                <span>Categories</span>
-                <strong id="categoriesCovered">0</strong>
-              </article>
+              <article class="hero-stat"><span>Total videos</span><strong id="totalVideos">0</strong></article>
+              <article class="hero-stat"><span>Generated</span><strong id="generatedVideos">0</strong></article>
+              <article class="hero-stat"><span>Published</span><strong id="publishedVideos">0</strong></article>
+              <article class="hero-stat"><span>Failed</span><strong id="failedVideos">0</strong></article>
+              <article class="hero-stat"><span>Categories</span><strong id="categoriesCovered">0</strong></article>
             </div>
 
             <div class="dashboard-grid">
               <section class="module-card module-card--video">
-                <div class="module-head">
-                  <div>
-                    <p class="eyebrow">Broadcast</p>
-                    <h3>Latest published short</h3>
-                  </div>
-                </div>
+                <div class="module-head"><div><p class="eyebrow">Broadcast</p><h3>Latest published short</h3></div></div>
                 <div id="latestEmbed" class="video-frame empty-state">No video yet.</div>
               </section>
 
               <section class="module-card">
-                <div class="module-head">
-                  <div>
-                    <p class="eyebrow">Category spread</p>
-                    <h3>Topic coverage</h3>
-                  </div>
-                </div>
+                <div class="module-head"><div><p class="eyebrow">Category spread</p><h3>Topic coverage</h3></div></div>
                 <div id="categoryBars" class="bars-list"></div>
               </section>
 
               <section class="module-card">
-                <div class="module-head">
-                  <div>
-                    <p class="eyebrow">Artifacts</p>
-                    <h3>Stored outputs</h3>
-                  </div>
-                </div>
+                <div class="module-head"><div><p class="eyebrow">Artifacts</p><h3>Stored outputs</h3></div></div>
                 <div id="artifactBars" class="bars-list"></div>
               </section>
 
               <section class="module-card module-card--wide">
-                <div class="module-head">
-                  <div>
-                    <p class="eyebrow">Recent runs</p>
-                    <h3>Pipeline timeline</h3>
-                  </div>
-                </div>
+                <div class="module-head"><div><p class="eyebrow">Recent runs</p><h3>Pipeline timeline</h3></div></div>
                 <div id="recentRunsList" class="timeline-list"></div>
               </section>
 
               <section class="module-card module-card--wide">
-                <div class="module-head">
-                  <div>
-                    <p class="eyebrow">Event stream</p>
-                    <h3>Latest content events</h3>
-                  </div>
-                </div>
+                <div class="module-head"><div><p class="eyebrow">Event stream</p><h3>Latest content events</h3></div></div>
                 <div id="recentEventsList" class="timeline-list"></div>
               </section>
 
               <section class="module-card module-card--wide">
-                <div class="module-head">
-                  <div>
-                    <p class="eyebrow">System pulse</p>
-                    <h3>Memory samples</h3>
-                  </div>
-                </div>
+                <div class="module-head"><div><p class="eyebrow">System pulse</p><h3>Memory samples</h3></div></div>
                 <div id="memoryChart" class="memory-chart"></div>
               </section>
             </div>
@@ -270,21 +311,13 @@
 
           <section class="view" data-view-panel="console">
             <div class="view-head">
-              <div>
-                <p class="eyebrow">Observability</p>
-                <h2>Live console</h2>
-              </div>
-              <div class="inline-actions">
-                <button class="button button--ghost" type="button" id="refreshLogsButton">Refresh logs</button>
-              </div>
+              <div><p class="eyebrow">Observability</p><h2>Live console</h2></div>
+              <div class="inline-actions"><button class="button button--ghost" type="button" id="refreshLogsButton">Refresh logs</button></div>
             </div>
 
             <div class="console-grid">
               <section class="terminal-panel">
-                <div class="terminal-head">
-                  <span>workflow state</span>
-                  <span id="workflowBadge">-</span>
-                </div>
+                <div class="terminal-head"><span>workflow state</span><span id="workflowBadge">-</span></div>
                 <div class="workflow-grid">
                   <article class="terminal-stat"><span>Workflow</span><strong id="workflowName">-</strong></article>
                   <article class="terminal-stat"><span>Automation</span><strong id="workflowActive">-</strong></article>
@@ -294,42 +327,27 @@
               </section>
 
               <section class="terminal-panel terminal-panel--wide">
-                <div class="terminal-head">
-                  <span>runner stdout/stderr</span>
-                  <span>frontend runner</span>
-                </div>
+                <div class="terminal-head"><span>runner stdout/stderr</span><span>frontend runner</span></div>
                 <pre id="logsConsole" class="terminal-output">No logs yet.</pre>
               </section>
 
               <section class="terminal-panel terminal-panel--wide">
-                <div class="terminal-head">
-                  <span>content events</span>
-                  <span>Neon</span>
-                </div>
+                <div class="terminal-head"><span>content events</span><span>Neon</span></div>
                 <div id="eventConsole" class="console-list"></div>
               </section>
 
               <section class="terminal-panel terminal-panel--wide">
-                <div class="terminal-head">
-                  <span>execution logs</span>
-                  <span>backend</span>
-                </div>
+                <div class="terminal-head"><span>execution logs</span><span>backend</span></div>
                 <div id="executionConsole" class="console-list"></div>
               </section>
 
               <section class="terminal-panel terminal-panel--wide">
-                <div class="terminal-head">
-                  <span>artifacts</span>
-                  <span>outputs</span>
-                </div>
+                <div class="terminal-head"><span>artifacts</span><span>outputs</span></div>
                 <div id="artifactConsole" class="console-list"></div>
               </section>
 
               <section class="terminal-panel terminal-panel--wide">
-                <div class="terminal-head">
-                  <span>api audit</span>
-                  <span>security</span>
-                </div>
+                <div class="terminal-head"><span>api audit</span><span>security</span></div>
                 <div id="auditConsole" class="console-list"></div>
               </section>
             </div>
@@ -337,13 +355,8 @@
 
           <section class="view" data-view-panel="health">
             <div class="view-head">
-              <div>
-                <p class="eyebrow">Runtime</p>
-                <h2>Health and internals</h2>
-              </div>
-              <div class="inline-actions">
-                <button class="button button--ghost" type="button" id="refreshHealthButton">Refresh health</button>
-              </div>
+              <div><p class="eyebrow">Runtime</p><h2>Health and internals</h2></div>
+              <div class="inline-actions"><button class="button button--ghost" type="button" id="refreshHealthButton">Refresh health</button></div>
             </div>
 
             <div class="health-grid">
