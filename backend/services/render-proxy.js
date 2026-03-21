@@ -957,6 +957,54 @@ function readSession(req) {
   return readSessionToken(cookies[authCookieName]);
 }
 
+function readBasicAuth(req) {
+  const authHeader = String(req.headers.authorization || "");
+  if (!authHeader.startsWith("Basic ")) {
+    return null;
+  }
+
+  try {
+    const decoded = Buffer.from(authHeader.slice("Basic ".length).trim(), "base64").toString("utf8");
+    const separatorIndex = decoded.indexOf(":");
+    if (separatorIndex === -1) {
+      return null;
+    }
+
+    return {
+      username: decoded.slice(0, separatorIndex),
+      password: decoded.slice(separatorIndex + 1),
+    };
+  } catch (error) {
+    return null;
+  }
+}
+
+function hasN8nAccess(req) {
+  if (!authEnabled) {
+    return true;
+  }
+
+  if (readSession(req)) {
+    return true;
+  }
+
+  const basicAuth = readBasicAuth(req);
+  if (!basicAuth) {
+    return false;
+  }
+
+  return safeEqual(basicAuth.username, authUser) && safeEqual(basicAuth.password, authPassword);
+}
+
+function requestN8nBasicAuth(res) {
+  res.writeHead(401, {
+    "WWW-Authenticate": 'Basic realm="Facts Engine n8n", charset="UTF-8"',
+    "cache-control": "no-store",
+    "content-type": "text/plain; charset=utf-8",
+  });
+  res.end("Authentication required");
+}
+
 
 function readBody(req) {
   return new Promise((resolve, reject) => {
@@ -1215,6 +1263,10 @@ const server = http.createServer((req, res) => {
 
 
   if (pathname === "/") {
+    if (!hasN8nAccess(req)) {
+      requestN8nBasicAuth(res);
+      return;
+    }
     proxy.web(req, res);
     return;
   }
@@ -1229,16 +1281,28 @@ const server = http.createServer((req, res) => {
   }
 
   if (isN8nRootPassThrough(pathname)) {
+    if (!hasN8nAccess(req)) {
+      requestN8nBasicAuth(res);
+      return;
+    }
     proxy.web(req, res);
     return;
   }
 
   if (isN8nRootAsset(pathname)) {
+    if (!hasN8nAccess(req)) {
+      requestN8nBasicAuth(res);
+      return;
+    }
     proxy.web(req, res);
     return;
   }
 
   if (n8nPath === "/" || pathname.startsWith(n8nPath)) {
+    if (!hasN8nAccess(req)) {
+      requestN8nBasicAuth(res);
+      return;
+    }
     proxy.web(req, res);
     return;
   }
@@ -1247,6 +1311,11 @@ const server = http.createServer((req, res) => {
 });
 
 server.on("upgrade", (req, socket, head) => {
+  if (!hasN8nAccess(req)) {
+    socket.destroy();
+    return;
+  }
+
   if (n8nPath !== "/" && !req.url.startsWith(n8nPath)) {
     const parsedUrl = new URL(req.url, `http://${req.headers.host || `${publicHost}:${publicPort}`}`);
     if (isN8nRootPassThrough(parsedUrl.pathname) || isN8nRootAsset(parsedUrl.pathname)) {
