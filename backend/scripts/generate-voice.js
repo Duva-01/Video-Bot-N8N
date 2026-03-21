@@ -109,8 +109,20 @@ async function main() {
     if (provider === "cloudflare") {
       const apiToken = getRequiredEnv("CLOUDFLARE_AI_API_TOKEN");
       const accountId = getRequiredEnv("CLOUDFLARE_ACCOUNT_ID");
-      const model = process.env.CLOUDFLARE_TTS_MODEL || "@cf/myshell-ai/melotts";
+      const model = process.env.CLOUDFLARE_TTS_MODEL || "@cf/deepgram/aura-2-es";
       const language = process.env.CLOUDFLARE_TTS_LANG || "es";
+      const speaker = process.env.CLOUDFLARE_TTS_SPEAKER || "aquila";
+      const isAuraModel = model.startsWith("@cf/deepgram/aura");
+      const requestBody = isAuraModel
+        ? {
+            text,
+            speaker,
+            encoding: "mp3",
+          }
+        : {
+            prompt: text,
+            lang: language,
+          };
 
       const response = await fetch(`https://api.cloudflare.com/client/v4/accounts/${accountId}/ai/run/${model}`, {
         method: "POST",
@@ -118,10 +130,7 @@ async function main() {
           Authorization: `Bearer ${apiToken}`,
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({
-          prompt: text,
-          lang: language,
-        }),
+        body: JSON.stringify(requestBody),
       });
 
       if (!response.ok) {
@@ -151,7 +160,7 @@ async function main() {
           label: "Narration audio",
           file_path: outputPath,
           mime_type: "audio/mpeg",
-          metadata: { provider, model, language },
+          metadata: { provider, model, language, speaker: isAuraModel ? speaker : null },
         });
         await logStepEvent(pool, {
           topic_key: topicKey,
@@ -159,11 +168,11 @@ async function main() {
           stage: "generate_voice",
           source: "generate-voice",
           message: "Voice generated",
-          metadata: { provider, model, language, bytes: buffer.length },
+          metadata: { provider, model, language, speaker: isAuraModel ? speaker : null, bytes: buffer.length },
         });
       });
 
-      log("voice generation completed", { outputPath, bytes: buffer.length, provider, model, language });
+      log("voice generation completed", { outputPath, bytes: buffer.length, provider, model, language, speaker: isAuraModel ? speaker : null });
       return;
     }
 

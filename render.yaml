@@ -69,9 +69,11 @@ services:
       - key: CLOUDFLARE_ACCOUNT_ID
         sync: false
       - key: CLOUDFLARE_TTS_MODEL
-        value: "@cf/myshell-ai/melotts"
+        value: "@cf/deepgram/aura-2-es"
       - key: CLOUDFLARE_TTS_LANG
         value: es
+      - key: CLOUDFLARE_TTS_SPEAKER
+        value: aquila
       - key: AZURE_SPEECH_KEY
         sync: false
       - key: AZURE_SPEECH_REGION
