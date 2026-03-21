@@ -22,6 +22,15 @@ function getRequiredEnv(name) {
   return value;
 }
 
+function xmlEscape(value) {
+  return String(value || "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&apos;");
+}
+
 function writeWavFile(outputPath, pcmBuffer, sampleRate = 24000, numChannels = 1, bitsPerSample = 16) {
   const byteRate = (sampleRate * numChannels * bitsPerSample) / 8;
   const header = Buffer.alloc(44);
@@ -71,7 +80,7 @@ async function main() {
     fail(`Missing narration text in ${scriptPath}`);
   }
 
-  const provider = process.env.TTS_PROVIDER || (process.env.GEMINI_API_KEY ? "gemini" : "elevenlabs");
+  const provider = process.env.TTS_PROVIDER || (process.env.AZURE_SPEECH_KEY ? "azure" : process.env.GEMINI_API_KEY ? "gemini" : "elevenlabs");
 
   log("voice generation starting", { scriptPath, outputPath, provider });
 
@@ -89,6 +98,73 @@ async function main() {
   fs.mkdirSync(path.dirname(outputPath), { recursive: true });
 
   try {
+    if (provider === "azure") {
+      const subscriptionKey = getRequiredEnv("AZURE_SPEECH_KEY");
+      const region = getRequiredEnv("AZURE_SPEECH_REGION");
+      const voiceName = process.env.AZURE_SPEECH_VOICE || "es-ES-ElviraNeural";
+      const outputFormat = process.env.AZURE_SPEECH_OUTPUT_FORMAT || "riff-24khz-16bit-mono-pcm";
+      const tokenResponse = await fetch(`https://${region}.api.cognitive.microsoft.com/sts/v1.0/issueToken`, {
+        method: "POST",
+        headers: {
+          "Ocp-Apim-Subscription-Key": subscriptionKey,
+          "Content-Length": "0",
+        },
+      });
+
+      if (!tokenResponse.ok) {
+        fail(`Azure Speech token request failed with status ${tokenResponse.status}: ${await tokenResponse.text()}`);
+      }
+
+      const accessToken = await tokenResponse.text();
+      const ssml = [
+        '<speak version="1.0" xml:lang="es-ES">',
+        `  <voice name="${xmlEscape(voiceName)}">`,
+        `    ${xmlEscape(text)}`,
+        "  </voice>",
+        "</speak>",
+      ].join("\n");
+
+      const response = await fetch(`https://${region}.tts.speech.microsoft.com/cognitiveservices/v1`, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+          "Content-Type": "application/ssml+xml",
+          "X-Microsoft-OutputFormat": outputFormat,
+          "User-Agent": "facts-engine-bot",
+        },
+        body: ssml,
+      });
+
+      if (!response.ok) {
+        fail(`Azure Speech request failed with status ${response.status}: ${await response.text()}`);
+      }
+
+      const buffer = Buffer.from(await response.arrayBuffer());
+      fs.writeFileSync(outputPath, buffer);
+
+      await withOptionalPool(async (pool) => {
+        await logArtifact(pool, {
+          topic_key: topicKey,
+          artifact_type: "voice_track",
+          label: "Narration audio",
+          file_path: outputPath,
+          mime_type: "audio/wav",
+          metadata: { provider, region, voiceName, outputFormat },
+        });
+        await logStepEvent(pool, {
+          topic_key: topicKey,
+          event_type: "step_completed",
+          stage: "generate_voice",
+          source: "generate-voice",
+          message: "Voice generated",
+          metadata: { provider, region, voiceName, outputFormat, bytes: buffer.length },
+        });
+      });
+
+      log("voice generation completed", { outputPath, bytes: buffer.length, provider, region, voiceName, outputFormat });
+      return;
+    }
+
     if (provider === "gemini") {
       const apiKey = getRequiredEnv("GEMINI_API_KEY");
       const model = process.env.GEMINI_TTS_MODEL || "gemini-2.5-flash-preview-tts";

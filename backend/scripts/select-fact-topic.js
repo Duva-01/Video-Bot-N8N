@@ -2,10 +2,10 @@ require("dotenv").config();
 
 const fs = require("fs");
 const path = require("path");
-const fetch = global.fetch || require("node-fetch");
 const topics = require("../data/fact-topics.json");
 const { upsertSelection } = require("./lib/content-db");
 const { logStepEvent, withOptionalPool } = require("./lib/script-observer");
+const { generateText, getTextModel, getTextProvider } = require("./lib/llm-text");
 
 function fail(message) {
   console.error(`[select-fact-topic][error] ${message}`);
@@ -88,20 +88,6 @@ function extractJson(text) {
   fail("Gemini dynamic topic response did not contain valid JSON");
 }
 
-function getGeminiText(data) {
-  const parts = data.candidates?.[0]?.content?.parts || [];
-  const text = parts
-    .map((part) => part.text || "")
-    .join("")
-    .trim();
-
-  if (!text) {
-    fail("Gemini dynamic topic response did not include text");
-  }
-
-  return text;
-}
-
 async function getExistingTopicState(pool) {
   const { rows } = await pool.query(
     `
@@ -154,34 +140,11 @@ function createDynamicPrompt(existingRows, allowedCategories) {
 }
 
 async function generateDynamicTopic(existingState, allowedCategories) {
-  const apiKey = process.env.GEMINI_API_KEY;
-  if (!apiKey) {
-    throw new Error("Missing GEMINI_API_KEY for dynamic topic generation");
-  }
-
-  const model = process.env.GEMINI_TEXT_MODEL || "gemini-2.5-flash-lite";
+  const provider = getTextProvider();
+  const model = getTextModel(provider);
   const prompt = createDynamicPrompt(existingState.rows, allowedCategories);
-  const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`, {
-    method: "POST",
-    headers: {
-      "x-goog-api-key": apiKey,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      contents: [
-        {
-          parts: [{ text: prompt }],
-        },
-      ],
-    }),
-  });
-
-  if (!response.ok) {
-    throw new Error(`Gemini request failed with status ${response.status}: ${await response.text()}`);
-  }
-
-  const data = await response.json();
-  const parsed = JSON.parse(extractJson(getGeminiText(data)));
+  const result = await generateText({ prompt, provider, model, temperature: 0.4 });
+  const parsed = JSON.parse(extractJson(result.text));
   const category = String(parsed.category || "").trim();
   const topic = String(parsed.topic || "").trim();
   const angle = String(parsed.angle || "").trim();
@@ -212,7 +175,7 @@ async function generateDynamicTopic(existingState, allowedCategories) {
     topic,
     angle,
     search_hint: searchHint || topic,
-    source: "dynamic-gemini",
+    source: `dynamic-${provider}`,
   };
 }
 

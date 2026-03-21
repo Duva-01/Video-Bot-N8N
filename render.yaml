@@ -57,9 +57,21 @@ services:
       - key: WEBHOOK_URL
         sync: false
       - key: TEXT_PROVIDER
-        value: gemini
+        value: groq
       - key: TTS_PROVIDER
-        value: gemini
+        value: azure
+      - key: GROQ_API_KEY
+        sync: false
+      - key: GROQ_TEXT_MODEL
+        value: llama-3.1-8b-instant
+      - key: AZURE_SPEECH_KEY
+        sync: false
+      - key: AZURE_SPEECH_REGION
+        sync: false
+      - key: AZURE_SPEECH_VOICE
+        value: es-ES-ElviraNeural
+      - key: AZURE_SPEECH_OUTPUT_FORMAT
+        value: riff-24khz-16bit-mono-pcm
       - key: GEMINI_API_KEY
         sync: false
       - key: GEMINI_TEXT_MODEL

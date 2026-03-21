@@ -2,9 +2,9 @@ require("dotenv").config();
 
 const fs = require("fs");
 const path = require("path");
-const fetch = global.fetch || require("node-fetch");
 const { markGenerated } = require("./lib/content-db");
 const { logArtifact, logFailure, logStepEvent, withOptionalPool } = require("./lib/script-observer");
+const { generateText, getTextModel, getTextProvider } = require("./lib/llm-text");
 
 function fail(message) {
   console.error(`[generate-script][error] ${message}`);
@@ -13,14 +13,6 @@ function fail(message) {
 
 function log(message, meta = {}) {
   console.log(JSON.stringify({ ts: new Date().toISOString(), message, ...meta }));
-}
-
-function getRequiredEnv(name) {
-  const value = process.env[name];
-  if (!value) {
-    fail(`Missing required environment variable: ${name}`);
-  }
-  return value;
 }
 
 function extractJson(text) {
@@ -43,20 +35,6 @@ function extractJson(text) {
   fail("Model response did not contain valid JSON text");
 }
 
-function getGeminiText(data) {
-  const parts = data.candidates?.[0]?.content?.parts || [];
-  const text = parts
-    .map((part) => part.text || "")
-    .join("")
-    .trim();
-
-  if (!text) {
-    fail("Gemini response did not include text output");
-  }
-
-  return text;
-}
-
 async function main() {
   const outputPath = process.argv[2] || "/tmp/bot-videos/script.json";
   const topicFilePath = process.argv[3] && process.argv[3].endsWith(".json") ? process.argv[3] : null;
@@ -66,8 +44,8 @@ async function main() {
   const cta = topicFile?.cta || process.argv[5] || process.env.VIDEO_DEFAULT_CTA || "Sigue la cuenta para mas hechos curiosos";
   const style = topicFile?.video_style || process.argv[6] || process.env.VIDEO_DEFAULT_STYLE || "curioso, rapido, directo";
   const language = topicFile?.language || process.argv[7] || process.env.VIDEO_DEFAULT_LANGUAGE || "es";
-  const provider = process.env.TEXT_PROVIDER || (process.env.GEMINI_API_KEY ? "gemini" : "openai");
-  const model = provider === "gemini" ? process.env.GEMINI_TEXT_MODEL || "gemini-2.5-flash-lite" : process.env.OPENAI_MODEL || "gpt-4.1-mini";
+  const provider = getTextProvider();
+  const model = getTextModel(provider);
   const angle = topicFile?.angle || "un hecho curioso poco conocido";
   const category = topicFile?.category || "general";
   const topicKey = topicFile?.key || null;
@@ -114,45 +92,8 @@ async function main() {
   let outputText;
 
   try {
-    if (provider === "gemini") {
-      const apiKey = getRequiredEnv("GEMINI_API_KEY");
-      const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`, {
-        method: "POST",
-        headers: {
-          "x-goog-api-key": apiKey,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] }),
-      });
-
-      if (!response.ok) {
-        fail(`Gemini request failed with status ${response.status}: ${await response.text()}`);
-      }
-
-      const data = await response.json();
-      outputText = getGeminiText(data);
-    } else {
-      const apiKey = getRequiredEnv("OPENAI_API_KEY");
-      const response = await fetch("https://api.openai.com/v1/responses", {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${apiKey}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ model, input: prompt }),
-      });
-
-      if (!response.ok) {
-        fail(`OpenAI request failed with status ${response.status}: ${await response.text()}`);
-      }
-
-      const data = await response.json();
-      outputText = data.output_text;
-
-      if (!outputText) {
-        fail("OpenAI response did not include output_text");
-      }
-    }
+    const result = await generateText({ prompt, provider, model, temperature: 0.3 });
+    outputText = result.text;
 
     const parsed = JSON.parse(extractJson(outputText));
     const payload = {
