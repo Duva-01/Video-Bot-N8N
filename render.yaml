@@ -18,6 +18,8 @@ services:
         value: "true"
       - key: APP_SESSION_SECRET
         sync: false
+      - key: N8N_ENCRYPTION_KEY
+        sync: false
       - key: N8N_HOST
         value: 0.0.0.0
       - key: N8N_PORT
@@ -30,6 +32,8 @@ services:
         sync: false
       - key: N8N_PROXY_HOPS
         value: "1"
+      - key: N8N_DB_SCHEMA
+        value: n8n
       - key: KEEP_ALIVE_ENABLED
         value: "true"
       - key: KEEP_ALIVE_INTERVAL_MS
@@ -88,6 +92,16 @@ services:
         sync: false
       - key: PEXELS_CLIPS_COUNT
         value: "1"
+      - key: PEXELS_QUERY_LIMIT
+        value: "3"
+      - key: PEXELS_PER_PAGE
+        value: "3"
+      - key: PEXELS_TARGET_WIDTH
+        value: "540"
+      - key: PEXELS_SEARCH_TIMEOUT_MS
+        value: "15000"
+      - key: PEXELS_DOWNLOAD_TIMEOUT_MS
+        value: "45000"
       - key: RENDER_LOW_MEMORY_MODE
         value: "true"
       - key: SHORTS_WIDTH

@@ -16,7 +16,7 @@ Sistema automatizado para generar `YouTube Shorts` de `facts` y `hechos curiosos
 - `Gemini` genera topic, guion y narracion
 - `Pexels` aporta clips de apoyo
 - `FFmpeg` monta el video final con subtitulos
-- `Neon` guarda historial y evita reutilizar topics
+- `Neon` guarda historial, evita reutilizar topics y persiste la base de datos de `n8n`
 - `YouTube` recibe la publicacion
 - `render-proxy.js` expone `GET /health`, `GET /dashboard` y proxya `n8n`
 
@@ -77,6 +77,12 @@ Ahora el proxy publica:
 - cookie de sesion persistente
 - `/auth/logout` para cerrar sesion
 
+Dentro de `n8n`:
+
+- `Dashboard` se abre en un panel inline
+- `Health` se abre inline con el JSON del estado
+- no saca al usuario a otra pagina aparte
+
 Por defecto reutiliza:
 
 - `N8N_BASIC_AUTH_USER`
@@ -107,6 +113,7 @@ Opcionalmente puedes separar las credenciales del proxy con:
 - `GEMINI_API_KEY`
 - `PEXELS_API_KEY`
 - `NEON_DATABASE_URL`
+- `N8N_ENCRYPTION_KEY`
 - `YOUTUBE_CLIENT_ID`
 - `YOUTUBE_CLIENT_SECRET`
 - `YOUTUBE_REFRESH_TOKEN`
@@ -134,8 +141,77 @@ Para `Render Free`, mantien:
 - `SHORTS_HEIGHT=960`
 - `SHORTS_FPS=20`
 - `FFMPEG_THREADS=1`
+- `PEXELS_QUERY_LIMIT=3`
+- `PEXELS_PER_PAGE=3`
+- `PEXELS_TARGET_WIDTH=540`
 
 Con esa configuracion el video final consume bastante menos memoria al montar en `FFmpeg`, que es justo donde `Render Free` suele matar la instancia por pasar de `512MB`.
+
+## Persistencia de n8n en Neon
+
+Si `NEON_DATABASE_URL` esta configurado, el proxy arranca `n8n` con `Postgres` en vez de `SQLite`.
+
+Eso hace que sobrevivan a los redeploys:
+
+- workflows
+- credenciales
+- ejecuciones
+- ajustes internos de `n8n`
+
+Configuracion minima recomendada:
+
+```text
+NEON_DATABASE_URL=postgresql://...
+N8N_DB_SCHEMA=n8n
+N8N_ENCRYPTION_KEY=una-clave-larga-y-estable
+```
+
+Nota importante:
+
+- el primer despliegue con Neon no puede rescatar automaticamente el SQLite efimero anterior
+- a partir de que importes el workflow una vez en la base `Neon`, ya queda persistente
+
+## Simulacion de Render Free
+
+Hay un simulador local que ejecuta el pipeline dentro de Docker con:
+
+- `512 MB`
+- `0.10 CPU`
+
+Comando:
+
+```bash
+npm run simulate:render
+```
+
+Genera artefactos en:
+
+- `tmp/render-free-sim/container.log`
+- `tmp/render-free-sim/stats.json`
+- `tmp/render-free-sim/summary.json`
+
+Sirve para ver:
+
+- donde cae el proceso
+- uso de memoria del contenedor
+- si el MP4 final se llego a construir
+
+## Pexels
+
+El nodo ahora esta optimizado para consumir menos memoria:
+
+- limita queries y resultados
+- elige ficheros mas cercanos a la resolucion objetivo
+- descarga clips en streaming a disco
+- registra errores por query y por descarga
+
+Variables utiles:
+
+- `PEXELS_QUERY_LIMIT`
+- `PEXELS_PER_PAGE`
+- `PEXELS_TARGET_WIDTH`
+- `PEXELS_SEARCH_TIMEOUT_MS`
+- `PEXELS_DOWNLOAD_TIMEOUT_MS`
 
 ## Neon
 

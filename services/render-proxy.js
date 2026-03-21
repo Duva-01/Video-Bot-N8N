@@ -6,6 +6,7 @@ const crypto = require("crypto");
 const fs = require("fs");
 const path = require("path");
 const { spawn } = require("child_process");
+const { Pool } = require("pg");
 const httpProxy = require("http-proxy");
 const { loadDashboardData } = require("./dashboard-data");
 
@@ -52,6 +53,37 @@ const staticFiles = {
   "/ui/chrome.js": path.join("..", "ui", "chrome.js"),
 };
 
+function getN8nDatabaseUrl() {
+  return process.env.N8N_DATABASE_URL || process.env.NEON_DATABASE_URL || process.env.DATABASE_URL || "";
+}
+
+function parsePostgresConnectionString(connectionString) {
+  const parsed = new URL(connectionString);
+
+  return {
+    host: parsed.hostname,
+    port: parsed.port || "5432",
+    user: decodeURIComponent(parsed.username || ""),
+    password: decodeURIComponent(parsed.password || ""),
+    database: decodeURIComponent(parsed.pathname.replace(/^\//, "") || "neondb"),
+  };
+}
+
+async function ensureN8nDatabaseSchema(connectionString, schema) {
+  const pool = new Pool({
+    connectionString,
+    ssl: { rejectUnauthorized: false },
+  });
+
+  const safeSchema = String(schema || "n8n").replace(/"/g, "\"\"");
+
+  try {
+    await pool.query(`CREATE SCHEMA IF NOT EXISTS "${safeSchema}"`);
+  } finally {
+    await pool.end();
+  }
+}
+
 function log(message, meta = {}) {
   const payload = {
     ts: new Date().toISOString(),
@@ -61,14 +93,63 @@ function log(message, meta = {}) {
   console.log(JSON.stringify(payload));
 }
 
-function startN8n() {
+async function buildN8nEnv() {
   const env = {
     ...process.env,
     N8N_HOST: internalHost,
     N8N_PORT: String(internalPort),
     PORT: String(internalPort),
     N8N_BASIC_AUTH_ACTIVE: "false",
+    N8N_ENCRYPTION_KEY:
+      process.env.N8N_ENCRYPTION_KEY ||
+      process.env.APP_SESSION_SECRET ||
+      process.env.N8N_BASIC_AUTH_PASSWORD ||
+      authSecret,
   };
+
+  const connectionString = getN8nDatabaseUrl();
+
+  if (!connectionString) {
+    log("n8n persistence using local sqlite", {
+      reason: "database url not configured",
+    });
+    return env;
+  }
+
+  const parsed = parsePostgresConnectionString(connectionString);
+  const schema = process.env.N8N_DB_SCHEMA || process.env.DB_POSTGRESDB_SCHEMA || "n8n";
+
+  await ensureN8nDatabaseSchema(connectionString, schema);
+
+  env.DB_TYPE = "postgresdb";
+  env.DB_POSTGRESDB_HOST = parsed.host;
+  env.DB_POSTGRESDB_PORT = String(parsed.port);
+  env.DB_POSTGRESDB_DATABASE = parsed.database;
+  env.DB_POSTGRESDB_USER = parsed.user;
+  env.DB_POSTGRESDB_PASSWORD = parsed.password;
+  env.DB_POSTGRESDB_SCHEMA = schema;
+  env.DB_POSTGRESDB_SSL_ENABLED = "true";
+  env.DB_POSTGRESDB_SSL_REJECT_UNAUTHORIZED = "false";
+  env.DB_POSTGRESDB_POOL_SIZE = process.env.DB_POSTGRESDB_POOL_SIZE || "1";
+  env.DB_POSTGRESDB_CONNECTION_TIMEOUT = process.env.DB_POSTGRESDB_CONNECTION_TIMEOUT || "20000";
+  env.DB_POSTGRESDB_IDLE_CONNECTION_TIMEOUT = process.env.DB_POSTGRESDB_IDLE_CONNECTION_TIMEOUT || "30000";
+
+  log("n8n persistence configured", {
+    databaseHost: parsed.host,
+    databaseName: parsed.database,
+    schema,
+  });
+
+  return env;
+}
+
+function startN8n(env) {
+  log("starting n8n child process", {
+    internalHost,
+    internalPort,
+    databaseBacked: env.DB_TYPE === "postgresdb",
+    dbSchema: env.DB_POSTGRESDB_SCHEMA || "sqlite",
+  });
 
   const child = spawn("n8n", ["start"], {
     env,
@@ -95,6 +176,17 @@ function getHealthPayload() {
     status: "ok",
     service: "bot-de-videos",
     n8nTarget: `http://${internalHost}:${internalPort}`,
+    persistence: {
+      n8nDatabase: Boolean(getN8nDatabaseUrl()),
+      n8nSchema: process.env.N8N_DB_SCHEMA || process.env.DB_POSTGRESDB_SCHEMA || "n8n",
+    },
+    performance: {
+      lowMemoryMode: (process.env.RENDER_LOW_MEMORY_MODE || "false") === "true",
+      shortsWidth: Number(process.env.SHORTS_WIDTH || 540),
+      shortsHeight: Number(process.env.SHORTS_HEIGHT || 960),
+      shortsFps: Number(process.env.SHORTS_FPS || 20),
+      ffmpegThreads: Number(process.env.FFMPEG_THREADS || 1),
+    },
     timestamp: new Date().toISOString(),
   });
 }
@@ -411,7 +503,7 @@ function startKeepAlive() {
   }, keepAliveIntervalMs).unref();
 }
 
-const n8nProcess = startN8n();
+let n8nProcess = null;
 
 proxy.on("error", (error, req, res) => {
   log("proxy error", {
@@ -529,15 +621,20 @@ server.on("upgrade", (req, socket, head) => {
   proxy.ws(req, socket, head);
 });
 
-server.listen(publicPort, publicHost, () => {
-  log("proxy listening", {
-    publicHost,
-    publicPort,
-    internalHost,
-    internalPort,
+async function main() {
+  const n8nEnv = await buildN8nEnv();
+  n8nProcess = startN8n(n8nEnv);
+
+  server.listen(publicPort, publicHost, () => {
+    log("proxy listening", {
+      publicHost,
+      publicPort,
+      internalHost,
+      internalPort,
+    });
+    startKeepAlive();
   });
-  startKeepAlive();
-});
+}
 
 function shutdown(signal) {
   if (shuttingDown) {
@@ -547,7 +644,7 @@ function shutdown(signal) {
   shuttingDown = true;
   log("shutdown requested", { signal });
   server.close(() => {
-    if (!n8nProcess.killed) {
+    if (n8nProcess && !n8nProcess.killed) {
       n8nProcess.kill(signal);
     }
   });
@@ -559,3 +656,10 @@ function shutdown(signal) {
 
 process.on("SIGINT", () => shutdown("SIGINT"));
 process.on("SIGTERM", () => shutdown("SIGTERM"));
+
+main().catch((error) => {
+  log("startup failed", {
+    error: error.message,
+  });
+  process.exit(1);
+});
