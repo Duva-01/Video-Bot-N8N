@@ -1,13 +1,10 @@
 require("dotenv").config();
 
-const { createPool, ensureSchema, getDashboardSummary, hasDatabase } = require("../scripts/lib/content-db");
+const { createPool, ensureSchema, getDashboardSummary, getOperationsLog, hasDatabase } = require("../scripts/lib/content-db");
 
 function pickLatestPublished(recentRuns) {
   const items = Array.isArray(recentRuns) ? recentRuns : [];
-  return (
-    items.find((item) => item.youtube_url || item.youtube_video_id || item.status === "published") ||
-    null
-  );
+  return items.find((item) => item.youtube_url || item.youtube_video_id || item.status === "published") || null;
 }
 
 async function loadDashboardData() {
@@ -34,14 +31,25 @@ async function loadDashboardData() {
         published_videos: 0,
         generated_videos: 0,
         selected_videos: 0,
+        failed_videos: 0,
         categories_covered: 0,
         last_published_at: null,
       },
       byStatus: [],
       byCategory: [],
       recentRuns: [],
-      timeline: [],
+      recentEvents: [],
+      artifactSummary: [],
+      memorySamples: [],
+      workflowSnapshot: null,
       latestPublished: null,
+      operations: {
+        events: [],
+        executionLogs: [],
+        artifacts: [],
+        apiAudit: [],
+        samples: [],
+      },
     };
   }
 
@@ -49,11 +57,12 @@ async function loadDashboardData() {
 
   try {
     await ensureSchema(pool);
-    const summary = await getDashboardSummary(pool);
+    const [summary, operations] = await Promise.all([getDashboardSummary(pool), getOperationsLog(pool, 30)]);
     return {
       ...basePayload,
       ...summary,
       latestPublished: pickLatestPublished(summary.recentRuns),
+      operations,
     };
   } finally {
     await pool.end();

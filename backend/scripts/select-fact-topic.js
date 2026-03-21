@@ -4,7 +4,8 @@ const fs = require("fs");
 const path = require("path");
 const fetch = global.fetch || require("node-fetch");
 const topics = require("../data/fact-topics.json");
-const { createPool, ensureSchema, hasDatabase, upsertSelection } = require("./lib/content-db");
+const { upsertSelection } = require("./lib/content-db");
+const { logStepEvent, withOptionalPool } = require("./lib/script-observer");
 
 function fail(message) {
   console.error(`[select-fact-topic][error] ${message}`);
@@ -282,22 +283,29 @@ async function main() {
 
   let selected;
   let usedDatabase = false;
-  let pool;
 
-  try {
-    if (hasDatabase()) {
-      usedDatabase = true;
-      pool = createPool();
-      await ensureSchema(pool);
-      selected = await selectTopicFromDb(pool, candidates);
-    } else {
-      selected = selectTopicWithoutDb(candidates);
-    }
-  } finally {
+  await withOptionalPool(async (pool) => {
     if (pool) {
-      await pool.end();
+      usedDatabase = true;
+      selected = await selectTopicFromDb(pool, candidates);
+      await logStepEvent(pool, {
+        topic_key: selected.key,
+        event_type: "topic_selected",
+        stage: "select_topic",
+        level: "info",
+        source: "select-fact-topic",
+        message: `Topic selected: ${selected.topic}`,
+        metadata: {
+          category: selected.category,
+          angle: selected.angle,
+          source: selected.source || "catalog",
+        },
+      });
+      return;
     }
-  }
+
+    selected = selectTopicWithoutDb(candidates);
+  });
 
   const payload = {
     ...selected,
@@ -326,4 +334,3 @@ async function main() {
 main().catch((error) => {
   fail(error.message);
 });
-

@@ -5,6 +5,7 @@ const path = require("path");
 const fetch = global.fetch || require("node-fetch");
 const { pipeline } = require("stream");
 const { promisify } = require("util");
+const { logArtifact, logFailure, logStepEvent, readJsonIfExists, withOptionalPool } = require("./lib/script-observer");
 
 const streamPipeline = promisify(pipeline);
 
@@ -14,13 +15,7 @@ function fail(message) {
 }
 
 function log(message, meta = {}) {
-  console.log(
-    JSON.stringify({
-      ts: new Date().toISOString(),
-      message,
-      ...meta,
-    }),
-  );
+  console.log(JSON.stringify({ ts: new Date().toISOString(), message, ...meta }));
 }
 
 function getRequiredEnv(name) {
@@ -33,37 +28,19 @@ function getRequiredEnv(name) {
 
 function buildQueries(scriptData) {
   const queries = [];
-
-  if (scriptData.search_query) {
-    queries.push(scriptData.search_query);
-  }
-
+  if (scriptData.search_query) queries.push(scriptData.search_query);
   if (Array.isArray(scriptData.visual_keywords)) {
     for (const keyword of scriptData.visual_keywords) {
-      if (keyword) {
-        queries.push(keyword);
-      }
+      if (keyword) queries.push(keyword);
     }
   }
-
-  if (scriptData.topic) {
-    queries.push(scriptData.topic);
-  }
-
+  if (scriptData.topic) queries.push(scriptData.topic);
   return [...new Set(queries.map((item) => item.trim()).filter(Boolean))];
 }
 
 function pickVideoFile(video, targetWidth) {
   const candidates = (video.video_files || [])
-    .filter((file) => {
-      if (!file.link || file.file_type !== "video/mp4") {
-        return false;
-      }
-
-      const width = Number(file.width || 0);
-      const height = Number(file.height || 0);
-      return width > 0 && height > 0;
-    })
+    .filter((file) => file.link && file.file_type === "video/mp4" && Number(file.width || 0) > 0 && Number(file.height || 0) > 0)
     .sort((a, b) => {
       const aWidth = Number(a.width || 0);
       const bWidth = Number(b.width || 0);
@@ -73,7 +50,6 @@ function pickVideoFile(video, targetWidth) {
       const bPortraitPenalty = bHeight >= bWidth ? 0 : 10000;
       const aTargetPenalty = Math.abs(aWidth - targetWidth) + (aWidth > targetWidth ? aWidth - targetWidth : 0);
       const bTargetPenalty = Math.abs(bWidth - targetWidth) + (bWidth > targetWidth ? bWidth - targetWidth : 0);
-
       return aPortraitPenalty + aTargetPenalty - (bPortraitPenalty + bTargetPenalty);
     });
 
@@ -82,9 +58,7 @@ function pickVideoFile(video, targetWidth) {
 
 async function downloadFile(url, outputPath, apiKey, timeoutMs) {
   const response = await fetch(url, {
-    headers: {
-      Authorization: apiKey,
-    },
+    headers: { Authorization: apiKey },
     timeout: timeoutMs,
   });
 
@@ -108,7 +82,8 @@ async function main() {
     fail(`Script file not found: ${scriptPath}`);
   }
 
-  const scriptData = JSON.parse(fs.readFileSync(scriptPath, "utf8"));
+  const scriptData = readJsonIfExists(scriptPath) || {};
+  const topicKey = scriptData.topic_key || null;
   const apiKey = getRequiredEnv("PEXELS_API_KEY");
   const maxClips = Number(process.env.PEXELS_CLIPS_COUNT || 3);
   const queryLimit = Number(process.env.PEXELS_QUERY_LIMIT || 3);
@@ -122,115 +97,145 @@ async function main() {
     fail("No search queries available for Pexels");
   }
 
+  await withOptionalPool(async (pool) => {
+    await logStepEvent(pool, {
+      topic_key: topicKey,
+      event_type: "step_started",
+      stage: "fetch_pexels",
+      source: "fetch-pexels",
+      message: "Fetching stock clips",
+      metadata: { queries, maxClips, perPage, targetWidth },
+    });
+  });
+
   fs.mkdirSync(clipsDir, { recursive: true });
   const downloads = [];
   const usedLinks = new Set();
   const queryErrors = [];
 
-  log("pexels search starting", {
-    scriptPath,
-    clipsDir,
-    queries,
-    maxClips,
-    queryLimit,
-    perPage,
-    targetWidth,
-  });
+  log("pexels search starting", { scriptPath, clipsDir, queries, maxClips, queryLimit, perPage, targetWidth });
 
-  for (const query of queries) {
-    if (downloads.length >= maxClips) {
-      break;
-    }
+  try {
+    for (const query of queries) {
+      if (downloads.length >= maxClips) break;
 
-    const url = `https://api.pexels.com/videos/search?query=${encodeURIComponent(query)}&orientation=portrait&per_page=${perPage}`;
-    let payload;
+      const url = `https://api.pexels.com/videos/search?query=${encodeURIComponent(query)}&orientation=portrait&per_page=${perPage}`;
+      let payload;
 
-    try {
-      const response = await fetch(url, {
-        headers: {
-          Authorization: apiKey,
-        },
-        timeout: searchTimeoutMs,
-      });
+      try {
+        const response = await fetch(url, {
+          headers: { Authorization: apiKey },
+          timeout: searchTimeoutMs,
+        });
 
-      if (!response.ok) {
-        throw new Error(`Pexels search failed with status ${response.status}: ${await response.text()}`);
-      }
+        if (!response.ok) {
+          throw new Error(`Pexels search failed with status ${response.status}: ${await response.text()}`);
+        }
 
-      payload = await response.json();
-    } catch (error) {
-      queryErrors.push({ query, error: error.message });
-      log("pexels query failed", {
-        query,
-        error: error.message,
-      });
-      continue;
-    }
-
-    const videos = Array.isArray(payload.videos) ? payload.videos : [];
-
-    log("pexels query completed", {
-      query,
-      videosFound: videos.length,
-    });
-
-    for (const video of videos) {
-      if (downloads.length >= maxClips) {
-        break;
-      }
-
-      const selectedFile = pickVideoFile(video, targetWidth);
-      if (!selectedFile || usedLinks.has(selectedFile.link)) {
+        payload = await response.json();
+      } catch (error) {
+        queryErrors.push({ query, error: error.message });
+        log("pexels query failed", { query, error: error.message });
         continue;
       }
 
-      const outputPath = path.join(clipsDir, `clip-${String(downloads.length + 1).padStart(2, "0")}.mp4`);
+      const videos = Array.isArray(payload.videos) ? payload.videos : [];
+      log("pexels query completed", { query, videosFound: videos.length });
 
-      try {
-        const downloadMeta = await downloadFile(selectedFile.link, outputPath, apiKey, downloadTimeoutMs);
-        usedLinks.add(selectedFile.link);
-        downloads.push({
-          query,
-          pexels_video_id: video.id,
-          outputPath,
-          width: selectedFile.width || null,
-          height: selectedFile.height || null,
-        });
-        log("pexels clip downloaded", {
-          query,
-          outputPath,
-          pexelsVideoId: video.id,
-          width: selectedFile.width || null,
-          height: selectedFile.height || null,
-          bytes: downloadMeta.bytes,
-          contentType: downloadMeta.contentType,
-        });
-      } catch (error) {
-        log("pexels clip download failed", {
-          query,
-          pexelsVideoId: video.id,
-          error: error.message,
-        });
+      for (const video of videos) {
+        if (downloads.length >= maxClips) break;
+
+        const selectedFile = pickVideoFile(video, targetWidth);
+        if (!selectedFile || usedLinks.has(selectedFile.link)) {
+          continue;
+        }
+
+        const outputPath = path.join(clipsDir, `clip-${String(downloads.length + 1).padStart(2, "0")}.mp4`);
+
+        try {
+          const downloadMeta = await downloadFile(selectedFile.link, outputPath, apiKey, downloadTimeoutMs);
+          usedLinks.add(selectedFile.link);
+          downloads.push({
+            query,
+            pexels_video_id: video.id,
+            outputPath,
+            width: selectedFile.width || null,
+            height: selectedFile.height || null,
+            bytes: downloadMeta.bytes,
+          });
+          log("pexels clip downloaded", {
+            query,
+            outputPath,
+            pexelsVideoId: video.id,
+            width: selectedFile.width || null,
+            height: selectedFile.height || null,
+            bytes: downloadMeta.bytes,
+            contentType: downloadMeta.contentType,
+          });
+        } catch (error) {
+          log("pexels clip download failed", { query, pexelsVideoId: video.id, error: error.message });
+        }
       }
     }
+
+    if (downloads.length === 0) {
+      fail(`No clips were downloaded from Pexels. Query errors: ${JSON.stringify(queryErrors)}`);
+    }
+
+    const manifestPath = path.join(clipsDir, "manifest.json");
+    fs.writeFileSync(manifestPath, JSON.stringify(downloads, null, 2));
+
+    await withOptionalPool(async (pool) => {
+      await logArtifact(pool, {
+        topic_key: topicKey,
+        artifact_type: "pexels_manifest",
+        label: "Downloaded clips manifest",
+        file_path: manifestPath,
+        mime_type: "application/json",
+        metadata: { clips: downloads.length, queryErrors },
+      });
+
+      for (const clip of downloads) {
+        await logArtifact(pool, {
+          topic_key: topicKey,
+          artifact_type: "source_clip",
+          label: `Pexels clip ${clip.pexels_video_id}`,
+          file_path: clip.outputPath,
+          mime_type: "video/mp4",
+          metadata: {
+            query: clip.query,
+            pexels_video_id: clip.pexels_video_id,
+            width: clip.width,
+            height: clip.height,
+          },
+        });
+      }
+
+      await logStepEvent(pool, {
+        topic_key: topicKey,
+        event_type: "step_completed",
+        stage: "fetch_pexels",
+        source: "fetch-pexels",
+        message: "Stock clips downloaded",
+        metadata: { clipsDownloaded: downloads.length, queryErrors },
+      });
+    });
+
+    log("pexels search completed", { clipsDir, clipsDownloaded: downloads.length, manifestPath, queryErrors: queryErrors.length });
+  } catch (error) {
+    await withOptionalPool(async (pool) => {
+      await logFailure(pool, {
+        topic_key: topicKey,
+        stage: "fetch_pexels",
+        source: "fetch-pexels",
+        error: error.message,
+        metadata: { queries, queryErrors },
+      });
+    });
+    throw error;
   }
-
-  if (downloads.length === 0) {
-    fail(`No clips were downloaded from Pexels. Query errors: ${JSON.stringify(queryErrors)}`);
-  }
-
-  const manifestPath = path.join(clipsDir, "manifest.json");
-  fs.writeFileSync(manifestPath, JSON.stringify(downloads, null, 2));
-
-  log("pexels search completed", {
-    clipsDir,
-    clipsDownloaded: downloads.length,
-    manifestPath,
-    queryErrors: queryErrors.length,
-  });
 }
 
 main().catch((error) => {
   fail(error.message);
 });
-

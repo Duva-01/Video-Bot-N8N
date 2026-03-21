@@ -1,7 +1,7 @@
 require("dotenv").config();
 
-const fs = require("fs");
 const { createPool, ensureSchema, hasDatabase, markPublished } = require("./lib/content-db");
+const { logArtifact, logFailure, logStepEvent, readJsonIfExists } = require("./lib/script-observer");
 
 function fail(message) {
   console.error(`[finalize-content][error] ${message}`);
@@ -9,20 +9,7 @@ function fail(message) {
 }
 
 function log(message, meta = {}) {
-  console.log(
-    JSON.stringify({
-      ts: new Date().toISOString(),
-      message,
-      ...meta,
-    }),
-  );
-}
-
-function readJsonIfExists(filePath) {
-  if (!filePath || !fs.existsSync(filePath)) {
-    return null;
-  }
-  return JSON.parse(fs.readFileSync(filePath, "utf8"));
+  console.log(JSON.stringify({ ts: new Date().toISOString(), message, ...meta }));
 }
 
 async function main() {
@@ -33,7 +20,6 @@ async function main() {
 
   const scriptPath = process.argv[2] || "/tmp/bot-videos/script.json";
   const youtubeResultPath = process.argv[3] || "/tmp/bot-videos/youtube-result.json";
-
   const scriptData = readJsonIfExists(scriptPath);
   if (!scriptData?.topic_key) {
     log("topic_key missing, skipping finalize");
@@ -41,7 +27,6 @@ async function main() {
   }
 
   const youtubeResult = readJsonIfExists(youtubeResultPath) || {};
-
   const pool = createPool();
 
   try {
@@ -58,6 +43,42 @@ async function main() {
         search_query: scriptData.search_query,
       },
     });
+
+    await logStepEvent(pool, {
+      topic_key: scriptData.topic_key,
+      event_type: "pipeline_completed",
+      stage: "finalize_content",
+      source: "finalize-content",
+      message: "Content finalized in database",
+      metadata: {
+        youtube_video_id: youtubeResult.videoId || null,
+        youtube_url: youtubeResult.url || null,
+      },
+    });
+
+    await logArtifact(pool, {
+      topic_key: scriptData.topic_key,
+      artifact_type: "publication_record",
+      label: "Published YouTube record",
+      external_url: youtubeResult.url || null,
+      mime_type: "application/json",
+      metadata: {
+        youtube_video_id: youtubeResult.videoId || null,
+        title: scriptData.title,
+      },
+    });
+  } catch (error) {
+    try {
+      await logFailure(pool, {
+        topic_key: scriptData.topic_key,
+        stage: "finalize_content",
+        source: "finalize-content",
+        error: error.message,
+      });
+    } catch (innerError) {
+      log("finalize failure logging error", { error: innerError.message });
+    }
+    throw error;
   } finally {
     await pool.end();
   }
@@ -71,4 +92,3 @@ async function main() {
 main().catch((error) => {
   fail(error.message);
 });
-

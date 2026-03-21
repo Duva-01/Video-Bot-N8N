@@ -3,6 +3,7 @@ require("dotenv").config();
 const fs = require("fs");
 const path = require("path");
 const { spawnSync } = require("child_process");
+const { logArtifact, logFailure, logStepEvent, readJsonIfExists, withOptionalPool } = require("./lib/script-observer");
 
 function fail(message) {
   console.error(`[generate-subtitles][error] ${message}`);
@@ -10,13 +11,7 @@ function fail(message) {
 }
 
 function log(message, meta = {}) {
-  console.log(
-    JSON.stringify({
-      ts: new Date().toISOString(),
-      message,
-      ...meta,
-    }),
-  );
+  console.log(JSON.stringify({ ts: new Date().toISOString(), message, ...meta }));
 }
 
 function toSrtTime(seconds) {
@@ -29,19 +24,9 @@ function toSrtTime(seconds) {
 }
 
 function getAudioDuration(audioPath) {
-  const result = spawnSync(
-    "ffprobe",
-    [
-      "-v",
-      "error",
-      "-show_entries",
-      "format=duration",
-      "-of",
-      "default=noprint_wrappers=1:nokey=1",
-      audioPath,
-    ],
-    { encoding: "utf8" },
-  );
+  const result = spawnSync("ffprobe", ["-v", "error", "-show_entries", "format=duration", "-of", "default=noprint_wrappers=1:nokey=1", audioPath], {
+    encoding: "utf8",
+  });
 
   if (result.status === 0) {
     const parsed = Number(result.stdout.trim());
@@ -89,45 +74,83 @@ async function main() {
     fail(`Script file not found: ${scriptPath}`);
   }
 
-  const scriptData = JSON.parse(fs.readFileSync(scriptPath, "utf8"));
+  const scriptData = readJsonIfExists(scriptPath) || {};
   const narration = scriptData.narration;
+  const topicKey = scriptData.topic_key || null;
 
   if (!narration) {
     fail(`Missing narration text in ${scriptPath}`);
   }
 
-  const chunks = splitNarration(narration);
-  const totalWords = narration.split(/\s+/).filter(Boolean).length || 1;
-  const totalDuration = getAudioDuration(audioPath) || Math.max(8, totalWords / 2.5);
-
-  let elapsed = 0;
-  const lines = [];
-
-  chunks.forEach((chunk, index) => {
-    const chunkWords = chunk.split(/\s+/).filter(Boolean).length || 1;
-    const duration = (chunkWords / totalWords) * totalDuration;
-    const start = elapsed;
-    const end = index === chunks.length - 1 ? totalDuration : elapsed + duration;
-
-    lines.push(String(index + 1));
-    lines.push(`${toSrtTime(start)} --> ${toSrtTime(end)}`);
-    lines.push(chunk);
-    lines.push("");
-
-    elapsed = end;
+  await withOptionalPool(async (pool) => {
+    await logStepEvent(pool, {
+      topic_key: topicKey,
+      event_type: "step_started",
+      stage: "generate_subtitles",
+      source: "generate-subtitles",
+      message: "Generating subtitles",
+      metadata: { scriptPath, audioPath },
+    });
   });
 
-  fs.mkdirSync(path.dirname(outputPath), { recursive: true });
-  fs.writeFileSync(outputPath, lines.join("\n"), "utf8");
+  try {
+    const chunks = splitNarration(narration);
+    const totalWords = narration.split(/\s+/).filter(Boolean).length || 1;
+    const totalDuration = getAudioDuration(audioPath) || Math.max(8, totalWords / 2.5);
 
-  log("subtitles generated", {
-    outputPath,
-    entries: chunks.length,
-    totalDuration,
-  });
+    let elapsed = 0;
+    const lines = [];
+
+    chunks.forEach((chunk, index) => {
+      const chunkWords = chunk.split(/\s+/).filter(Boolean).length || 1;
+      const duration = (chunkWords / totalWords) * totalDuration;
+      const start = elapsed;
+      const end = index === chunks.length - 1 ? totalDuration : elapsed + duration;
+
+      lines.push(String(index + 1));
+      lines.push(`${toSrtTime(start)} --> ${toSrtTime(end)}`);
+      lines.push(chunk);
+      lines.push("");
+      elapsed = end;
+    });
+
+    fs.mkdirSync(path.dirname(outputPath), { recursive: true });
+    fs.writeFileSync(outputPath, lines.join("\n"), "utf8");
+
+    await withOptionalPool(async (pool) => {
+      await logArtifact(pool, {
+        topic_key: topicKey,
+        artifact_type: "subtitles_srt",
+        label: "Subtitles file",
+        file_path: outputPath,
+        mime_type: "application/x-subrip",
+        metadata: { entries: chunks.length, totalDuration },
+      });
+      await logStepEvent(pool, {
+        topic_key: topicKey,
+        event_type: "step_completed",
+        stage: "generate_subtitles",
+        source: "generate-subtitles",
+        message: "Subtitles generated",
+        metadata: { entries: chunks.length, totalDuration },
+      });
+    });
+
+    log("subtitles generated", { outputPath, entries: chunks.length, totalDuration });
+  } catch (error) {
+    await withOptionalPool(async (pool) => {
+      await logFailure(pool, {
+        topic_key: topicKey,
+        stage: "generate_subtitles",
+        source: "generate-subtitles",
+        error: error.message,
+        metadata: { scriptPath, audioPath },
+      });
+    });
+    throw error;
+  }
 }
 
 main().catch((error) => {
   fail(error.message);
 });
-

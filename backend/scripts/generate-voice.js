@@ -3,6 +3,7 @@ require("dotenv").config();
 const fs = require("fs");
 const path = require("path");
 const fetch = global.fetch || require("node-fetch");
+const { logArtifact, logFailure, logStepEvent, readJsonIfExists, withOptionalPool } = require("./lib/script-observer");
 
 function fail(message) {
   console.error(`[generate-voice][error] ${message}`);
@@ -10,13 +11,7 @@ function fail(message) {
 }
 
 function log(message, meta = {}) {
-  console.log(
-    JSON.stringify({
-      ts: new Date().toISOString(),
-      message,
-      ...meta,
-    }),
-  );
+  console.log(JSON.stringify({ ts: new Date().toISOString(), message, ...meta }));
 }
 
 function getRequiredEnv(name) {
@@ -28,8 +23,7 @@ function getRequiredEnv(name) {
 }
 
 function writeWavFile(outputPath, pcmBuffer, sampleRate = 24000, numChannels = 1, bitsPerSample = 16) {
-  const byteRate = sampleRate * numChannels * bitsPerSample / 8;
-  const blockAlign = numChannels * bitsPerSample / 8;
+  const byteRate = (sampleRate * numChannels * bitsPerSample) / 8;
   const header = Buffer.alloc(44);
 
   header.write("RIFF", 0);
@@ -41,7 +35,7 @@ function writeWavFile(outputPath, pcmBuffer, sampleRate = 24000, numChannels = 1
   header.writeUInt16LE(numChannels, 22);
   header.writeUInt32LE(sampleRate, 24);
   header.writeUInt32LE(byteRate, 28);
-  header.writeUInt16LE(blockAlign, 32);
+  header.writeUInt16LE((numChannels * bitsPerSample) / 8, 32);
   header.writeUInt16LE(bitsPerSample, 34);
   header.write("data", 36);
   header.writeUInt32LE(pcmBuffer.length, 40);
@@ -68,9 +62,10 @@ async function main() {
     fail(`Script file not found: ${scriptPath}`);
   }
 
-  const scriptData = JSON.parse(fs.readFileSync(scriptPath, "utf8"));
+  const scriptData = readJsonIfExists(scriptPath) || {};
   const text = scriptData.narration;
   const language = scriptData.language || process.env.VIDEO_DEFAULT_LANGUAGE || "es";
+  const topicKey = scriptData.topic_key || null;
 
   if (!text) {
     fail(`Missing narration text in ${scriptPath}`);
@@ -78,110 +73,132 @@ async function main() {
 
   const provider = process.env.TTS_PROVIDER || (process.env.GEMINI_API_KEY ? "gemini" : "elevenlabs");
 
-  log("voice generation starting", {
-    scriptPath,
-    outputPath,
-    provider,
+  log("voice generation starting", { scriptPath, outputPath, provider });
+
+  await withOptionalPool(async (pool) => {
+    await logStepEvent(pool, {
+      topic_key: topicKey,
+      event_type: "step_started",
+      stage: "generate_voice",
+      source: "generate-voice",
+      message: "Generating voice track",
+      metadata: { provider },
+    });
   });
 
   fs.mkdirSync(path.dirname(outputPath), { recursive: true });
 
-  if (provider === "gemini") {
-    const apiKey = getRequiredEnv("GEMINI_API_KEY");
-    const model = process.env.GEMINI_TTS_MODEL || "gemini-2.5-flash-preview-tts";
-    const voiceName = process.env.GEMINI_TTS_VOICE || "Kore";
-    const prompt = [
-      `Lee el siguiente texto en ${language}.`,
-      "Usa un tono natural, claro y directo, apto para un video corto de tecnologia.",
-      text,
-    ].join("\n");
+  try {
+    if (provider === "gemini") {
+      const apiKey = getRequiredEnv("GEMINI_API_KEY");
+      const model = process.env.GEMINI_TTS_MODEL || "gemini-2.5-flash-preview-tts";
+      const voiceName = process.env.GEMINI_TTS_VOICE || "Kore";
+      const prompt = [`Lee el siguiente texto en ${language}.`, "Usa un tono natural, claro y directo.", text].join("\n");
 
-    const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`, {
+      const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`, {
+        method: "POST",
+        headers: {
+          "x-goog-api-key": apiKey,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          contents: [{ parts: [{ text: prompt }] }],
+          generationConfig: {
+            responseModalities: ["AUDIO"],
+            speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName } } },
+          },
+        }),
+      });
+
+      if (!response.ok) {
+        fail(`Gemini TTS request failed with status ${response.status}: ${await response.text()}`);
+      }
+
+      const data = await response.json();
+      const pcmBuffer = Buffer.from(getGeminiInlineAudio(data), "base64");
+      writeWavFile(outputPath, pcmBuffer);
+
+      await withOptionalPool(async (pool) => {
+        await logArtifact(pool, {
+          topic_key: topicKey,
+          artifact_type: "voice_track",
+          label: "Narration audio",
+          file_path: outputPath,
+          mime_type: "audio/wav",
+          metadata: { provider, model, voiceName },
+        });
+        await logStepEvent(pool, {
+          topic_key: topicKey,
+          event_type: "step_completed",
+          stage: "generate_voice",
+          source: "generate-voice",
+          message: "Voice generated",
+          metadata: { provider, model, voiceName, bytes: pcmBuffer.length },
+        });
+      });
+
+      log("voice generation completed", { outputPath, bytes: pcmBuffer.length, provider, voiceName, model });
+      return;
+    }
+
+    const apiKey = getRequiredEnv("ELEVENLABS_API_KEY");
+    const voiceId = getRequiredEnv("ELEVENLABS_VOICE_ID");
+    const modelId = process.env.ELEVENLABS_MODEL_ID || "eleven_multilingual_v2";
+    const response = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${voiceId}`, {
       method: "POST",
       headers: {
-        "x-goog-api-key": apiKey,
+        "xi-api-key": apiKey,
+        Accept: "audio/mpeg",
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        contents: [
-          {
-            parts: [
-              {
-                text: prompt,
-              },
-            ],
-          },
-        ],
-        generationConfig: {
-          responseModalities: ["AUDIO"],
-          speechConfig: {
-            voiceConfig: {
-              prebuiltVoiceConfig: {
-                voiceName,
-              },
-            },
-          },
-        },
+        text,
+        model_id: modelId,
+        voice_settings: { stability: 0.5, similarity_boost: 0.75 },
       }),
     });
 
     if (!response.ok) {
-      fail(`Gemini TTS request failed with status ${response.status}: ${await response.text()}`);
+      fail(`ElevenLabs request failed with status ${response.status}: ${await response.text()}`);
     }
 
-    const data = await response.json();
-    const audioBase64 = getGeminiInlineAudio(data);
-    const pcmBuffer = Buffer.from(audioBase64, "base64");
-    writeWavFile(outputPath, pcmBuffer);
+    const buffer = Buffer.from(await response.arrayBuffer());
+    fs.writeFileSync(outputPath, buffer);
 
-    log("voice generation completed", {
-      outputPath,
-      bytes: pcmBuffer.length,
-      provider,
-      voiceName,
-      model,
+    await withOptionalPool(async (pool) => {
+      await logArtifact(pool, {
+        topic_key: topicKey,
+        artifact_type: "voice_track",
+        label: "Narration audio",
+        file_path: outputPath,
+        mime_type: "audio/mpeg",
+        metadata: { provider, voiceId, modelId },
+      });
+      await logStepEvent(pool, {
+        topic_key: topicKey,
+        event_type: "step_completed",
+        stage: "generate_voice",
+        source: "generate-voice",
+        message: "Voice generated",
+        metadata: { provider, voiceId, modelId, bytes: buffer.length },
+      });
     });
 
-    return;
+    log("voice generation completed", { outputPath, bytes: buffer.length, provider, voiceId, modelId });
+  } catch (error) {
+    await withOptionalPool(async (pool) => {
+      await logFailure(pool, {
+        topic_key: topicKey,
+        stage: "generate_voice",
+        source: "generate-voice",
+        error: error.message,
+        metadata: { provider },
+      });
+    });
+    throw error;
   }
-
-  const apiKey = getRequiredEnv("ELEVENLABS_API_KEY");
-  const voiceId = getRequiredEnv("ELEVENLABS_VOICE_ID");
-  const modelId = process.env.ELEVENLABS_MODEL_ID || "eleven_multilingual_v2";
-  const response = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${voiceId}`, {
-    method: "POST",
-    headers: {
-      "xi-api-key": apiKey,
-      Accept: "audio/mpeg",
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      text,
-      model_id: modelId,
-      voice_settings: {
-        stability: 0.5,
-        similarity_boost: 0.75,
-      },
-    }),
-  });
-
-  if (!response.ok) {
-    fail(`ElevenLabs request failed with status ${response.status}: ${await response.text()}`);
-  }
-
-  const buffer = Buffer.from(await response.arrayBuffer());
-  fs.writeFileSync(outputPath, buffer);
-
-  log("voice generation completed", {
-    outputPath,
-    bytes: buffer.length,
-    provider,
-    voiceId,
-    modelId,
-  });
 }
 
 main().catch((error) => {
   fail(error.message);
 });
-

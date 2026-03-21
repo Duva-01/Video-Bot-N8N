@@ -3,45 +3,65 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Facts Engine OS</title>
+    <title>Facts Engine Control</title>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link
-      href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&family=IBM+Plex+Mono:wght@400;500&display=swap"
-      rel="stylesheet"
-    />
+    <link href="https://fonts.googleapis.com/css2?family=Sora:wght@400;600;700;800&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet" />
     <link rel="stylesheet" href="./styles.css" />
   </head>
   <body>
-    <div class="shell-bg shell-bg-a"></div>
-    <div class="shell-bg shell-bg-b"></div>
+    <div class="orb orb-a"></div>
+    <div class="orb orb-b"></div>
+    <div class="grid-noise"></div>
 
-    <main class="login-layout" id="loginView">
-      <section class="login-copy panel">
-        <p class="eyebrow">Cloudflare Control Surface</p>
-        <h1>Facts Engine OS</h1>
-        <p class="sidebar-copy">
-          Frontend ligero desplegable en Cloudflare. El backend de Render queda solo para `n8n`, workflow runtime,
-          persistencia y APIs.
+    <main class="login-screen" id="loginView">
+      <section class="login-hero panel glass">
+        <p class="eyebrow">Cloudflare control surface</p>
+        <h1>Facts Engine Control</h1>
+        <p class="hero-copy">
+          Operaciones para Shorts automaticos de facts. Render ejecuta n8n y FFmpeg. Neon guarda runs, eventos,
+          artefactos, auditoria y metricas. Cloudflare sirve la capa visual.
         </p>
-        <div class="mini-grid">
-          <article class="mini-card">
-            <span class="metric-label">Backend</span>
+
+        <div class="hero-metrics">
+          <article class="hero-metric">
+            <span>Runtime</span>
             <strong>Render + n8n</strong>
           </article>
-          <article class="mini-card">
-            <span class="metric-label">Persistencia</span>
-            <strong>Neon</strong>
+          <article class="hero-metric">
+            <span>Persistence</span>
+            <strong>Neon telemetry</strong>
           </article>
+          <article class="hero-metric">
+            <span>Surface</span>
+            <strong>Cloudflare Pages</strong>
+          </article>
+        </div>
+
+        <div class="signal-stack">
+          <div class="signal-card signal-card--pulse">
+            <span class="signal-dot"></span>
+            <div>
+              <strong>Workflow automation</strong>
+              <p>Control manual y scheduler desde una sola superficie.</p>
+            </div>
+          </div>
+          <div class="signal-card">
+            <span class="signal-dot signal-dot--warm"></span>
+            <div>
+              <strong>Neon logging</strong>
+              <p>Eventos, artefactos, auditoria, snapshots y muestras del sistema.</p>
+            </div>
+          </div>
         </div>
       </section>
 
-      <section class="login-panel panel">
-        <form id="loginForm" class="form">
+      <section class="login-card panel glass">
+        <form id="loginForm" class="login-form">
           <div class="panel-head">
-            <span class="badge">API Sign In</span>
-            <h2>Entrar al panel</h2>
-            <p>El token se guarda solo en este navegador.</p>
+            <span class="badge">Secure access</span>
+            <h2>Entrar al control center</h2>
+            <p>Autenticacion por token contra el backend de Render.</p>
           </div>
 
           <label class="field">
@@ -55,184 +75,262 @@
           </label>
 
           <label class="field">
-            <span>Contraseña</span>
+            <span>Password</span>
             <input id="password" type="password" autocomplete="current-password" required />
           </label>
 
-          <button type="submit" class="submit">Conectar</button>
+          <button type="submit" class="button button--primary button--glow">Access system</button>
           <p id="loginMessage" class="message" aria-live="polite"></p>
         </form>
       </section>
     </main>
 
     <div class="app-shell app-shell--hidden" id="appView">
-      <header class="topbar">
+      <header class="topbar glass panel">
         <div class="brand">
-          <div class="brand-mark" aria-hidden="true"></div>
-          <div class="brand-copy">
-            <span class="eyebrow">Official Control Surface</span>
-            <strong>Facts Engine OS</strong>
-            <span class="brand-subtitle">Frontend ligero separado del runtime de n8n</span>
+          <div class="brand-mark"></div>
+          <div>
+            <span class="eyebrow">Official operations surface</span>
+            <strong>Facts Engine Control</strong>
+            <p>Dashboard, console, health and automation.</p>
           </div>
         </div>
 
-        <div class="header-metrics">
-          <article class="header-chip">
-            <span class="metric-label">Publicados</span>
+        <div class="headline-metrics">
+          <article class="headline-metric">
+            <span>Published</span>
             <strong id="headerPublishedCount">0</strong>
           </article>
-          <article class="header-chip header-chip--wide">
-            <span class="metric-label">Último short</span>
-            <strong id="headerLatestTitle">Sin datos</strong>
+          <article class="headline-metric headline-metric--wide">
+            <span>Latest short</span>
+            <strong id="headerLatestTitle">No data</strong>
           </article>
-          <article class="header-chip">
-            <span class="metric-label">Última publicación</span>
+          <article class="headline-metric">
+            <span>Last publish</span>
             <strong id="headerLastPublished">-</strong>
           </article>
         </div>
 
-        <nav class="topbar-actions" aria-label="Navegación principal">
+        <nav class="top-actions">
           <button class="nav-button nav-button--active" type="button" data-view="dashboard">Dashboard</button>
-          <button class="nav-button" type="button" data-view="logs">Logs</button>
+          <button class="nav-button" type="button" data-view="console">Console</button>
           <button class="nav-button" type="button" data-view="health">Health</button>
-          <a class="nav-button" id="openN8nButton" href="#" target="_blank" rel="noreferrer">n8n</a>
+          <a class="nav-button" id="openN8nButton" href="#" target="_blank" rel="noreferrer">Open n8n</a>
           <button class="nav-button nav-button--primary" type="button" id="runNowButton">Run now</button>
           <button class="nav-button" type="button" id="toggleAutomationButton">Automation OFF</button>
-          <button class="nav-button nav-button--danger" type="button" id="logoutButton">Salir</button>
+          <button class="nav-button nav-button--danger" type="button" id="logoutButton">Logout</button>
         </nav>
       </header>
 
       <main class="workspace">
-        <aside class="sidebar panel">
+        <aside class="sidebar glass panel">
           <div class="sidebar-block">
-            <span class="eyebrow">Sección actual</span>
+            <p class="eyebrow">Section</p>
             <h1 id="viewTitle">Dashboard</h1>
-            <p id="viewDescription" class="sidebar-copy">
-              Vista principal con actividad, estado del pipeline y resumen operativo.
-            </p>
+            <p id="viewDescription" class="muted">Operational overview with telemetry, recent videos and pipeline state.</p>
           </div>
 
-          <div class="sidebar-block metrics">
-            <article class="metric-card">
-              <span class="metric-label">Estado</span>
+          <div class="sidebar-block stat-grid">
+            <article class="stat-tile">
+              <span>Service</span>
               <strong id="healthStatus">-</strong>
             </article>
-            <article class="metric-card">
-              <span class="metric-label">Persistencia</span>
+            <article class="stat-tile">
+              <span>Persistence</span>
               <strong id="healthPersistence">-</strong>
             </article>
-            <article class="metric-card">
-              <span class="metric-label">Modo vídeo</span>
+            <article class="stat-tile">
+              <span>Profile</span>
               <strong id="healthMode">-</strong>
             </article>
-          </div>
-
-          <div class="sidebar-block">
-            <span class="eyebrow">Último short</span>
-            <article class="latest-card" id="latestCard">
-              <div class="latest-card__empty">Todavía no hay Shorts publicados.</div>
+            <article class="stat-tile">
+              <span>Backend</span>
+              <strong id="backendLabel">-</strong>
             </article>
           </div>
 
-          <div class="sidebar-block">
-            <span class="eyebrow">Ejecución</span>
-            <article class="runner-card">
-              <div class="runner-card__top">
+          <div class="sidebar-block runner-panel">
+            <div class="runner-head">
+              <div>
+                <p class="eyebrow">Runner</p>
                 <strong id="runnerStatus">Idle</strong>
-                <span class="runner-dot" id="runnerDot"></span>
               </div>
-              <p class="sidebar-copy" id="runnerCopy">Sin ejecuciones recientes desde la shell.</p>
-              <div class="runner-meta" id="runnerMeta">Workflow: -</div>
-              <pre class="runner-logs" id="runnerLogs">Sin logs recientes.</pre>
-            </article>
+              <span class="runner-dot" id="runnerDot"></span>
+            </div>
+            <p id="runnerCopy" class="muted">No executions from the control panel yet.</p>
+            <div id="runnerMeta" class="runner-meta">Workflow: -</div>
+            <pre id="runnerLogs" class="runner-logs">No logs yet.</pre>
+          </div>
+
+          <div class="sidebar-block latest-panel">
+            <p class="eyebrow">Latest short</p>
+            <div id="latestCard" class="latest-card">
+              <div class="empty-state">There is no published short yet.</div>
+            </div>
           </div>
         </aside>
 
-        <section class="content panel">
+        <section class="content glass panel">
           <section class="view view--active" data-view-panel="dashboard">
             <div class="view-head">
               <div>
-                <span class="eyebrow">Operations</span>
-                <h2>Dashboard</h2>
+                <p class="eyebrow">Overview</p>
+                <h2>Operations dashboard</h2>
               </div>
-              <span class="status-pill" id="backendLabel">Backend desconectado</span>
+              <div class="inline-actions">
+                <button class="button button--ghost" type="button" id="refreshDashboardButton">Refresh</button>
+              </div>
             </div>
-            <div class="dashboard-shell">
-              <div class="logs-grid">
-                <article class="health-card">
-                  <span class="metric-label">Total vídeos</span>
-                  <strong id="totalVideos">0</strong>
-                </article>
-                <article class="health-card">
-                  <span class="metric-label">Generados</span>
-                  <strong id="generatedVideos">0</strong>
-                </article>
-                <article class="health-card">
-                  <span class="metric-label">Publicados</span>
-                  <strong id="publishedVideos">0</strong>
-                </article>
-                <article class="health-card">
-                  <span class="metric-label">Categorías</span>
-                  <strong id="categoriesCovered">0</strong>
-                </article>
-              </div>
 
-              <section class="logs-panel">
-                <div class="logs-panel__head">
-                  <span class="eyebrow">Recent Runs</span>
-                  <strong>Últimos topics</strong>
+            <div class="hero-strip">
+              <article class="hero-stat">
+                <span>Total videos</span>
+                <strong id="totalVideos">0</strong>
+              </article>
+              <article class="hero-stat">
+                <span>Generated</span>
+                <strong id="generatedVideos">0</strong>
+              </article>
+              <article class="hero-stat">
+                <span>Published</span>
+                <strong id="publishedVideos">0</strong>
+              </article>
+              <article class="hero-stat">
+                <span>Failed</span>
+                <strong id="failedVideos">0</strong>
+              </article>
+              <article class="hero-stat">
+                <span>Categories</span>
+                <strong id="categoriesCovered">0</strong>
+              </article>
+            </div>
+
+            <div class="dashboard-grid">
+              <section class="module-card module-card--video">
+                <div class="module-head">
+                  <div>
+                    <p class="eyebrow">Broadcast</p>
+                    <h3>Latest published short</h3>
+                  </div>
                 </div>
-                <div class="execution-list" id="recentRunsList">
-                  <div class="execution-empty">Sin histórico todavía.</div>
+                <div id="latestEmbed" class="video-frame empty-state">No video yet.</div>
+              </section>
+
+              <section class="module-card">
+                <div class="module-head">
+                  <div>
+                    <p class="eyebrow">Category spread</p>
+                    <h3>Topic coverage</h3>
+                  </div>
                 </div>
+                <div id="categoryBars" class="bars-list"></div>
+              </section>
+
+              <section class="module-card">
+                <div class="module-head">
+                  <div>
+                    <p class="eyebrow">Artifacts</p>
+                    <h3>Stored outputs</h3>
+                  </div>
+                </div>
+                <div id="artifactBars" class="bars-list"></div>
+              </section>
+
+              <section class="module-card module-card--wide">
+                <div class="module-head">
+                  <div>
+                    <p class="eyebrow">Recent runs</p>
+                    <h3>Pipeline timeline</h3>
+                  </div>
+                </div>
+                <div id="recentRunsList" class="timeline-list"></div>
+              </section>
+
+              <section class="module-card module-card--wide">
+                <div class="module-head">
+                  <div>
+                    <p class="eyebrow">Event stream</p>
+                    <h3>Latest content events</h3>
+                  </div>
+                </div>
+                <div id="recentEventsList" class="timeline-list"></div>
+              </section>
+
+              <section class="module-card module-card--wide">
+                <div class="module-head">
+                  <div>
+                    <p class="eyebrow">System pulse</p>
+                    <h3>Memory samples</h3>
+                  </div>
+                </div>
+                <div id="memoryChart" class="memory-chart"></div>
               </section>
             </div>
           </section>
 
-          <section class="view" data-view-panel="logs">
+          <section class="view" data-view-panel="console">
             <div class="view-head">
               <div>
-                <span class="eyebrow">Execution Trace</span>
-                <h2>Logs</h2>
+                <p class="eyebrow">Observability</p>
+                <h2>Live console</h2>
               </div>
-              <button class="inline-action" type="button" id="refreshLogsButton">Refrescar logs</button>
+              <div class="inline-actions">
+                <button class="button button--ghost" type="button" id="refreshLogsButton">Refresh logs</button>
+              </div>
             </div>
-            <div class="logs-shell">
-              <div class="logs-grid">
-                <article class="health-card">
-                  <span class="metric-label">Workflow</span>
-                  <strong id="workflowName">-</strong>
-                </article>
-                <article class="health-card">
-                  <span class="metric-label">Automation</span>
-                  <strong id="workflowActive">-</strong>
-                </article>
-                <article class="health-card">
-                  <span class="metric-label">Trigger count</span>
-                  <strong id="workflowTriggerCount">-</strong>
-                </article>
-                <article class="health-card">
-                  <span class="metric-label">Actualizado</span>
-                  <strong id="workflowUpdatedAt">-</strong>
-                </article>
-              </div>
 
-              <section class="logs-panel">
-                <div class="logs-panel__head">
-                  <span class="eyebrow">Runner</span>
-                  <strong>Salida reciente</strong>
+            <div class="console-grid">
+              <section class="terminal-panel">
+                <div class="terminal-head">
+                  <span>workflow state</span>
+                  <span id="workflowBadge">-</span>
                 </div>
-                <pre class="health-json logs-console" id="logsConsole">Sin logs recientes.</pre>
+                <div class="workflow-grid">
+                  <article class="terminal-stat"><span>Workflow</span><strong id="workflowName">-</strong></article>
+                  <article class="terminal-stat"><span>Automation</span><strong id="workflowActive">-</strong></article>
+                  <article class="terminal-stat"><span>Triggers</span><strong id="workflowTriggerCount">-</strong></article>
+                  <article class="terminal-stat"><span>Updated</span><strong id="workflowUpdatedAt">-</strong></article>
+                </div>
               </section>
 
-              <section class="logs-panel">
-                <div class="logs-panel__head">
-                  <span class="eyebrow">n8n</span>
-                  <strong>Últimas ejecuciones</strong>
+              <section class="terminal-panel terminal-panel--wide">
+                <div class="terminal-head">
+                  <span>runner stdout/stderr</span>
+                  <span>frontend runner</span>
                 </div>
-                <div class="execution-list" id="executionList">
-                  <div class="execution-empty">Todavía no hay ejecuciones registradas.</div>
+                <pre id="logsConsole" class="terminal-output">No logs yet.</pre>
+              </section>
+
+              <section class="terminal-panel terminal-panel--wide">
+                <div class="terminal-head">
+                  <span>content events</span>
+                  <span>Neon</span>
                 </div>
+                <div id="eventConsole" class="console-list"></div>
+              </section>
+
+              <section class="terminal-panel terminal-panel--wide">
+                <div class="terminal-head">
+                  <span>execution logs</span>
+                  <span>backend</span>
+                </div>
+                <div id="executionConsole" class="console-list"></div>
+              </section>
+
+              <section class="terminal-panel terminal-panel--wide">
+                <div class="terminal-head">
+                  <span>artifacts</span>
+                  <span>outputs</span>
+                </div>
+                <div id="artifactConsole" class="console-list"></div>
+              </section>
+
+              <section class="terminal-panel terminal-panel--wide">
+                <div class="terminal-head">
+                  <span>api audit</span>
+                  <span>security</span>
+                </div>
+                <div id="auditConsole" class="console-list"></div>
               </section>
             </div>
           </section>
@@ -240,30 +338,22 @@
           <section class="view" data-view-panel="health">
             <div class="view-head">
               <div>
-                <span class="eyebrow">Service State</span>
-                <h2>Health</h2>
+                <p class="eyebrow">Runtime</p>
+                <h2>Health and internals</h2>
               </div>
-              <button class="inline-action" type="button" id="refreshHealthButton">Refrescar</button>
+              <div class="inline-actions">
+                <button class="button button--ghost" type="button" id="refreshHealthButton">Refresh health</button>
+              </div>
             </div>
+
             <div class="health-grid">
-              <article class="health-card">
-                <span class="metric-label">Servicio</span>
-                <strong id="healthService">-</strong>
-              </article>
-              <article class="health-card">
-                <span class="metric-label">Ruta n8n</span>
-                <strong id="healthN8nPath">-</strong>
-              </article>
-              <article class="health-card">
-                <span class="metric-label">Resolución</span>
-                <strong id="healthResolution">-</strong>
-              </article>
-              <article class="health-card">
-                <span class="metric-label">Threads</span>
-                <strong id="healthThreads">-</strong>
-              </article>
+              <article class="hero-stat"><span>Service</span><strong id="healthService">-</strong></article>
+              <article class="hero-stat"><span>n8n path</span><strong id="healthN8nPath">-</strong></article>
+              <article class="hero-stat"><span>Resolution</span><strong id="healthResolution">-</strong></article>
+              <article class="hero-stat"><span>FFmpeg threads</span><strong id="healthThreads">-</strong></article>
             </div>
-            <pre class="health-json" id="healthJson">Cargando health...</pre>
+
+            <pre id="healthJson" class="terminal-output terminal-output--tall">Loading health...</pre>
           </section>
         </section>
       </main>

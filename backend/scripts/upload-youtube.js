@@ -3,6 +3,7 @@ require("dotenv").config();
 const fs = require("fs");
 const path = require("path");
 const { google } = require("googleapis");
+const { logArtifact, logFailure, logStepEvent, readJsonIfExists, withOptionalPool } = require("./lib/script-observer");
 
 function fail(message) {
   console.error(`[youtube-upload][error] ${message}`);
@@ -10,13 +11,7 @@ function fail(message) {
 }
 
 function log(message, meta = {}) {
-  console.log(
-    JSON.stringify({
-      ts: new Date().toISOString(),
-      message,
-      ...meta,
-    }),
-  );
+  console.log(JSON.stringify({ ts: new Date().toISOString(), message, ...meta }));
 }
 
 function getRequiredEnv(name) {
@@ -45,70 +40,95 @@ async function main() {
   }
 
   const resolvedVideoPath = path.resolve(videoPath);
-
   if (!fs.existsSync(resolvedVideoPath)) {
     fail(`Video file not found: ${resolvedVideoPath}`);
   }
 
+  const scriptData = readJsonIfExists(scriptPath) || {};
+  const topicKey = scriptData.topic_key || null;
   const clientId = getRequiredEnv("YOUTUBE_CLIENT_ID");
   const clientSecret = getRequiredEnv("YOUTUBE_CLIENT_SECRET");
   const refreshToken = getRequiredEnv("YOUTUBE_REFRESH_TOKEN");
-  const scriptData = fs.existsSync(scriptPath) ? JSON.parse(fs.readFileSync(scriptPath, "utf8")) : {};
   const defaultTitle = scriptData.title || process.env.YOUTUBE_DEFAULT_TITLE || `Short IA ${new Date().toISOString().slice(0, 10)}`;
   const defaultDescription = scriptData.description || process.env.YOUTUBE_DEFAULT_DESCRIPTION || "Video generado automaticamente con n8n.";
   const defaultTags = (scriptData.tags || []).join(",") || process.env.YOUTUBE_DEFAULT_TAGS || "ia,automatizacion,shorts";
   const privacyStatus = process.env.YOUTUBE_PRIVACY_STATUS || "private";
   const categoryId = process.env.YOUTUBE_CATEGORY_ID || "28";
-
   const title = defaultTitle.slice(0, 100);
   const description = defaultDescription.slice(0, 5000);
   const tags = sanitizeTags(defaultTags);
 
-  const auth = new google.auth.OAuth2(clientId, clientSecret);
-  auth.setCredentials({ refresh_token: refreshToken });
-
-  const youtube = google.youtube({
-    version: "v3",
-    auth,
+  await withOptionalPool(async (pool) => {
+    await logStepEvent(pool, {
+      topic_key: topicKey,
+      event_type: "step_started",
+      stage: "youtube_upload",
+      source: "upload-youtube",
+      message: "Uploading video to YouTube",
+      metadata: { title, privacyStatus, categoryId },
+    });
   });
 
-  log("youtube upload starting", {
-    videoPath: resolvedVideoPath,
-    title,
-    privacyStatus,
-  });
+  try {
+    const auth = new google.auth.OAuth2(clientId, clientSecret);
+    auth.setCredentials({ refresh_token: refreshToken });
 
-  const response = await youtube.videos.insert({
-    part: ["snippet", "status"],
-    notifySubscribers: false,
-    requestBody: {
-      snippet: {
-        title,
-        description,
-        tags,
-        categoryId,
+    const youtube = google.youtube({ version: "v3", auth });
+
+    log("youtube upload starting", { videoPath: resolvedVideoPath, title, privacyStatus });
+
+    const response = await youtube.videos.insert({
+      part: ["snippet", "status"],
+      notifySubscribers: false,
+      requestBody: {
+        snippet: { title, description, tags, categoryId },
+        status: { privacyStatus, selfDeclaredMadeForKids: false },
       },
-      status: {
-        privacyStatus,
-        selfDeclaredMadeForKids: false,
-      },
-    },
-    media: {
-      body: fs.createReadStream(resolvedVideoPath),
-    },
-  });
+      media: { body: fs.createReadStream(resolvedVideoPath) },
+    });
 
-  const videoId = response.data.id;
-  const result = {
-    videoId,
-    url: videoId ? `https://www.youtube.com/watch?v=${videoId}` : null,
-  };
-  fs.writeFileSync(resultPath, JSON.stringify(result, null, 2));
+    const videoId = response.data.id;
+    const result = {
+      videoId,
+      url: videoId ? `https://www.youtube.com/watch?v=${videoId}` : null,
+    };
+    fs.writeFileSync(resultPath, JSON.stringify(result, null, 2));
 
-  log("youtube upload completed", result);
+    await withOptionalPool(async (pool) => {
+      await logArtifact(pool, {
+        topic_key: topicKey,
+        artifact_type: "youtube_result",
+        label: "YouTube upload result",
+        file_path: resultPath,
+        external_url: result.url,
+        mime_type: "application/json",
+        metadata: { videoId, privacyStatus },
+      });
+      await logStepEvent(pool, {
+        topic_key: topicKey,
+        event_type: "step_completed",
+        stage: "youtube_upload",
+        source: "upload-youtube",
+        message: "Video uploaded to YouTube",
+        metadata: { videoId, url: result.url, privacyStatus },
+      });
+    });
+
+    log("youtube upload completed", result);
+  } catch (error) {
+    await withOptionalPool(async (pool) => {
+      await logFailure(pool, {
+        topic_key: topicKey,
+        stage: "youtube_upload",
+        source: "upload-youtube",
+        error: error.message,
+        metadata: { title, privacyStatus },
+      });
+    });
+    throw error;
+  }
 }
 
 main().catch((error) => {
   fail(error.message);
 });
-

@@ -9,6 +9,15 @@ const { spawn } = require("child_process");
 const { Pool } = require("pg");
 const httpProxy = require("http-proxy");
 const { loadDashboardData } = require("./dashboard-data");
+const {
+  createPool: createContentPool,
+  ensureSchema: ensureContentSchema,
+  hasDatabase: hasContentDatabase,
+  recordApiAudit,
+  recordExecutionLog,
+  recordSystemSample,
+  upsertWorkflowSnapshot,
+} = require("../scripts/lib/content-db");
 
 const publicHost = process.env.N8N_HOST || "0.0.0.0";
 const publicPort = Number(process.env.N8N_PORT || process.env.PORT || 10000);
@@ -51,6 +60,8 @@ let restartingN8n = false;
 let restartResolve = null;
 let restartReject = null;
 let cachedWorkflow = null;
+let lastCpuUsage = process.cpuUsage();
+let lastCpuTime = Date.now();
 let runnerState = {
   running: false,
   startedAt: null,
@@ -141,6 +152,96 @@ function log(message, meta = {}) {
     ...meta,
   };
   console.log(JSON.stringify(payload));
+}
+
+async function withObservabilityPool(work) {
+  if (!hasContentDatabase()) {
+    return null;
+  }
+
+  const pool = createContentPool();
+  try {
+    await ensureContentSchema(pool);
+    return await work(pool);
+  } finally {
+    await pool.end();
+  }
+}
+
+function getClientIp(req) {
+  const forwarded = String(req.headers["x-forwarded-for"] || "")
+    .split(",")
+    .map((value) => value.trim())
+    .filter(Boolean);
+
+  return forwarded[0] || req.socket?.remoteAddress || null;
+}
+
+async function writeApiAudit(req, action, statusCode, metadata = {}) {
+  await withObservabilityPool(async (pool) => {
+    await recordApiAudit(pool, {
+      actor: readSession(req)?.username || null,
+      action,
+      path: req.url || "/",
+      status_code: statusCode,
+      ip_address: getClientIp(req),
+      metadata,
+    });
+  }).catch(() => null);
+}
+
+async function writeExecutionLog(payload) {
+  await withObservabilityPool(async (pool) => {
+    await recordExecutionLog(pool, payload);
+  }).catch(() => null);
+}
+
+async function writeWorkflowSnapshot(payload) {
+  await withObservabilityPool(async (pool) => {
+    await upsertWorkflowSnapshot(pool, payload);
+  }).catch(() => null);
+}
+
+async function sampleProcessMetrics(reason = "interval") {
+  const memory = process.memoryUsage();
+  const now = Date.now();
+  const cpuUsage = process.cpuUsage();
+  const elapsedMicros = Math.max(1, (now - lastCpuTime) * 1000);
+  const userDiff = cpuUsage.user - lastCpuUsage.user;
+  const systemDiff = cpuUsage.system - lastCpuUsage.system;
+  const cpuPercent = ((userDiff + systemDiff) / elapsedMicros) * 100;
+
+  lastCpuUsage = cpuUsage;
+  lastCpuTime = now;
+
+  await withObservabilityPool(async (pool) => {
+    await Promise.all([
+      recordSystemSample(pool, {
+        service: "render-backend",
+        sample_type: "process",
+        metric_name: "rss_mb",
+        metric_value: memory.rss / 1024 / 1024,
+        unit: "MB",
+        metadata: { reason },
+      }),
+      recordSystemSample(pool, {
+        service: "render-backend",
+        sample_type: "process",
+        metric_name: "heap_used_mb",
+        metric_value: memory.heapUsed / 1024 / 1024,
+        unit: "MB",
+        metadata: { reason },
+      }),
+      recordSystemSample(pool, {
+        service: "render-backend",
+        sample_type: "process",
+        metric_name: "cpu_percent",
+        metric_value: cpuPercent,
+        unit: "%",
+        metadata: { reason },
+      }),
+    ]);
+  }).catch(() => null);
 }
 
 function appendTail(previous, chunk) {
@@ -540,6 +641,17 @@ async function triggerWorkflowExecution() {
     workflowName: workflow.name,
   });
 
+  await writeExecutionLog({
+    workflow_id: workflow.id,
+    topic_key: null,
+    source: "shell-runner",
+    level: "info",
+    message: "Workflow execution requested from frontend",
+    context: {
+      workflowName: workflow.name,
+    },
+  });
+
   const child = spawn("n8n", ["execute", "--id", workflow.id], {
     env: currentN8nEnv || process.env,
     stdio: ["ignore", "pipe", "pipe"],
@@ -557,6 +669,16 @@ async function triggerWorkflowExecution() {
     runnerState.running = false;
     runnerState.finishedAt = new Date().toISOString();
     runnerState.lastError = error.message;
+    void writeExecutionLog({
+      workflow_id: workflow.id,
+      source: "shell-runner",
+      level: "error",
+      message: "Workflow execution failed to start",
+      context: {
+        workflowName: workflow.name,
+        error: error.message,
+      },
+    });
     log("shell run failed to start", {
       workflowId: workflow.id,
       error: error.message,
@@ -572,6 +694,18 @@ async function triggerWorkflowExecution() {
 
     if (code !== 0) {
       runnerState.lastError = runnerState.stderrTail || `Execution exited with code ${code}`;
+      void writeExecutionLog({
+        workflow_id: workflow.id,
+        source: "shell-runner",
+        level: "error",
+        message: "Workflow execution completed with error",
+        context: {
+          workflowName: workflow.name,
+          exitCode: code,
+          signal,
+          stderrTail: runnerState.stderrTail,
+        },
+      });
       log("shell run completed with error", {
         workflowId: workflow.id,
         exitCode: code,
@@ -580,6 +714,17 @@ async function triggerWorkflowExecution() {
     }
 
     runnerState.lastError = null;
+    void writeExecutionLog({
+      workflow_id: workflow.id,
+      source: "shell-runner",
+      level: "info",
+      message: "Workflow execution completed successfully",
+      context: {
+        workflowName: workflow.name,
+        exitCode: code,
+        stdoutTail: runnerState.stdoutTail,
+      },
+    });
     log("shell run completed", {
       workflowId: workflow.id,
       workflowName: workflow.name,
@@ -596,6 +741,24 @@ async function loadShellData() {
     loadDashboardData(),
     workflow ? getRecentWorkflowExecutions(12, workflow.id).catch(() => []) : [],
   ]);
+
+  if (workflow) {
+    const latestExecution = executions[0] || null;
+    await writeWorkflowSnapshot({
+      workflow_id: workflow.id,
+      workflow_name: workflow.name,
+      active: workflow.active,
+      trigger_count: workflow.triggerCount,
+      last_execution_id: latestExecution?.id || null,
+      last_status: latestExecution?.status || null,
+      last_started_at: latestExecution?.startedAt || null,
+      last_finished_at: latestExecution?.stoppedAt || null,
+      metadata: {
+        execution_count_visible: executions.length,
+      },
+    });
+  }
+
   return {
     dashboard,
     health: JSON.parse(getHealthPayload()),
@@ -932,6 +1095,13 @@ function startKeepAlive() {
   }, keepAliveIntervalMs).unref();
 }
 
+function startTelemetrySampling() {
+  sampleProcessMetrics("startup").catch(() => null);
+  setInterval(() => {
+    sampleProcessMetrics("interval").catch(() => null);
+  }, Number(process.env.SYSTEM_SAMPLE_INTERVAL_MS || 60000)).unref();
+}
+
 let n8nProcess = null;
 
 proxy.on("error", (error, req, res) => {
@@ -992,11 +1162,13 @@ const server = http.createServer((req, res) => {
         const next = getRedirectTarget(parsed.next);
 
         if (!safeEqual(username, authUser) || !safeEqual(password, authPassword)) {
+          void writeApiAudit(req, "login_form_failed", 401, { username });
           sendJson(res, 401, { error: "Usuario o contraseña incorrectos" });
           return;
         }
 
         setSessionCookie(res, username);
+        void writeApiAudit(req, "login_form_success", 200, { username });
         sendJson(res, 200, { ok: true, redirect: next });
       })
       .catch((error) => {
@@ -1013,10 +1185,12 @@ const server = http.createServer((req, res) => {
         const password = String(parsed.password || "");
 
         if (!safeEqual(username, authUser) || !safeEqual(password, authPassword)) {
+          void writeApiAudit(req, "api_login_failed", 401, { username });
           sendApiJson(req, res, 401, { error: "Usuario o contraseña incorrectos" });
           return;
         }
 
+        void writeApiAudit(req, "api_login_success", 200, { username });
         sendApiJson(req, res, 200, {
           ok: true,
           token: createSessionToken(username),
@@ -1097,8 +1271,12 @@ const server = http.createServer((req, res) => {
     }
 
     triggerWorkflowExecution()
-      .then((payload) => sendApiJson(req, res, 202, payload))
+      .then((payload) => {
+        void writeApiAudit(req, "run_now_requested", 202, { workflowId: payload.workflowId, workflowName: payload.workflowName });
+        sendApiJson(req, res, 202, payload);
+      })
       .catch((error) => {
+        void writeApiAudit(req, "run_now_failed", error.statusCode || 500, { error: error.message });
         sendApiJson(req, res, error.statusCode || 500, { error: error.message, runner: getRunnerSnapshot() });
       });
     return;
@@ -1125,9 +1303,13 @@ const server = http.createServer((req, res) => {
     readBody(req)
       .then((body) => JSON.parse(body || "{}"))
       .then((payload) => setWorkflowAutomation(Boolean(payload.active)))
-      .then((payload) => sendApiJson(req, res, 200, payload))
+      .then((payload) => {
+        void writeApiAudit(req, "workflow_automation_updated", 200, { workflowId: payload.id, active: payload.active });
+        sendApiJson(req, res, 200, payload);
+      })
       .catch((error) => {
         log("workflow automation api error", { error: error.message });
+        void writeApiAudit(req, "workflow_automation_failed", 500, { error: error.message });
         sendApiJson(req, res, 500, { error: error.message });
       });
     return;
@@ -1233,6 +1415,7 @@ async function main() {
       internalPort,
     });
     startKeepAlive();
+    startTelemetrySampling();
   });
 }
 
@@ -1263,3 +1446,6 @@ main().catch((error) => {
   });
   process.exit(1);
 });
+
+
+

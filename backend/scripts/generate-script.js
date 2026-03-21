@@ -3,7 +3,8 @@ require("dotenv").config();
 const fs = require("fs");
 const path = require("path");
 const fetch = global.fetch || require("node-fetch");
-const { createPool, ensureSchema, hasDatabase, markGenerated } = require("./lib/content-db");
+const { markGenerated } = require("./lib/content-db");
+const { logArtifact, logFailure, logStepEvent, withOptionalPool } = require("./lib/script-observer");
 
 function fail(message) {
   console.error(`[generate-script][error] ${message}`);
@@ -11,13 +12,7 @@ function fail(message) {
 }
 
 function log(message, meta = {}) {
-  console.log(
-    JSON.stringify({
-      ts: new Date().toISOString(),
-      message,
-      ...meta,
-    }),
-  );
+  console.log(JSON.stringify({ ts: new Date().toISOString(), message, ...meta }));
 }
 
 function getRequiredEnv(name) {
@@ -30,7 +25,6 @@ function getRequiredEnv(name) {
 
 function extractJson(text) {
   const trimmed = text.trim();
-
   if (trimmed.startsWith("{")) {
     return trimmed;
   }
@@ -46,7 +40,7 @@ function extractJson(text) {
     return trimmed.slice(firstBrace, lastBrace + 1);
   }
 
-  fail("OpenAI response did not contain valid JSON text");
+  fail("Model response did not contain valid JSON text");
 }
 
 function getGeminiText(data) {
@@ -73,12 +67,10 @@ async function main() {
   const style = topicFile?.video_style || process.argv[6] || process.env.VIDEO_DEFAULT_STYLE || "curioso, rapido, directo";
   const language = topicFile?.language || process.argv[7] || process.env.VIDEO_DEFAULT_LANGUAGE || "es";
   const provider = process.env.TEXT_PROVIDER || (process.env.GEMINI_API_KEY ? "gemini" : "openai");
-  const model =
-    provider === "gemini"
-      ? process.env.GEMINI_TEXT_MODEL || "gemini-2.5-flash-lite"
-      : process.env.OPENAI_MODEL || "gpt-4.1-mini";
+  const model = provider === "gemini" ? process.env.GEMINI_TEXT_MODEL || "gemini-2.5-flash-lite" : process.env.OPENAI_MODEL || "gpt-4.1-mini";
   const angle = topicFile?.angle || "un hecho curioso poco conocido";
   const category = topicFile?.category || "general";
+  const topicKey = topicFile?.key || null;
 
   const prompt = [
     "Genera un plan completo para un video corto vertical de facts y hechos curiosos para YouTube Shorts.",
@@ -105,110 +97,135 @@ async function main() {
     "}",
   ].join("\n");
 
-  log("openai script generation starting", {
-    outputPath,
-    topic,
-    durationSeconds,
-    model,
-    provider,
+  log("script generation starting", { outputPath, topic, durationSeconds, model, provider });
+
+  await withOptionalPool(async (pool) => {
+    await logStepEvent(pool, {
+      topic_key: topicKey,
+      event_type: "step_started",
+      stage: "generate_script",
+      level: "info",
+      source: "generate-script",
+      message: "Generating script",
+      metadata: { provider, model, topic, category },
+    });
   });
 
   let outputText;
 
-  if (provider === "gemini") {
-    const apiKey = getRequiredEnv("GEMINI_API_KEY");
-    const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`, {
-      method: "POST",
-      headers: {
-        "x-goog-api-key": apiKey,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        contents: [
-          {
-            parts: [
-              {
-                text: prompt,
-              },
-            ],
-          },
-        ],
-      }),
+  try {
+    if (provider === "gemini") {
+      const apiKey = getRequiredEnv("GEMINI_API_KEY");
+      const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`, {
+        method: "POST",
+        headers: {
+          "x-goog-api-key": apiKey,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] }),
+      });
+
+      if (!response.ok) {
+        fail(`Gemini request failed with status ${response.status}: ${await response.text()}`);
+      }
+
+      const data = await response.json();
+      outputText = getGeminiText(data);
+    } else {
+      const apiKey = getRequiredEnv("OPENAI_API_KEY");
+      const response = await fetch("https://api.openai.com/v1/responses", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${apiKey}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ model, input: prompt }),
+      });
+
+      if (!response.ok) {
+        fail(`OpenAI request failed with status ${response.status}: ${await response.text()}`);
+      }
+
+      const data = await response.json();
+      outputText = data.output_text;
+
+      if (!outputText) {
+        fail("OpenAI response did not include output_text");
+      }
+    }
+
+    const parsed = JSON.parse(extractJson(outputText));
+    const payload = {
+      topic_key: topicKey,
+      topic_source: topicFile?.source || "catalog",
+      category,
+      topic,
+      angle,
+      duration_seconds: durationSeconds,
+      cta,
+      style,
+      language,
+      title: parsed.title,
+      description: parsed.description,
+      narration: parsed.narration,
+      visual_keywords: Array.isArray(parsed.visual_keywords) ? parsed.visual_keywords : [],
+      search_query: parsed.search_query || topicFile?.search_hint || topic,
+      tags: Array.isArray(parsed.tags) ? parsed.tags : [],
+    };
+
+    fs.mkdirSync(path.dirname(outputPath), { recursive: true });
+    fs.writeFileSync(outputPath, JSON.stringify(payload, null, 2));
+
+    await withOptionalPool(async (pool) => {
+      if (pool && payload.topic_key) {
+        await markGenerated(pool, payload);
+        await logArtifact(pool, {
+          topic_key: payload.topic_key,
+          artifact_type: "script_json",
+          label: "Generated script payload",
+          file_path: outputPath,
+          mime_type: "application/json",
+          metadata: { provider, model },
+        });
+      }
+
+      await logStepEvent(pool, {
+        topic_key: payload.topic_key,
+        event_type: "step_completed",
+        stage: "generate_script",
+        level: "info",
+        source: "generate-script",
+        message: "Script generated",
+        metadata: {
+          provider,
+          model,
+          title: payload.title,
+          search_query: payload.search_query,
+          tag_count: payload.tags.length,
+        },
+      });
     });
 
-    if (!response.ok) {
-      fail(`Gemini request failed with status ${response.status}: ${await response.text()}`);
-    }
-
-    const data = await response.json();
-    outputText = getGeminiText(data);
-  } else {
-    const apiKey = getRequiredEnv("OPENAI_API_KEY");
-    const response = await fetch("https://api.openai.com/v1/responses", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${apiKey}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        model,
-        input: prompt,
-      }),
+    log("script generation completed", {
+      outputPath,
+      title: payload.title,
+      searchQuery: payload.search_query,
+      provider,
     });
-
-    if (!response.ok) {
-      fail(`OpenAI request failed with status ${response.status}: ${await response.text()}`);
-    }
-
-    const data = await response.json();
-    outputText = data.output_text;
-
-    if (!outputText) {
-      fail("OpenAI response did not include output_text");
-    }
+  } catch (error) {
+    await withOptionalPool(async (pool) => {
+      await logFailure(pool, {
+        topic_key: topicKey,
+        stage: "generate_script",
+        source: "generate-script",
+        error: error.message,
+        metadata: { provider, model },
+      });
+    });
+    throw error;
   }
-
-  const parsed = JSON.parse(extractJson(outputText));
-  const payload = {
-    topic_key: topicFile?.key || null,
-    topic_source: topicFile?.source || "catalog",
-    category,
-    topic,
-    angle,
-    duration_seconds: durationSeconds,
-    cta,
-    style,
-    language,
-    title: parsed.title,
-    description: parsed.description,
-    narration: parsed.narration,
-    visual_keywords: Array.isArray(parsed.visual_keywords) ? parsed.visual_keywords : [],
-    search_query: parsed.search_query || topicFile?.search_hint || topic,
-    tags: Array.isArray(parsed.tags) ? parsed.tags : [],
-  };
-
-  fs.mkdirSync(path.dirname(outputPath), { recursive: true });
-  fs.writeFileSync(outputPath, JSON.stringify(payload, null, 2));
-
-  if (hasDatabase() && payload.topic_key) {
-    const pool = createPool();
-    try {
-      await ensureSchema(pool);
-      await markGenerated(pool, payload);
-    } finally {
-      await pool.end();
-    }
-  }
-
-  log("openai script generation completed", {
-    outputPath,
-    title: payload.title,
-    searchQuery: payload.search_query,
-    provider,
-  });
 }
 
 main().catch((error) => {
   fail(error.message);
 });
-
