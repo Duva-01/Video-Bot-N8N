@@ -112,7 +112,7 @@ async function main() {
       const model = process.env.CLOUDFLARE_TTS_MODEL || "@cf/myshell-ai/melotts";
       const language = process.env.CLOUDFLARE_TTS_LANG || "es";
 
-      const response = await fetch(`https://api.cloudflare.com/client/v4/accounts/${accountId}/ai/run/${encodeURIComponent(model)}`, {
+      const response = await fetch(`https://api.cloudflare.com/client/v4/accounts/${accountId}/ai/run/${model}`, {
         method: "POST",
         headers: {
           Authorization: `Bearer ${apiToken}`,
