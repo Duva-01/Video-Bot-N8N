@@ -49,6 +49,7 @@ let currentN8nEnv = null;
 let restartingN8n = false;
 let restartResolve = null;
 let restartReject = null;
+let cachedWorkflow = null;
 let runnerState = {
   running: false,
   startedAt: null,
@@ -178,6 +179,10 @@ function getRunnerSnapshot() {
   };
 }
 
+function invalidateWorkflowCache() {
+  cachedWorkflow = null;
+}
+
 async function buildN8nEnv() {
   const env = {
     ...process.env,
@@ -279,27 +284,61 @@ async function resolveShellWorkflow() {
     };
   }
 
+  if (cachedWorkflow && Date.now() - cachedWorkflow.cachedAt < 60 * 1000) {
+    return cachedWorkflow.value;
+  }
+
   const targetName = process.env.N8N_SHELL_WORKFLOW_NAME || process.env.SHELL_WORKFLOW_NAME || "";
-  const { stdout } = await runN8nCli(["export:workflow", "--all"]);
-  const workflows = JSON.parse(stdout || "[]");
-  if (!Array.isArray(workflows) || workflows.length === 0) {
+  const schema = getN8nSchema();
+  const result = await queryN8nDatabase(
+    `select id, name, active, nodes
+       from "${schema}".workflow_entity
+      order by active desc, "updatedAt" desc, id desc`,
+  );
+
+  if (!Array.isArray(result.rows) || result.rows.length === 0) {
     throw new Error("No workflows found in n8n database");
   }
+
+  const workflows = result.rows.map((row) => {
+    let nodes = row.nodes;
+    if (typeof nodes === "string") {
+      try {
+        nodes = JSON.parse(nodes);
+      } catch (error) {
+        nodes = [];
+      }
+    }
+
+    return {
+      id: String(row.id),
+      name: row.name || "workflow",
+      active: Boolean(row.active),
+      nodes: Array.isArray(nodes) ? nodes : [],
+    };
+  });
 
   const chosen =
     workflows.find((item) => targetName && item.name === targetName) ||
     workflows.find((item) => item.active) ||
-    workflows.find((item) => Array.isArray(item.nodes) && item.nodes.some((node) => node.name === "YouTube Upload")) ||
+    workflows.find((item) => item.nodes.some((node) => node.name === "YouTube Upload")) ||
     workflows[0];
 
   if (!chosen?.id) {
     throw new Error("Unable to resolve workflow id");
   }
 
-  return {
+  const resolved = {
     id: String(chosen.id),
     name: chosen.name || "workflow",
   };
+
+  cachedWorkflow = {
+    cachedAt: Date.now(),
+    value: resolved,
+  };
+
+  return resolved;
 }
 
 async function getWorkflowAutomationState() {
@@ -327,8 +366,8 @@ async function getWorkflowAutomationState() {
   };
 }
 
-async function getRecentWorkflowExecutions(limit = 12) {
-  const workflow = await resolveShellWorkflow();
+async function getRecentWorkflowExecutions(limit = 12, workflowId = null) {
+  const workflow = workflowId ? { id: String(workflowId) } : await resolveShellWorkflow();
   const schema = getN8nSchema();
   const result = await queryN8nDatabase(
     `select id, status, finished, mode, "startedAt", "stoppedAt", "workflowId"
@@ -417,6 +456,7 @@ async function restartN8nChild() {
 async function setWorkflowAutomation(active) {
   const workflow = await resolveShellWorkflow();
   await runN8nCli(["update:workflow", `--id=${workflow.id}`, `--active=${active ? "true" : "false"}`]);
+  invalidateWorkflowCache();
 
   log("workflow automation updated", {
     workflowId: workflow.id,
@@ -505,10 +545,10 @@ async function triggerWorkflowExecution() {
 }
 
 async function loadShellData() {
-  const [dashboard, workflow, executions] = await Promise.all([
+  const workflow = await getWorkflowAutomationState().catch(() => null);
+  const [dashboard, executions] = await Promise.all([
     loadDashboardData(),
-    getWorkflowAutomationState().catch(() => null),
-    getRecentWorkflowExecutions().catch(() => []),
+    workflow ? getRecentWorkflowExecutions(12, workflow.id).catch(() => []) : [],
   ]);
   return {
     dashboard,
