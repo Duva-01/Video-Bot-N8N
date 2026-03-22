@@ -1,16 +1,12 @@
-name: Trigger Content Run
+name: Trigger Content Runs
 
 on:
+  workflow_dispatch:
   schedule:
     - cron: "0 */2 * * *"
-  workflow_dispatch:
-
-concurrency:
-  group: facts-engine-run-now
-  cancel-in-progress: false
 
 jobs:
-  trigger-run:
+  trigger-content-run:
     runs-on: ubuntu-latest
     steps:
       - name: Ping backend health

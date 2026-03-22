@@ -301,7 +301,7 @@ Se despliega la carpeta:
 ### GitHub Actions
 Workflows actuales:
 - [.github/workflows/keep-render-awake.yml](.github/workflows/keep-render-awake.yml)
-- [.github/workflows/trigger-content-run.yml](.github/workflows/trigger-content-run.yml)
+- [.github/workflows/run-content-trigger.yml](.github/workflows/run-content-trigger.yml)
 
 `keep-render-awake.yml` hace ping a:
 - `/health`
@@ -310,7 +310,7 @@ Workflows actuales:
 Objetivo:
 - reducir suspensiones del servicio free de Render
 
-`trigger-content-run.yml`:
+`run-content-trigger.yml`:
 - hace login contra `POST /api/auth/login`
 - obtiene un token bearer temporal
 - llama a `POST /api/run-now`
