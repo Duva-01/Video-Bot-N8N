@@ -23,9 +23,18 @@ const publicHost = process.env.N8N_HOST || "0.0.0.0";
 const publicPort = Number(process.env.N8N_PORT || process.env.PORT || 10000);
 const internalHost = process.env.N8N_INTERNAL_HOST || "127.0.0.1";
 const internalPort = Number(process.env.N8N_INTERNAL_PORT || 5678);
-const triggerWebhookPath = (() => {
-  const raw = String(process.env.N8N_TRIGGER_WEBHOOK_PATH || "facts-engine-run").trim();
-  return raw.replace(/^\/+|\/+$/g, "");
+const triggerWebhookEndpoint = (() => {
+  const raw = String(
+    process.env.N8N_TRIGGER_WEBHOOK_ENDPOINT ||
+      process.env.N8N_TRIGGER_WEBHOOK_PATH ||
+      "/webhook/facts-engine-run",
+  ).trim();
+
+  if (!raw) {
+    return "/webhook/facts-engine-run";
+  }
+
+  return raw.startsWith("/") ? raw : `/${raw}`;
 })();
 const keepAliveEnabled = (process.env.KEEP_ALIVE_ENABLED || "true") === "true";
 const keepAliveIntervalMs = Number(process.env.KEEP_ALIVE_INTERVAL_MS || 300000);
@@ -646,12 +655,12 @@ async function triggerWorkflowExecution() {
     workflow_id: workflow.id,
     topic_key: null,
     source: "shell-runner",
-    level: "info",
+      level: "info",
     message: "Workflow execution requested from frontend",
     context: {
       workflowName: workflow.name,
       triggerMode: "webhook",
-      webhookPath: triggerWebhookPath,
+      webhookEndpoint: triggerWebhookEndpoint,
     },
   });
 
@@ -660,7 +669,7 @@ async function triggerWorkflowExecution() {
       {
         hostname: internalHost,
         port: internalPort,
-        path: `/webhook/${triggerWebhookPath}`,
+        path: triggerWebhookEndpoint,
         method: "POST",
         headers: {
           "content-type": "application/json",
