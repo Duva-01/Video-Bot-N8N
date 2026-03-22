@@ -8,6 +8,7 @@ on:
 jobs:
   trigger-content-run:
     runs-on: ubuntu-latest
+    environment: Video Bot N8N
     steps:
       - name: Ping backend health
         env:
