@@ -40,16 +40,7 @@ jobs:
             "${BACKEND_URL}/api/auth/login")
 
           echo "${response}" > /tmp/login.json
-          token=$(python - <<'PY'
-import json
-with open('/tmp/login.json', 'r', encoding='utf-8') as fh:
-    data = json.load(fh)
-token = data.get('token')
-if not token:
-    raise SystemExit('Missing token in login response')
-print(token)
-PY
-)
+          token=$(python -c "import json,sys; data=json.load(open('/tmp/login.json', encoding='utf-8')); token=data.get('token'); print(token) if token else sys.exit('Missing token in login response')")
 
           echo "::add-mask::${token}"
           echo "token=${token}" >> "${GITHUB_OUTPUT}"
