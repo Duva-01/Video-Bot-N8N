@@ -299,15 +299,27 @@ Se despliega la carpeta:
 - `frontend/`
 
 ### GitHub Actions
-Workflow actual:
+Workflows actuales:
 - [.github/workflows/keep-render-awake.yml](.github/workflows/keep-render-awake.yml)
+- [.github/workflows/trigger-content-run.yml](.github/workflows/trigger-content-run.yml)
 
-Hace ping a:
+`keep-render-awake.yml` hace ping a:
 - `/health`
 - cada `5 minutos`
 
 Objetivo:
 - reducir suspensiones del servicio free de Render
+
+`trigger-content-run.yml`:
+- hace login contra `POST /api/auth/login`
+- obtiene un token bearer temporal
+- llama a `POST /api/run-now`
+- corre cada `2 horas`
+- también se puede lanzar manualmente desde GitHub Actions
+
+Secrets requeridos en GitHub:
+- `FACTS_ENGINE_APP_USER`
+- `FACTS_ENGINE_APP_PASSWORD`
 
 ## Variables importantes
 

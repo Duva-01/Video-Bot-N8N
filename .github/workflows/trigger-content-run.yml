@@ -1,0 +1,75 @@
+name: Trigger Content Run
+
+on:
+  schedule:
+    - cron: "0 */2 * * *"
+  workflow_dispatch:
+
+concurrency:
+  group: facts-engine-run-now
+  cancel-in-progress: false
+
+jobs:
+  trigger-run:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ping backend health
+        env:
+          BACKEND_URL: https://video-bot-n8n.onrender.com
+        run: |
+          set -euo pipefail
+          echo "Checking ${BACKEND_URL}/health"
+          curl --fail --show-error --silent --location --max-time 30 "${BACKEND_URL}/health" > /tmp/health.json
+          cat /tmp/health.json
+
+      - name: Login and fetch session token
+        id: login
+        env:
+          BACKEND_URL: https://video-bot-n8n.onrender.com
+          APP_AUTH_USER: ${{ secrets.FACTS_ENGINE_APP_USER }}
+          APP_AUTH_PASSWORD: ${{ secrets.FACTS_ENGINE_APP_PASSWORD }}
+        run: |
+          set -euo pipefail
+          if [ -z "${APP_AUTH_USER}" ] || [ -z "${APP_AUTH_PASSWORD}" ]; then
+            echo "Missing GitHub secrets FACTS_ENGINE_APP_USER or FACTS_ENGINE_APP_PASSWORD" >&2
+            exit 1
+          fi
+
+          payload=$(printf '{"username":"%s","password":"%s"}' "${APP_AUTH_USER}" "${APP_AUTH_PASSWORD}")
+          response=$(curl --fail --show-error --silent \
+            --location \
+            --max-time 30 \
+            -H "Content-Type: application/json" \
+            -d "${payload}" \
+            "${BACKEND_URL}/api/auth/login")
+
+          echo "${response}" > /tmp/login.json
+          token=$(python - <<'PY'
+import json
+with open('/tmp/login.json', 'r', encoding='utf-8') as fh:
+    data = json.load(fh)
+token = data.get('token')
+if not token:
+    raise SystemExit('Missing token in login response')
+print(token)
+PY
+)
+
+          echo "::add-mask::${token}"
+          echo "token=${token}" >> "${GITHUB_OUTPUT}"
+
+      - name: Trigger n8n workflow
+        env:
+          BACKEND_URL: https://video-bot-n8n.onrender.com
+          SESSION_TOKEN: ${{ steps.login.outputs.token }}
+        run: |
+          set -euo pipefail
+          echo "Triggering ${BACKEND_URL}/api/run-now"
+          curl --fail --show-error --silent \
+            --location \
+            --max-time 60 \
+            -X POST \
+            -H "Authorization: Bearer ${SESSION_TOKEN}" \
+            -H "Content-Type: application/json" \
+            "${BACKEND_URL}/api/run-now" > /tmp/run-now.json
+          cat /tmp/run-now.json
