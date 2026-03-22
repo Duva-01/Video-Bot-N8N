@@ -34,6 +34,21 @@
     },
     {
       "parameters": {
+        "httpMethod": "POST",
+        "path": "facts-engine-run",
+        "responseMode": "onReceived"
+      },
+      "id": "webhook-trigger",
+      "name": "Webhook Trigger",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [
+        200,
+        500
+      ]
+    },
+    {
+      "parameters": {
         "command": "rm -rf /tmp/bot-videos && mkdir -p /tmp/bot-videos/clips"
       },
       "id": "prepare-workspace",
@@ -164,6 +179,17 @@
       ]
     },
     "Schedule Trigger": {
+      "main": [
+        [
+          {
+            "node": "Prepare Workspace",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Webhook Trigger": {
       "main": [
         [
           {

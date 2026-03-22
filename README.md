@@ -314,12 +314,17 @@ Objetivo:
 - hace login contra `POST /api/auth/login`
 - obtiene un token bearer temporal
 - llama a `POST /api/run-now`
+- `POST /api/run-now` dispara internamente el workflow por webhook
 - corre cada `2 horas`
 - también se puede lanzar manualmente desde GitHub Actions
 
 Secrets requeridos en GitHub:
 - `FACTS_ENGINE_APP_USER`
 - `FACTS_ENGINE_APP_PASSWORD`
+
+Importante:
+- la plantilla del workflow incluye `Webhook Trigger` con path `facts-engine-run`
+- si tu instancia de `n8n` tiene un workflow antiguo importado antes de este cambio, debes reimportar la plantilla o añadir ese nodo manualmente y conectarlo a `Prepare Workspace`
 
 ## Variables importantes
 

@@ -23,6 +23,10 @@ const publicHost = process.env.N8N_HOST || "0.0.0.0";
 const publicPort = Number(process.env.N8N_PORT || process.env.PORT || 10000);
 const internalHost = process.env.N8N_INTERNAL_HOST || "127.0.0.1";
 const internalPort = Number(process.env.N8N_INTERNAL_PORT || 5678);
+const triggerWebhookPath = (() => {
+  const raw = String(process.env.N8N_TRIGGER_WEBHOOK_PATH || "facts-engine-run").trim();
+  return raw.replace(/^\/+|\/+$/g, "");
+})();
 const keepAliveEnabled = (process.env.KEEP_ALIVE_ENABLED || "true") === "true";
 const keepAliveIntervalMs = Number(process.env.KEEP_ALIVE_INTERVAL_MS || 300000);
 const webhookUrl = (process.env.WEBHOOK_URL || "").replace(/\/+$/, "");
@@ -646,87 +650,88 @@ async function triggerWorkflowExecution() {
     message: "Workflow execution requested from frontend",
     context: {
       workflowName: workflow.name,
+      triggerMode: "webhook",
+      webhookPath: triggerWebhookPath,
     },
   });
 
-  const child = spawn("n8n", ["execute", "--id", workflow.id], {
-    env: currentN8nEnv || process.env,
-    stdio: ["ignore", "pipe", "pipe"],
-  });
-
-  child.stdout.on("data", (chunk) => {
-    runnerState.stdoutTail = appendTail(runnerState.stdoutTail, chunk.toString());
-  });
-
-  child.stderr.on("data", (chunk) => {
-    runnerState.stderrTail = appendTail(runnerState.stderrTail, chunk.toString());
-  });
-
-  child.on("error", (error) => {
-    runnerState.running = false;
-    runnerState.finishedAt = new Date().toISOString();
-    runnerState.lastError = error.message;
-    void writeExecutionLog({
-      workflow_id: workflow.id,
-      source: "shell-runner",
-      level: "error",
-      message: "Workflow execution failed to start",
-      context: {
-        workflowName: workflow.name,
-        error: error.message,
+  await new Promise((resolve, reject) => {
+    const request = http.request(
+      {
+        hostname: internalHost,
+        port: internalPort,
+        path: `/webhook/${triggerWebhookPath}`,
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+        },
       },
-    });
-    log("shell run failed to start", {
-      workflowId: workflow.id,
-      error: error.message,
-    });
-  });
+      (response) => {
+        const chunks = [];
+        response.on("data", (chunk) => chunks.push(chunk));
+        response.on("end", () => {
+          const body = Buffer.concat(chunks).toString("utf8");
+          runnerState.running = false;
+          runnerState.finishedAt = new Date().toISOString();
+          runnerState.exitCode = response.statusCode || 0;
+          runnerState.signal = null;
+          runnerState.stdoutTail = appendTail(runnerState.stdoutTail, body);
+          runnerState.lastResult = extractLastJsonBlock(body) || body || null;
 
-  child.on("close", (code, signal) => {
-    runnerState.running = false;
-    runnerState.finishedAt = new Date().toISOString();
-    runnerState.exitCode = code;
-    runnerState.signal = signal || null;
-    runnerState.lastResult = extractLastJsonBlock(runnerState.stdoutTail);
+          if ((response.statusCode || 500) >= 400) {
+            runnerState.lastError = body || `Webhook trigger failed with status ${response.statusCode}`;
+            void writeExecutionLog({
+              workflow_id: workflow.id,
+              source: "shell-runner",
+              level: "error",
+              message: "Workflow webhook trigger failed",
+              context: {
+                workflowName: workflow.name,
+                statusCode: response.statusCode,
+                responseBody: body,
+              },
+            });
+            const error = new Error(runnerState.lastError);
+            error.statusCode = response.statusCode || 500;
+            reject(error);
+            return;
+          }
 
-    if (code !== 0) {
-      runnerState.lastError = runnerState.stderrTail || `Execution exited with code ${code}`;
+          runnerState.lastError = null;
+          void writeExecutionLog({
+            workflow_id: workflow.id,
+            source: "shell-runner",
+            level: "info",
+            message: "Workflow webhook trigger accepted",
+            context: {
+              workflowName: workflow.name,
+              statusCode: response.statusCode,
+              responseBody: body,
+            },
+          });
+          resolve();
+        });
+      },
+    );
+
+    request.on("error", (error) => {
+      runnerState.running = false;
+      runnerState.finishedAt = new Date().toISOString();
+      runnerState.lastError = error.message;
       void writeExecutionLog({
         workflow_id: workflow.id,
         source: "shell-runner",
         level: "error",
-        message: "Workflow execution completed with error",
+        message: "Workflow webhook trigger failed to start",
         context: {
           workflowName: workflow.name,
-          exitCode: code,
-          signal,
-          stderrTail: runnerState.stderrTail,
+          error: error.message,
         },
       });
-      log("shell run completed with error", {
-        workflowId: workflow.id,
-        exitCode: code,
-      });
-      return;
-    }
+      reject(error);
+    });
 
-    runnerState.lastError = null;
-    void writeExecutionLog({
-      workflow_id: workflow.id,
-      source: "shell-runner",
-      level: "info",
-      message: "Workflow execution completed successfully",
-      context: {
-        workflowName: workflow.name,
-        exitCode: code,
-        stdoutTail: runnerState.stdoutTail,
-      },
-    });
-    log("shell run completed", {
-      workflowId: workflow.id,
-      workflowName: workflow.name,
-      exitCode: code,
-    });
+    request.end("{}");
   });
 
   return getRunnerSnapshot();
