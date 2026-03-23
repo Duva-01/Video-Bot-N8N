@@ -20,6 +20,7 @@ async function main() {
 
   const scriptPath = process.argv[2] || "/tmp/bot-videos/script.json";
   const youtubeResultPath = process.argv[3] || "/tmp/bot-videos/youtube-result.json";
+  const socialResultPath = process.argv[4] || "/tmp/bot-videos/social-result.json";
   const scriptData = readJsonIfExists(scriptPath);
   if (!scriptData?.topic_key) {
     log("topic_key missing, skipping finalize");
@@ -27,6 +28,7 @@ async function main() {
   }
 
   const youtubeResult = readJsonIfExists(youtubeResultPath) || {};
+  const socialResult = readJsonIfExists(socialResultPath) || {};
   const pool = createPool();
 
   try {
@@ -42,6 +44,7 @@ async function main() {
         topic: scriptData.topic,
         search_query: scriptData.search_query,
         privacy_status: youtubeResult.privacyStatus || null,
+        social_posts: socialResult,
       },
     });
 
@@ -55,6 +58,7 @@ async function main() {
         youtube_video_id: youtubeResult.videoId || null,
         youtube_url: youtubeResult.url || null,
         privacy_status: youtubeResult.privacyStatus || null,
+        social_posts: socialResult,
       },
     });
 
@@ -68,6 +72,7 @@ async function main() {
         youtube_video_id: youtubeResult.videoId || null,
         title: scriptData.title,
         privacy_status: youtubeResult.privacyStatus || null,
+        social_posts: socialResult,
       },
     });
   } catch (error) {
