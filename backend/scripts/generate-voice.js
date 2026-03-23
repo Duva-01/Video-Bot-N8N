@@ -64,6 +64,14 @@ function getGeminiInlineAudio(data) {
   return inlineData.data;
 }
 
+function requiredEnv(name) {
+  const value = process.env[name];
+  if (!value) {
+    throw new Error(`Missing required environment variable: ${name}`);
+  }
+  return value;
+}
+
 function runCommand(command, args) {
   const result = spawnSync(command, args, {
     encoding: "utf8",
@@ -95,6 +103,195 @@ function runCommandWithInput(command, args, input) {
   }
 }
 
+async function runCloudflareTts({ text, topicKey, outputPath }) {
+  const apiToken = requiredEnv("CLOUDFLARE_AI_API_TOKEN");
+  const accountId = requiredEnv("CLOUDFLARE_ACCOUNT_ID");
+  const model = process.env.CLOUDFLARE_TTS_MODEL || "@cf/deepgram/aura-2-es";
+  const language = process.env.CLOUDFLARE_TTS_LANG || "es";
+  const speaker = process.env.CLOUDFLARE_TTS_SPEAKER || "aquila";
+  const isAuraModel = model.startsWith("@cf/deepgram/aura");
+  const requestBody = isAuraModel
+    ? {
+        text,
+        speaker,
+        encoding: "mp3",
+      }
+    : {
+        prompt: text,
+        lang: language,
+      };
+
+  const response = await fetch(`https://api.cloudflare.com/client/v4/accounts/${accountId}/ai/run/${model}`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${apiToken}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(requestBody),
+  });
+
+  if (!response.ok) {
+    throw new Error(`Cloudflare Workers AI TTS request failed with status ${response.status}: ${await response.text()}`);
+  }
+
+  const contentType = String(response.headers.get("content-type") || "");
+  let buffer;
+
+  if (contentType.includes("application/json")) {
+    const payload = await response.json();
+    const audioBase64 = payload?.result?.audio || payload?.audio || null;
+    if (!audioBase64) {
+      throw new Error("Cloudflare Workers AI TTS response did not include audio data");
+    }
+    buffer = Buffer.from(audioBase64, "base64");
+  } else {
+    buffer = Buffer.from(await response.arrayBuffer());
+  }
+
+  fs.writeFileSync(outputPath, buffer);
+
+  await withOptionalPool(async (pool) => {
+    await logArtifact(pool, {
+      topic_key: topicKey,
+      artifact_type: "voice_track",
+      label: "Narration audio",
+      file_path: outputPath,
+      mime_type: "audio/mpeg",
+      metadata: { provider: "cloudflare", model, language, speaker: isAuraModel ? speaker : null },
+    });
+    await logStepEvent(pool, {
+      topic_key: topicKey,
+      event_type: "step_completed",
+      stage: "generate_voice",
+      source: "generate-voice",
+      message: "Voice generated",
+      metadata: {
+        provider: "cloudflare",
+        model,
+        language,
+        speaker: isAuraModel ? speaker : null,
+        bytes: buffer.length,
+      },
+    });
+  });
+
+  log("voice generation completed", {
+    outputPath,
+    bytes: buffer.length,
+    provider: "cloudflare",
+    model,
+    language,
+    speaker: isAuraModel ? speaker : null,
+  });
+}
+
+async function runEspeakTts({ text, topicKey, outputPath, language }) {
+  const voiceName = process.env.ESPEAK_VOICE || language || "es";
+  const rate = process.env.ESPEAK_RATE || "165";
+  const pitch = process.env.ESPEAK_PITCH || "55";
+
+  runCommand("espeak-ng", ["-v", voiceName, "-s", String(rate), "-p", String(pitch), "-w", outputPath, text]);
+
+  const stats = fs.statSync(outputPath);
+
+  await withOptionalPool(async (pool) => {
+    await logArtifact(pool, {
+      topic_key: topicKey,
+      artifact_type: "voice_track",
+      label: "Narration audio",
+      file_path: outputPath,
+      mime_type: "audio/wav",
+      metadata: { provider: "espeak", voiceName, rate: Number(rate), pitch: Number(pitch) },
+    });
+    await logStepEvent(pool, {
+      topic_key: topicKey,
+      event_type: "step_completed",
+      stage: "generate_voice",
+      source: "generate-voice",
+      message: "Voice generated",
+      metadata: {
+        provider: "espeak",
+        voiceName,
+        rate: Number(rate),
+        pitch: Number(pitch),
+        bytes: stats.size,
+      },
+    });
+  });
+
+  log("voice generation completed", {
+    outputPath,
+    bytes: stats.size,
+    provider: "espeak",
+    voiceName,
+    rate: Number(rate),
+    pitch: Number(pitch),
+  });
+}
+
+async function runPiperTts({ text, topicKey, outputPath }) {
+  const voiceName = process.env.PIPER_VOICE || "es_ES-carlfm-x_low";
+  const dataDir = process.env.PIPER_DATA_DIR || "/app/voices";
+  const modelPath = process.env.PIPER_MODEL_PATH || path.join(dataDir, `${voiceName}.onnx`);
+  const configPath = process.env.PIPER_CONFIG_PATH || `${modelPath}.json`;
+
+  runCommandWithInput("piper", [
+    "--model",
+    modelPath,
+    "--config",
+    configPath,
+    "--espeak_data",
+    "/usr/share/piper/espeak-ng-data",
+    "--output_file",
+    outputPath,
+  ], text);
+
+  const stats = fs.statSync(outputPath);
+
+  await withOptionalPool(async (pool) => {
+    await logArtifact(pool, {
+      topic_key: topicKey,
+      artifact_type: "voice_track",
+      label: "Narration audio",
+      file_path: outputPath,
+      mime_type: "audio/wav",
+      metadata: { provider: "piper", voiceName, dataDir, modelPath, configPath },
+    });
+    await logStepEvent(pool, {
+      topic_key: topicKey,
+      event_type: "step_completed",
+      stage: "generate_voice",
+      source: "generate-voice",
+      message: "Voice generated",
+      metadata: { provider: "piper", voiceName, dataDir, modelPath, configPath, bytes: stats.size },
+    });
+  });
+
+  log("voice generation completed", {
+    outputPath,
+    bytes: stats.size,
+    provider: "piper",
+    voiceName,
+    dataDir,
+    modelPath,
+    configPath,
+  });
+}
+
+async function runLocalFallbackTts({ text, topicKey, outputPath, language, fallbackProvider }) {
+  if (fallbackProvider === "espeak" || fallbackProvider === "espeak-ng") {
+    await runEspeakTts({ text, topicKey, outputPath, language });
+    return "espeak";
+  }
+
+  if (fallbackProvider === "piper") {
+    await runPiperTts({ text, topicKey, outputPath });
+    return "piper";
+  }
+
+  throw new Error(`Unsupported fallback TTS provider: ${fallbackProvider}`);
+}
+
 async function main() {
   const scriptPath = process.argv[2] || "/tmp/bot-videos/script.json";
   const outputPath = process.argv[3] || "/tmp/bot-videos/narration.wav";
@@ -121,6 +318,8 @@ async function main() {
         : process.env.GEMINI_API_KEY
           ? "gemini"
           : "elevenlabs");
+  const fallbackEnabled = (process.env.TTS_FALLBACK_ENABLED || "true") === "true";
+  const fallbackProvider = process.env.TTS_FALLBACK_PROVIDER || "piper";
 
   log("voice generation starting", { scriptPath, outputPath, provider });
 
@@ -139,72 +338,35 @@ async function main() {
 
   try {
     if (provider === "cloudflare") {
-      const apiToken = getRequiredEnv("CLOUDFLARE_AI_API_TOKEN");
-      const accountId = getRequiredEnv("CLOUDFLARE_ACCOUNT_ID");
-      const model = process.env.CLOUDFLARE_TTS_MODEL || "@cf/deepgram/aura-2-es";
-      const language = process.env.CLOUDFLARE_TTS_LANG || "es";
-      const speaker = process.env.CLOUDFLARE_TTS_SPEAKER || "aquila";
-      const isAuraModel = model.startsWith("@cf/deepgram/aura");
-      const requestBody = isAuraModel
-        ? {
-            text,
-            speaker,
-            encoding: "mp3",
-          }
-        : {
-            prompt: text,
-            lang: language,
-          };
-
-      const response = await fetch(`https://api.cloudflare.com/client/v4/accounts/${accountId}/ai/run/${model}`, {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${apiToken}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(requestBody),
-      });
-
-      if (!response.ok) {
-        fail(`Cloudflare Workers AI TTS request failed with status ${response.status}: ${await response.text()}`);
-      }
-
-      const contentType = String(response.headers.get("content-type") || "");
-      let buffer;
-
-      if (contentType.includes("application/json")) {
-        const payload = await response.json();
-        const audioBase64 = payload?.result?.audio || payload?.audio || null;
-        if (!audioBase64) {
-          fail("Cloudflare Workers AI TTS response did not include audio data");
+      try {
+        await runCloudflareTts({ text, topicKey, outputPath });
+      } catch (error) {
+        if (!fallbackEnabled) {
+          throw error;
         }
-        buffer = Buffer.from(audioBase64, "base64");
-      } else {
-        buffer = Buffer.from(await response.arrayBuffer());
+
+        log("cloudflare tts failed, falling back to local provider", {
+          fallbackProvider,
+          error: error.message,
+        });
+
+        await withOptionalPool(async (pool) => {
+          await logStepEvent(pool, {
+            topic_key: topicKey,
+            event_type: "step_warning",
+            stage: "generate_voice",
+            source: "generate-voice",
+            message: "Primary TTS provider failed, using fallback",
+            metadata: {
+              provider: "cloudflare",
+              fallbackProvider,
+              error: error.message,
+            },
+          });
+        });
+
+        await runLocalFallbackTts({ text, topicKey, outputPath, language, fallbackProvider });
       }
-
-      fs.writeFileSync(outputPath, buffer);
-
-      await withOptionalPool(async (pool) => {
-        await logArtifact(pool, {
-          topic_key: topicKey,
-          artifact_type: "voice_track",
-          label: "Narration audio",
-          file_path: outputPath,
-          mime_type: "audio/mpeg",
-          metadata: { provider, model, language, speaker: isAuraModel ? speaker : null },
-        });
-        await logStepEvent(pool, {
-          topic_key: topicKey,
-          event_type: "step_completed",
-          stage: "generate_voice",
-          source: "generate-voice",
-          message: "Voice generated",
-          metadata: { provider, model, language, speaker: isAuraModel ? speaker : null, bytes: buffer.length },
-        });
-      });
-
-      log("voice generation completed", { outputPath, bytes: buffer.length, provider, model, language, speaker: isAuraModel ? speaker : null });
       return;
     }
 
@@ -328,91 +490,12 @@ async function main() {
     }
 
     if (provider === "espeak" || provider === "espeak-ng") {
-      const voiceName = process.env.ESPEAK_VOICE || language || "es";
-      const rate = process.env.ESPEAK_RATE || "165";
-      const pitch = process.env.ESPEAK_PITCH || "55";
-
-      runCommand("espeak-ng", ["-v", voiceName, "-s", String(rate), "-p", String(pitch), "-w", outputPath, text]);
-
-      const stats = fs.statSync(outputPath);
-
-      await withOptionalPool(async (pool) => {
-        await logArtifact(pool, {
-          topic_key: topicKey,
-          artifact_type: "voice_track",
-          label: "Narration audio",
-          file_path: outputPath,
-          mime_type: "audio/wav",
-          metadata: { provider: "espeak", voiceName, rate: Number(rate), pitch: Number(pitch) },
-        });
-        await logStepEvent(pool, {
-          topic_key: topicKey,
-          event_type: "step_completed",
-          stage: "generate_voice",
-          source: "generate-voice",
-          message: "Voice generated",
-          metadata: { provider: "espeak", voiceName, rate: Number(rate), pitch: Number(pitch), bytes: stats.size },
-        });
-      });
-
-      log("voice generation completed", {
-        outputPath,
-        bytes: stats.size,
-        provider: "espeak",
-        voiceName,
-        rate: Number(rate),
-        pitch: Number(pitch),
-      });
+      await runEspeakTts({ text, topicKey, outputPath, language });
       return;
     }
 
     if (provider === "piper") {
-      const voiceName = process.env.PIPER_VOICE || "es_ES-carlfm-x_low";
-      const dataDir = process.env.PIPER_DATA_DIR || "/app/voices";
-      const modelPath = process.env.PIPER_MODEL_PATH || path.join(dataDir, `${voiceName}.onnx`);
-      const configPath = process.env.PIPER_CONFIG_PATH || `${modelPath}.json`;
-
-      runCommandWithInput("piper", [
-        "--model",
-        modelPath,
-        "--config",
-        configPath,
-        "--espeak_data",
-        "/usr/share/piper/espeak-ng-data",
-        "--output_file",
-        outputPath,
-      ], text);
-
-      const stats = fs.statSync(outputPath);
-
-      await withOptionalPool(async (pool) => {
-        await logArtifact(pool, {
-          topic_key: topicKey,
-          artifact_type: "voice_track",
-          label: "Narration audio",
-          file_path: outputPath,
-          mime_type: "audio/wav",
-          metadata: { provider: "piper", voiceName, dataDir, modelPath, configPath },
-        });
-        await logStepEvent(pool, {
-          topic_key: topicKey,
-          event_type: "step_completed",
-          stage: "generate_voice",
-          source: "generate-voice",
-          message: "Voice generated",
-          metadata: { provider: "piper", voiceName, dataDir, modelPath, configPath, bytes: stats.size },
-        });
-      });
-
-      log("voice generation completed", {
-        outputPath,
-        bytes: stats.size,
-        provider: "piper",
-        voiceName,
-        dataDir,
-        modelPath,
-        configPath,
-      });
+      await runPiperTts({ text, topicKey, outputPath });
       return;
     }
 

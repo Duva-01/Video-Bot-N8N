@@ -59,6 +59,10 @@ services:
       - key: TEXT_PROVIDER
         value: groq
       - key: TTS_PROVIDER
+        value: cloudflare
+      - key: TTS_FALLBACK_ENABLED
+        value: "true"
+      - key: TTS_FALLBACK_PROVIDER
         value: piper
       - key: PIPER_VOICE
         value: es_ES-carlfm-x_low
