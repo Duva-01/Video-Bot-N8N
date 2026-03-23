@@ -60,6 +60,12 @@ services:
         value: groq
       - key: TTS_PROVIDER
         value: cloudflare
+      - key: ESPEAK_VOICE
+        value: es
+      - key: ESPEAK_RATE
+        value: "165"
+      - key: ESPEAK_PITCH
+        value: "55"
       - key: GROQ_API_KEY
         sync: false
       - key: GROQ_TEXT_MODEL

@@ -2,6 +2,7 @@ require("dotenv").config();
 
 const fs = require("fs");
 const path = require("path");
+const { spawnSync } = require("child_process");
 const fetch = global.fetch || require("node-fetch");
 const { logArtifact, logFailure, logStepEvent, readJsonIfExists, withOptionalPool } = require("./lib/script-observer");
 
@@ -61,6 +62,21 @@ function getGeminiInlineAudio(data) {
   }
 
   return inlineData.data;
+}
+
+function runCommand(command, args) {
+  const result = spawnSync(command, args, {
+    encoding: "utf8",
+    stdio: ["ignore", "pipe", "pipe"],
+  });
+
+  if (result.error) {
+    fail(`${command} failed to start: ${result.error.message}`);
+  }
+
+  if (result.status !== 0) {
+    fail(`${command} exited with status ${result.status}: ${(result.stderr || result.stdout || "").trim()}`);
+  }
 }
 
 async function main() {
@@ -292,6 +308,45 @@ async function main() {
       });
 
       log("voice generation completed", { outputPath, bytes: pcmBuffer.length, provider, voiceName, model });
+      return;
+    }
+
+    if (provider === "espeak" || provider === "espeak-ng") {
+      const voiceName = process.env.ESPEAK_VOICE || language || "es";
+      const rate = process.env.ESPEAK_RATE || "165";
+      const pitch = process.env.ESPEAK_PITCH || "55";
+
+      runCommand("espeak-ng", ["-v", voiceName, "-s", String(rate), "-p", String(pitch), "-w", outputPath, text]);
+
+      const stats = fs.statSync(outputPath);
+
+      await withOptionalPool(async (pool) => {
+        await logArtifact(pool, {
+          topic_key: topicKey,
+          artifact_type: "voice_track",
+          label: "Narration audio",
+          file_path: outputPath,
+          mime_type: "audio/wav",
+          metadata: { provider: "espeak", voiceName, rate: Number(rate), pitch: Number(pitch) },
+        });
+        await logStepEvent(pool, {
+          topic_key: topicKey,
+          event_type: "step_completed",
+          stage: "generate_voice",
+          source: "generate-voice",
+          message: "Voice generated",
+          metadata: { provider: "espeak", voiceName, rate: Number(rate), pitch: Number(pitch), bytes: stats.size },
+        });
+      });
+
+      log("voice generation completed", {
+        outputPath,
+        bytes: stats.size,
+        provider: "espeak",
+        voiceName,
+        rate: Number(rate),
+        pitch: Number(pitch),
+      });
       return;
     }
 

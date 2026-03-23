@@ -6,7 +6,7 @@ RUN sed -i 's|http://deb.debian.org/debian|http://archive.debian.org/debian|g' /
     && sed -i 's|http://deb.debian.org/debian-security|http://archive.debian.org/debian-security|g' /etc/apt/sources.list \
     && printf 'Acquire::Check-Valid-Until "false";\n' > /etc/apt/apt.conf.d/99no-check-valid \
     && apt-get update -o Acquire::Check-Valid-Until=false \
-    && apt-get install -y --no-install-recommends ffmpeg bash \
+    && apt-get install -y --no-install-recommends ffmpeg bash espeak-ng \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
