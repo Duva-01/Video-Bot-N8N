@@ -59,7 +59,9 @@ services:
       - key: TEXT_PROVIDER
         value: groq
       - key: TTS_PROVIDER
-        value: cloudflare
+        value: gemini
+      - key: TTS_PROVIDER_CHAIN
+        value: gemini,cloudflare,piper,espeak
       - key: TTS_FALLBACK_ENABLED
         value: "true"
       - key: TTS_FALLBACK_PROVIDER

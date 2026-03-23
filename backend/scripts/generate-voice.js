@@ -58,7 +58,7 @@ function getGeminiInlineAudio(data) {
   const inlineData = parts.find((part) => part.inlineData?.data)?.inlineData;
 
   if (!inlineData?.data) {
-    fail("Gemini TTS response did not include inline audio data");
+    throw new Error("Gemini TTS response did not include inline audio data");
   }
 
   return inlineData.data;
@@ -278,18 +278,250 @@ async function runPiperTts({ text, topicKey, outputPath }) {
   });
 }
 
-async function runLocalFallbackTts({ text, topicKey, outputPath, language, fallbackProvider }) {
-  if (fallbackProvider === "espeak" || fallbackProvider === "espeak-ng") {
-    await runEspeakTts({ text, topicKey, outputPath, language });
+async function runAzureTts({ text, topicKey, outputPath }) {
+  const subscriptionKey = getRequiredEnv("AZURE_SPEECH_KEY");
+  const region = getRequiredEnv("AZURE_SPEECH_REGION");
+  const voiceName = process.env.AZURE_SPEECH_VOICE || "es-ES-ElviraNeural";
+  const outputFormat = process.env.AZURE_SPEECH_OUTPUT_FORMAT || "riff-24khz-16bit-mono-pcm";
+  const tokenResponse = await fetch(`https://${region}.api.cognitive.microsoft.com/sts/v1.0/issueToken`, {
+    method: "POST",
+    headers: {
+      "Ocp-Apim-Subscription-Key": subscriptionKey,
+      "Content-Length": "0",
+    },
+  });
+
+  if (!tokenResponse.ok) {
+    throw new Error(`Azure Speech token request failed with status ${tokenResponse.status}: ${await tokenResponse.text()}`);
+  }
+
+  const accessToken = await tokenResponse.text();
+  const ssml = [
+    '<speak version="1.0" xml:lang="es-ES">',
+    `  <voice name="${xmlEscape(voiceName)}">`,
+    `    ${xmlEscape(text)}`,
+    "  </voice>",
+    "</speak>",
+  ].join("\n");
+
+  const response = await fetch(`https://${region}.tts.speech.microsoft.com/cognitiveservices/v1`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+      "Content-Type": "application/ssml+xml",
+      "X-Microsoft-OutputFormat": outputFormat,
+      "User-Agent": "facts-engine-bot",
+    },
+    body: ssml,
+  });
+
+  if (!response.ok) {
+    throw new Error(`Azure Speech request failed with status ${response.status}: ${await response.text()}`);
+  }
+
+  const buffer = Buffer.from(await response.arrayBuffer());
+  fs.writeFileSync(outputPath, buffer);
+
+  await withOptionalPool(async (pool) => {
+    await logArtifact(pool, {
+      topic_key: topicKey,
+      artifact_type: "voice_track",
+      label: "Narration audio",
+      file_path: outputPath,
+      mime_type: "audio/wav",
+      metadata: { provider: "azure", region, voiceName, outputFormat },
+    });
+    await logStepEvent(pool, {
+      topic_key: topicKey,
+      event_type: "step_completed",
+      stage: "generate_voice",
+      source: "generate-voice",
+      message: "Voice generated",
+      metadata: { provider: "azure", region, voiceName, outputFormat, bytes: buffer.length },
+    });
+  });
+
+  log("voice generation completed", { outputPath, bytes: buffer.length, provider: "azure", region, voiceName, outputFormat });
+}
+
+async function runGeminiTts({ text, topicKey, outputPath, language }) {
+  const apiKey = getRequiredEnv("GEMINI_API_KEY");
+  const model = process.env.GEMINI_TTS_MODEL || "gemini-2.5-flash-preview-tts";
+  const voiceName = process.env.GEMINI_TTS_VOICE || "Kore";
+  const prompt = [`Lee el siguiente texto en ${language}.`, "Usa un tono natural, claro y directo.", text].join("\n");
+
+  const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`, {
+    method: "POST",
+    headers: {
+      "x-goog-api-key": apiKey,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      contents: [{ parts: [{ text: prompt }] }],
+      generationConfig: {
+        responseModalities: ["AUDIO"],
+        speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName } } },
+      },
+    }),
+  });
+
+  if (!response.ok) {
+    throw new Error(`Gemini TTS request failed with status ${response.status}: ${await response.text()}`);
+  }
+
+  const data = await response.json();
+  const pcmBuffer = Buffer.from(getGeminiInlineAudio(data), "base64");
+  writeWavFile(outputPath, pcmBuffer);
+
+  await withOptionalPool(async (pool) => {
+    await logArtifact(pool, {
+      topic_key: topicKey,
+      artifact_type: "voice_track",
+      label: "Narration audio",
+      file_path: outputPath,
+      mime_type: "audio/wav",
+      metadata: { provider: "gemini", model, voiceName },
+    });
+    await logStepEvent(pool, {
+      topic_key: topicKey,
+      event_type: "step_completed",
+      stage: "generate_voice",
+      source: "generate-voice",
+      message: "Voice generated",
+      metadata: { provider: "gemini", model, voiceName, bytes: pcmBuffer.length },
+    });
+  });
+
+  log("voice generation completed", { outputPath, bytes: pcmBuffer.length, provider: "gemini", voiceName, model });
+}
+
+async function runElevenLabsTts({ text, topicKey, outputPath }) {
+  const apiKey = getRequiredEnv("ELEVENLABS_API_KEY");
+  const voiceId = getRequiredEnv("ELEVENLABS_VOICE_ID");
+  const modelId = process.env.ELEVENLABS_MODEL_ID || "eleven_multilingual_v2";
+  const response = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${voiceId}`, {
+    method: "POST",
+    headers: {
+      "xi-api-key": apiKey,
+      Accept: "audio/mpeg",
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      text,
+      model_id: modelId,
+      voice_settings: { stability: 0.5, similarity_boost: 0.75 },
+    }),
+  });
+
+  if (!response.ok) {
+    throw new Error(`ElevenLabs request failed with status ${response.status}: ${await response.text()}`);
+  }
+
+  const buffer = Buffer.from(await response.arrayBuffer());
+  fs.writeFileSync(outputPath, buffer);
+
+  await withOptionalPool(async (pool) => {
+    await logArtifact(pool, {
+      topic_key: topicKey,
+      artifact_type: "voice_track",
+      label: "Narration audio",
+      file_path: outputPath,
+      mime_type: "audio/mpeg",
+      metadata: { provider: "elevenlabs", voiceId, modelId },
+    });
+    await logStepEvent(pool, {
+      topic_key: topicKey,
+      event_type: "step_completed",
+      stage: "generate_voice",
+      source: "generate-voice",
+      message: "Voice generated",
+      metadata: { provider: "elevenlabs", voiceId, modelId, bytes: buffer.length },
+    });
+  });
+
+  log("voice generation completed", { outputPath, bytes: buffer.length, provider: "elevenlabs", voiceId, modelId });
+}
+
+function normalizeProviderName(provider) {
+  const value = String(provider || "").trim().toLowerCase();
+  if (!value) {
+    return "";
+  }
+
+  if (value === "espeak-ng") {
     return "espeak";
   }
 
-  if (fallbackProvider === "piper") {
-    await runPiperTts({ text, topicKey, outputPath });
-    return "piper";
+  return value;
+}
+
+function getDefaultProvider() {
+  return (
+    process.env.TTS_PROVIDER ||
+    (process.env.GEMINI_API_KEY
+      ? "gemini"
+      : process.env.CLOUDFLARE_AI_API_TOKEN
+        ? "cloudflare"
+        : process.env.AZURE_SPEECH_KEY
+          ? "azure"
+          : "elevenlabs")
+  );
+}
+
+function resolveProviderChain() {
+  const explicitChain = String(process.env.TTS_PROVIDER_CHAIN || "")
+    .split(",")
+    .map((item) => normalizeProviderName(item))
+    .filter(Boolean);
+
+  if (explicitChain.length > 0) {
+    return [...new Set(explicitChain)];
   }
 
-  throw new Error(`Unsupported fallback TTS provider: ${fallbackProvider}`);
+  const primaryProvider = normalizeProviderName(getDefaultProvider());
+  const fallbackEnabled = (process.env.TTS_FALLBACK_ENABLED || "true") === "true";
+  const fallbackProvider = normalizeProviderName(process.env.TTS_FALLBACK_PROVIDER || "piper");
+  const providers = [primaryProvider];
+
+  if (fallbackEnabled && fallbackProvider) {
+    providers.push(fallbackProvider);
+  }
+
+  return [...new Set(providers.filter(Boolean))];
+}
+
+async function runProvider(provider, context) {
+  if (provider === "cloudflare") {
+    await runCloudflareTts(context);
+    return;
+  }
+
+  if (provider === "azure") {
+    await runAzureTts(context);
+    return;
+  }
+
+  if (provider === "gemini") {
+    await runGeminiTts(context);
+    return;
+  }
+
+  if (provider === "espeak") {
+    await runEspeakTts(context);
+    return;
+  }
+
+  if (provider === "piper") {
+    await runPiperTts(context);
+    return;
+  }
+
+  if (provider === "elevenlabs") {
+    await runElevenLabsTts(context);
+    return;
+  }
+
+  throw new Error(`Unsupported TTS provider: ${provider}`);
 }
 
 async function main() {
@@ -309,19 +541,10 @@ async function main() {
     fail(`Missing narration text in ${scriptPath}`);
   }
 
-  const provider =
-    process.env.TTS_PROVIDER ||
-    (process.env.CLOUDFLARE_AI_API_TOKEN
-      ? "cloudflare"
-      : process.env.AZURE_SPEECH_KEY
-        ? "azure"
-        : process.env.GEMINI_API_KEY
-          ? "gemini"
-          : "elevenlabs");
-  const fallbackEnabled = (process.env.TTS_FALLBACK_ENABLED || "true") === "true";
-  const fallbackProvider = process.env.TTS_FALLBACK_PROVIDER || "piper";
+  const providerChain = resolveProviderChain();
+  const primaryProvider = providerChain[0] || getDefaultProvider();
 
-  log("voice generation starting", { scriptPath, outputPath, provider });
+  log("voice generation starting", { scriptPath, outputPath, provider: primaryProvider, providerChain });
 
   await withOptionalPool(async (pool) => {
     await logStepEvent(pool, {
@@ -330,219 +553,50 @@ async function main() {
       stage: "generate_voice",
       source: "generate-voice",
       message: "Generating voice track",
-      metadata: { provider },
+      metadata: { provider: primaryProvider, providerChain },
     });
   });
 
   fs.mkdirSync(path.dirname(outputPath), { recursive: true });
 
   try {
-    if (provider === "cloudflare") {
+    const executionContext = { text, topicKey, outputPath, language };
+    const errors = [];
+
+    for (const provider of providerChain) {
       try {
-        await runCloudflareTts({ text, topicKey, outputPath });
+        await runProvider(provider, executionContext);
+        return;
       } catch (error) {
-        if (!fallbackEnabled) {
-          throw error;
-        }
+        errors.push({ provider, error: error.message });
 
-        log("cloudflare tts failed, falling back to local provider", {
-          fallbackProvider,
-          error: error.message,
-        });
-
-        await withOptionalPool(async (pool) => {
-          await logStepEvent(pool, {
-            topic_key: topicKey,
-            event_type: "step_warning",
-            stage: "generate_voice",
-            source: "generate-voice",
-            message: "Primary TTS provider failed, using fallback",
-            metadata: {
-              provider: "cloudflare",
-              fallbackProvider,
-              error: error.message,
-            },
+        if (provider !== providerChain[providerChain.length - 1]) {
+          log("tts provider failed, trying next provider", {
+            provider,
+            nextProvider: providerChain[providerChain.indexOf(provider) + 1],
+            error: error.message,
           });
-        });
 
-        await runLocalFallbackTts({ text, topicKey, outputPath, language, fallbackProvider });
+          await withOptionalPool(async (pool) => {
+            await logStepEvent(pool, {
+              topic_key: topicKey,
+              event_type: "step_warning",
+              stage: "generate_voice",
+              source: "generate-voice",
+              message: "TTS provider failed, trying next provider",
+              metadata: {
+                provider,
+                nextProvider: providerChain[providerChain.indexOf(provider) + 1],
+                error: error.message,
+              },
+            });
+          });
+          continue;
+        }
       }
-      return;
     }
 
-    if (provider === "azure") {
-      const subscriptionKey = getRequiredEnv("AZURE_SPEECH_KEY");
-      const region = getRequiredEnv("AZURE_SPEECH_REGION");
-      const voiceName = process.env.AZURE_SPEECH_VOICE || "es-ES-ElviraNeural";
-      const outputFormat = process.env.AZURE_SPEECH_OUTPUT_FORMAT || "riff-24khz-16bit-mono-pcm";
-      const tokenResponse = await fetch(`https://${region}.api.cognitive.microsoft.com/sts/v1.0/issueToken`, {
-        method: "POST",
-        headers: {
-          "Ocp-Apim-Subscription-Key": subscriptionKey,
-          "Content-Length": "0",
-        },
-      });
-
-      if (!tokenResponse.ok) {
-        fail(`Azure Speech token request failed with status ${tokenResponse.status}: ${await tokenResponse.text()}`);
-      }
-
-      const accessToken = await tokenResponse.text();
-      const ssml = [
-        '<speak version="1.0" xml:lang="es-ES">',
-        `  <voice name="${xmlEscape(voiceName)}">`,
-        `    ${xmlEscape(text)}`,
-        "  </voice>",
-        "</speak>",
-      ].join("\n");
-
-      const response = await fetch(`https://${region}.tts.speech.microsoft.com/cognitiveservices/v1`, {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${accessToken}`,
-          "Content-Type": "application/ssml+xml",
-          "X-Microsoft-OutputFormat": outputFormat,
-          "User-Agent": "facts-engine-bot",
-        },
-        body: ssml,
-      });
-
-      if (!response.ok) {
-        fail(`Azure Speech request failed with status ${response.status}: ${await response.text()}`);
-      }
-
-      const buffer = Buffer.from(await response.arrayBuffer());
-      fs.writeFileSync(outputPath, buffer);
-
-      await withOptionalPool(async (pool) => {
-        await logArtifact(pool, {
-          topic_key: topicKey,
-          artifact_type: "voice_track",
-          label: "Narration audio",
-          file_path: outputPath,
-          mime_type: "audio/wav",
-          metadata: { provider, region, voiceName, outputFormat },
-        });
-        await logStepEvent(pool, {
-          topic_key: topicKey,
-          event_type: "step_completed",
-          stage: "generate_voice",
-          source: "generate-voice",
-          message: "Voice generated",
-          metadata: { provider, region, voiceName, outputFormat, bytes: buffer.length },
-        });
-      });
-
-      log("voice generation completed", { outputPath, bytes: buffer.length, provider, region, voiceName, outputFormat });
-      return;
-    }
-
-    if (provider === "gemini") {
-      const apiKey = getRequiredEnv("GEMINI_API_KEY");
-      const model = process.env.GEMINI_TTS_MODEL || "gemini-2.5-flash-preview-tts";
-      const voiceName = process.env.GEMINI_TTS_VOICE || "Kore";
-      const prompt = [`Lee el siguiente texto en ${language}.`, "Usa un tono natural, claro y directo.", text].join("\n");
-
-      const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`, {
-        method: "POST",
-        headers: {
-          "x-goog-api-key": apiKey,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          contents: [{ parts: [{ text: prompt }] }],
-          generationConfig: {
-            responseModalities: ["AUDIO"],
-            speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName } } },
-          },
-        }),
-      });
-
-      if (!response.ok) {
-        fail(`Gemini TTS request failed with status ${response.status}: ${await response.text()}`);
-      }
-
-      const data = await response.json();
-      const pcmBuffer = Buffer.from(getGeminiInlineAudio(data), "base64");
-      writeWavFile(outputPath, pcmBuffer);
-
-      await withOptionalPool(async (pool) => {
-        await logArtifact(pool, {
-          topic_key: topicKey,
-          artifact_type: "voice_track",
-          label: "Narration audio",
-          file_path: outputPath,
-          mime_type: "audio/wav",
-          metadata: { provider, model, voiceName },
-        });
-        await logStepEvent(pool, {
-          topic_key: topicKey,
-          event_type: "step_completed",
-          stage: "generate_voice",
-          source: "generate-voice",
-          message: "Voice generated",
-          metadata: { provider, model, voiceName, bytes: pcmBuffer.length },
-        });
-      });
-
-      log("voice generation completed", { outputPath, bytes: pcmBuffer.length, provider, voiceName, model });
-      return;
-    }
-
-    if (provider === "espeak" || provider === "espeak-ng") {
-      await runEspeakTts({ text, topicKey, outputPath, language });
-      return;
-    }
-
-    if (provider === "piper") {
-      await runPiperTts({ text, topicKey, outputPath });
-      return;
-    }
-
-    const apiKey = getRequiredEnv("ELEVENLABS_API_KEY");
-    const voiceId = getRequiredEnv("ELEVENLABS_VOICE_ID");
-    const modelId = process.env.ELEVENLABS_MODEL_ID || "eleven_multilingual_v2";
-    const response = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${voiceId}`, {
-      method: "POST",
-      headers: {
-        "xi-api-key": apiKey,
-        Accept: "audio/mpeg",
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        text,
-        model_id: modelId,
-        voice_settings: { stability: 0.5, similarity_boost: 0.75 },
-      }),
-    });
-
-    if (!response.ok) {
-      fail(`ElevenLabs request failed with status ${response.status}: ${await response.text()}`);
-    }
-
-    const buffer = Buffer.from(await response.arrayBuffer());
-    fs.writeFileSync(outputPath, buffer);
-
-    await withOptionalPool(async (pool) => {
-      await logArtifact(pool, {
-        topic_key: topicKey,
-        artifact_type: "voice_track",
-        label: "Narration audio",
-        file_path: outputPath,
-        mime_type: "audio/mpeg",
-        metadata: { provider, voiceId, modelId },
-      });
-      await logStepEvent(pool, {
-        topic_key: topicKey,
-        event_type: "step_completed",
-        stage: "generate_voice",
-        source: "generate-voice",
-        message: "Voice generated",
-        metadata: { provider, voiceId, modelId, bytes: buffer.length },
-      });
-    });
-
-    log("voice generation completed", { outputPath, bytes: buffer.length, provider, voiceId, modelId });
+    throw new Error(`All TTS providers failed: ${errors.map((item) => `${item.provider}: ${item.error}`).join(" | ")}`);
   } catch (error) {
     await withOptionalPool(async (pool) => {
       await logFailure(pool, {
@@ -550,7 +604,7 @@ async function main() {
         stage: "generate_voice",
         source: "generate-voice",
         error: error.message,
-        metadata: { provider },
+        metadata: { provider: primaryProvider, providerChain },
       });
     });
     throw error;
