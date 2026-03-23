@@ -54,6 +54,10 @@ function getTopicMode() {
   return process.env.FACT_TOPIC_MODE || "dynamic-first";
 }
 
+function getCategoryHistoryWindow() {
+  return Number(process.env.FACT_CATEGORY_HISTORY_WINDOW || 24);
+}
+
 function normalizeText(value) {
   return String(value || "")
     .toLowerCase()
@@ -114,7 +118,40 @@ async function getExistingTopicState(pool) {
   };
 }
 
-function createDynamicPrompt(existingRows, allowedCategories) {
+function buildCategoryUsage(rows, allowedCategories) {
+  const historyWindow = getCategoryHistoryWindow();
+  const usage = new Map(allowedCategories.map((category) => [category, 0]));
+
+  rows.slice(0, historyWindow).forEach((row) => {
+    if (usage.has(row.category)) {
+      usage.set(row.category, usage.get(row.category) + 1);
+    }
+  });
+
+  return usage;
+}
+
+function pickBalancedCategory(rows, allowedCategories) {
+  if (!allowedCategories.length) {
+    fail("No allowed categories configured");
+  }
+
+  const usage = buildCategoryUsage(rows, allowedCategories);
+  const minUsage = Math.min(...usage.values());
+  let candidates = allowedCategories.filter((category) => usage.get(category) === minUsage);
+  const lastCategory = rows[0]?.category || null;
+
+  if (lastCategory && candidates.length > 1) {
+    const withoutLast = candidates.filter((category) => category !== lastCategory);
+    if (withoutLast.length) {
+      candidates = withoutLast;
+    }
+  }
+
+  return pickRandom(candidates);
+}
+
+function createDynamicPrompt(existingRows, allowedCategories, targetCategory) {
   const recent = existingRows
     .slice(0, 40)
     .map((row) => `- ${row.category} | ${row.topic} | ${row.angle}`)
@@ -126,6 +163,7 @@ function createDynamicPrompt(existingRows, allowedCategories) {
     "No puede repetir ninguno de los topics ya usados.",
     "No menciones portfolio, servicios, ventas ni llamadas a contratar nada.",
     `Categorias permitidas: ${allowedCategories.join(", ")}.`,
+    `La categoria elegida debe ser exactamente: ${targetCategory}.`,
     "Devuelve solo JSON valido, sin markdown.",
     "Schema exacto:",
     "{",
@@ -139,10 +177,10 @@ function createDynamicPrompt(existingRows, allowedCategories) {
   ].join("\n");
 }
 
-async function generateDynamicTopic(existingState, allowedCategories) {
+async function generateDynamicTopic(existingState, allowedCategories, targetCategory) {
   const provider = getTextProvider();
   const model = getTextModel(provider);
-  const prompt = createDynamicPrompt(existingState.rows, allowedCategories);
+  const prompt = createDynamicPrompt(existingState.rows, allowedCategories, targetCategory);
   const result = await generateText({ prompt, provider, model, temperature: 0.4 });
   const parsed = JSON.parse(extractJson(result.text));
   const category = String(parsed.category || "").trim();
@@ -152,6 +190,10 @@ async function generateDynamicTopic(existingState, allowedCategories) {
 
   if (!allowedCategories.includes(category)) {
     throw new Error(`Gemini returned unsupported category: ${category}`);
+  }
+
+  if (category !== targetCategory) {
+    throw new Error(`Gemini returned category ${category} instead of required ${targetCategory}`);
   }
 
   if (topic.length < 4 || angle.length < 12) {
@@ -182,10 +224,11 @@ async function generateDynamicTopic(existingState, allowedCategories) {
 async function selectDynamicTopicFromDb(pool, existingState, candidates) {
   const allowedCategories = buildAllowedCategories();
   const attempts = Number(process.env.FACT_DYNAMIC_TOPIC_ATTEMPTS || 4);
+  const targetCategory = pickBalancedCategory(existingState.rows, allowedCategories);
 
   for (let attempt = 1; attempt <= attempts; attempt += 1) {
     try {
-      const dynamicTopic = await generateDynamicTopic(existingState, allowedCategories);
+      const dynamicTopic = await generateDynamicTopic(existingState, allowedCategories, targetCategory);
       await upsertSelection(pool, dynamicTopic, {
         source: dynamicTopic.source,
         search_hint: dynamicTopic.search_hint,
@@ -193,10 +236,12 @@ async function selectDynamicTopicFromDb(pool, existingState, candidates) {
       return {
         ...dynamicTopic,
         reused_catalog: false,
+        target_category: targetCategory,
       };
     } catch (error) {
       log("dynamic topic rejected", {
         attempt,
+        targetCategory,
         error: error.message,
       });
     }
@@ -207,11 +252,13 @@ async function selectDynamicTopicFromDb(pool, existingState, candidates) {
     fail("Dynamic topic generation failed and the fixed catalog is exhausted. Add more topics or widen FACT_ALLOWED_CATEGORIES.");
   }
 
-  const chosen = pickRandom(availableCatalog);
+  const categoryPool = availableCatalog.filter((item) => item.category === targetCategory);
+  const chosen = pickRandom(categoryPool.length ? categoryPool : availableCatalog);
   await upsertSelection(pool, chosen, { source: "catalog-fallback" });
   return {
     ...chosen,
     reused_catalog: false,
+    target_category: targetCategory,
   };
 }
 
@@ -228,11 +275,15 @@ async function selectTopicFromDb(pool, candidates) {
     fail("All fact topics in the current catalog have already been used. Switch FACT_TOPIC_MODE or add more topics.");
   }
 
-  const chosen = pickRandom(available);
+  const availableCategories = [...new Set(available.map((item) => item.category))];
+  const targetCategory = pickBalancedCategory(existingState.rows, availableCategories);
+  const categoryPool = available.filter((item) => item.category === targetCategory);
+  const chosen = pickRandom(categoryPool.length ? categoryPool : available);
   await upsertSelection(pool, chosen, { source: "catalog" });
   return {
     ...chosen,
     reused_catalog: false,
+    target_category: targetCategory,
   };
 }
 
