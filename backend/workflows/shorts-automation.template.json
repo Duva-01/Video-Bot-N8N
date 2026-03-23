@@ -307,17 +307,6 @@
       "main": [
         [
           {
-            "node": "Check Instagram Token",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Check Instagram Token": {
-      "main": [
-        [
-          {
             "node": "Upload Socials",
             "type": "main",
             "index": 0
