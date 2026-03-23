@@ -184,3 +184,33 @@ services:
         value: Video generado automaticamente con n8n.
       - key: YOUTUBE_DEFAULT_TAGS
         value: facts,curiosidades,shorts
+      - key: SOCIAL_CHANNEL_URL
+        sync: false
+      - key: INSTAGRAM_PUBLISH_ENABLED
+        value: "true"
+      - key: INSTAGRAM_GRAPH_API_VERSION
+        value: v25.0
+      - key: INSTAGRAM_IG_USER_ID
+        sync: false
+      - key: INSTAGRAM_ACCESS_TOKEN
+        sync: false
+      - key: INSTAGRAM_VIDEO_URL
+        sync: false
+      - key: INSTAGRAM_HASHTAGS
+        value: curiosidades,datoscuriosos,shorts
+      - key: INSTAGRAM_FIXED_CTA
+        value: "Visita mi canal de YouTube: https://www.youtube.com/channel/UC9ynAJNdEpRGI6K2-Fqv4Ow"
+      - key: INSTAGRAM_CONTAINER_POLL_INTERVAL_MS
+        value: "5000"
+      - key: INSTAGRAM_CONTAINER_POLL_MAX_ATTEMPTS
+        value: "24"
+      - key: CLOUDINARY_CLOUD_NAME
+        sync: false
+      - key: CLOUDINARY_API_KEY
+        sync: false
+      - key: CLOUDINARY_API_SECRET
+        sync: false
+      - key: CLOUDINARY_FOLDER
+        value: bot-videos
+      - key: CLOUDINARY_DELETE_AFTER_INSTAGRAM
+        value: "true"
