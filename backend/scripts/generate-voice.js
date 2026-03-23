@@ -79,6 +79,22 @@ function runCommand(command, args) {
   }
 }
 
+function runCommandWithInput(command, args, input) {
+  const result = spawnSync(command, args, {
+    encoding: "utf8",
+    input,
+    stdio: ["pipe", "pipe", "pipe"],
+  });
+
+  if (result.error) {
+    fail(`${command} failed to start: ${result.error.message}`);
+  }
+
+  if (result.status !== 0) {
+    fail(`${command} exited with status ${result.status}: ${(result.stderr || result.stdout || "").trim()}`);
+  }
+}
+
 async function main() {
   const scriptPath = process.argv[2] || "/tmp/bot-videos/script.json";
   const outputPath = process.argv[3] || "/tmp/bot-videos/narration.wav";
@@ -346,6 +362,56 @@ async function main() {
         voiceName,
         rate: Number(rate),
         pitch: Number(pitch),
+      });
+      return;
+    }
+
+    if (provider === "piper") {
+      const voiceName = process.env.PIPER_VOICE || "es_ES-carlfm-x_low";
+      const dataDir = process.env.PIPER_DATA_DIR || "/app/voices";
+      const modelPath = process.env.PIPER_MODEL_PATH || path.join(dataDir, `${voiceName}.onnx`);
+      const configPath = process.env.PIPER_CONFIG_PATH || `${modelPath}.json`;
+
+      runCommandWithInput("piper", [
+        "--model",
+        modelPath,
+        "--config",
+        configPath,
+        "--espeak_data",
+        "/usr/share/piper/espeak-ng-data",
+        "--output_file",
+        outputPath,
+      ], text);
+
+      const stats = fs.statSync(outputPath);
+
+      await withOptionalPool(async (pool) => {
+        await logArtifact(pool, {
+          topic_key: topicKey,
+          artifact_type: "voice_track",
+          label: "Narration audio",
+          file_path: outputPath,
+          mime_type: "audio/wav",
+          metadata: { provider: "piper", voiceName, dataDir, modelPath, configPath },
+        });
+        await logStepEvent(pool, {
+          topic_key: topicKey,
+          event_type: "step_completed",
+          stage: "generate_voice",
+          source: "generate-voice",
+          message: "Voice generated",
+          metadata: { provider: "piper", voiceName, dataDir, modelPath, configPath, bytes: stats.size },
+        });
+      });
+
+      log("voice generation completed", {
+        outputPath,
+        bytes: stats.size,
+        provider: "piper",
+        voiceName,
+        dataDir,
+        modelPath,
+        configPath,
       });
       return;
     }
