@@ -215,11 +215,31 @@ async function deleteCloudinaryAsset(publicId, resourceType = "video") {
   return payload.result || null;
 }
 
-function buildInstagramApiUrl(apiVersion, resourcePath, query = {}) {
-  const baseUrl = String(process.env.INSTAGRAM_GRAPH_API_BASE_URL || "https://graph.instagram.com").replace(/\/+$/, "");
+function buildInstagramApiUrl(resourcePath, query = {}) {
+  const baseUrl = "https://graph.instagram.com";
+  const apiVersion = process.env.INSTAGRAM_GRAPH_API_VERSION || "v25.0";
   const cleanPath = String(resourcePath || "").replace(/^\/+/, "");
   const params = new URLSearchParams(query);
   return params.size ? `${baseUrl}/${apiVersion}/${cleanPath}?${params.toString()}` : `${baseUrl}/${apiVersion}/${cleanPath}`;
+}
+
+async function verifyInstagramAccessToken(accessToken, expectedUserId) {
+  const response = await fetch(
+    buildInstagramApiUrl("me", {
+      fields: "id,username",
+      access_token: accessToken,
+    }),
+    { method: "GET" },
+  );
+  const payload = await readJsonResponse(response, "Instagram token preflight");
+
+  if (expectedUserId && String(payload.id || "") !== String(expectedUserId)) {
+    throw new Error(
+      `Instagram token preflight returned unexpected user id ${payload.id || "unknown"} instead of ${expectedUserId}`,
+    );
+  }
+
+  return payload;
 }
 
 async function readJsonResponse(response, errorPrefix) {
@@ -231,13 +251,13 @@ async function readJsonResponse(response, errorPrefix) {
   return payload;
 }
 
-async function waitForInstagramContainer(accessToken, apiVersion, creationId) {
+async function waitForInstagramContainer(accessToken, creationId) {
   const pollIntervalMs = Number(process.env.INSTAGRAM_CONTAINER_POLL_INTERVAL_MS || 5000);
   const maxAttempts = Number(process.env.INSTAGRAM_CONTAINER_POLL_MAX_ATTEMPTS || 24);
 
   for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
     const statusResponse = await fetch(
-      buildInstagramApiUrl(apiVersion, creationId, {
+      buildInstagramApiUrl(creationId, {
         access_token: accessToken,
         fields: "status,status_code",
       }),
@@ -263,10 +283,11 @@ async function waitForInstagramContainer(accessToken, apiVersion, creationId) {
 async function uploadToInstagram(videoPath, scriptData) {
   const igUserId = getRequiredEnv("INSTAGRAM_IG_USER_ID");
   const accessToken = getRequiredEnv("INSTAGRAM_ACCESS_TOKEN");
-  const apiVersion = process.env.INSTAGRAM_GRAPH_API_VERSION || "v25.0";
   let videoUrl = process.env.INSTAGRAM_VIDEO_URL || null;
   let cloudinaryAsset = null;
   const caption = buildCaption(scriptData, "instagram");
+
+  await verifyInstagramAccessToken(accessToken, igUserId);
 
   if (!videoUrl) {
     cloudinaryAsset = await uploadVideoToCloudinary(videoPath, scriptData.topic_key || scriptData.title || null);
@@ -277,7 +298,7 @@ async function uploadToInstagram(videoPath, scriptData) {
     throw new Error("Instagram video URL is missing. Provide INSTAGRAM_VIDEO_URL or Cloudinary credentials.");
   }
 
-  const containerResponse = await fetch(buildInstagramApiUrl(apiVersion, `${igUserId}/media`), {
+  const containerResponse = await fetch(buildInstagramApiUrl(`${igUserId}/media`), {
     method: "POST",
     headers: { "Content-Type": "application/x-www-form-urlencoded" },
     body: new URLSearchParams({
@@ -295,9 +316,9 @@ async function uploadToInstagram(videoPath, scriptData) {
     throw new Error(`Instagram media container returned no creation id: ${JSON.stringify(containerPayload)}`);
   }
 
-  await waitForInstagramContainer(accessToken, apiVersion, creationId);
+  await waitForInstagramContainer(accessToken, creationId);
 
-  const publishResponse = await fetch(buildInstagramApiUrl(apiVersion, `${igUserId}/media_publish`), {
+  const publishResponse = await fetch(buildInstagramApiUrl(`${igUserId}/media_publish`), {
     method: "POST",
     headers: { "Content-Type": "application/x-www-form-urlencoded" },
     body: new URLSearchParams({
@@ -311,7 +332,7 @@ async function uploadToInstagram(videoPath, scriptData) {
   let permalink = null;
   if (mediaId) {
     const infoResponse = await fetch(
-      buildInstagramApiUrl(apiVersion, mediaId, {
+      buildInstagramApiUrl(mediaId, {
         access_token: accessToken,
         fields: "permalink",
       }),

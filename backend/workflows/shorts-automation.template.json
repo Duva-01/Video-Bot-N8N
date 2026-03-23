@@ -153,6 +153,19 @@
     },
     {
       "parameters": {
+        "command": "node /app/scripts/check-instagram-token.js"
+      },
+      "id": "check-instagram-token",
+      "name": "Check Instagram Token",
+      "type": "n8n-nodes-base.executeCommand",
+      "typeVersion": 1,
+      "position": [
+        2540,
+        260
+      ]
+    },
+    {
+      "parameters": {
         "command": "node /app/scripts/upload-socials.js /tmp/bot-videos/final.mp4 /tmp/bot-videos/script.json /tmp/bot-videos/youtube-result.json /tmp/bot-videos/social-result.json"
       },
       "id": "upload-socials",
@@ -160,7 +173,7 @@
       "type": "n8n-nodes-base.executeCommand",
       "typeVersion": 1,
       "position": [
-        2540,
+        2800,
         260
       ]
     },
@@ -173,7 +186,7 @@
       "type": "n8n-nodes-base.executeCommand",
       "typeVersion": 1,
       "position": [
-        2800,
+        3060,
         260
       ]
     }
@@ -291,6 +304,17 @@
       ]
     },
     "YouTube Upload": {
+      "main": [
+        [
+          {
+            "node": "Check Instagram Token",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Instagram Token": {
       "main": [
         [
           {
