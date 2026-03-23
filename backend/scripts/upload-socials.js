@@ -223,15 +223,65 @@ function buildInstagramApiUrl(resourcePath, query = {}) {
   return params.size ? `${baseUrl}/${apiVersion}/${cleanPath}?${params.toString()}` : `${baseUrl}/${apiVersion}/${cleanPath}`;
 }
 
+async function readJsonResponse(response, errorPrefix) {
+  const raw = await response.text();
+  const payload = raw ? JSON.parse(raw) : {};
+  if (!response.ok) {
+    throw new Error(`${errorPrefix} failed with status ${response.status}: ${raw}`);
+  }
+  return payload;
+}
+
+function shouldRetryInstagramRequest(status, raw) {
+  if (status >= 500) {
+    return true;
+  }
+
+  try {
+    const payload = raw ? JSON.parse(raw) : {};
+    const error = payload?.error || {};
+    return Number(error.code) === 1;
+  } catch {
+    return false;
+  }
+}
+
+async function fetchInstagramJson(resourcePath, { method = "GET", query = {}, body, headers = {}, errorPrefix }) {
+  const maxAttempts = Number(process.env.INSTAGRAM_REQUEST_MAX_ATTEMPTS || 4);
+  const baseDelayMs = Number(process.env.INSTAGRAM_REQUEST_RETRY_DELAY_MS || 1500);
+  let lastError = null;
+
+  for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
+    const response = await fetch(buildInstagramApiUrl(resourcePath, query), {
+      method,
+      headers,
+      body,
+    });
+    const raw = await response.text();
+
+    if (response.ok) {
+      return raw ? JSON.parse(raw) : {};
+    }
+
+    lastError = new Error(`${errorPrefix} failed with status ${response.status}: ${raw}`);
+    if (!shouldRetryInstagramRequest(response.status, raw) || attempt === maxAttempts) {
+      throw lastError;
+    }
+
+    await new Promise((resolve) => setTimeout(resolve, baseDelayMs * attempt));
+  }
+
+  throw lastError || new Error(`${errorPrefix} failed`);
+}
+
 async function verifyInstagramAccessToken(accessToken, expectedUserId) {
-  const response = await fetch(
-    buildInstagramApiUrl("me", {
+  const payload = await fetchInstagramJson("me", {
+    query: {
       fields: "id,username",
       access_token: accessToken,
-    }),
-    { method: "GET" },
-  );
-  const payload = await readJsonResponse(response, "Instagram token preflight");
+    },
+    errorPrefix: "Instagram token preflight",
+  });
 
   if (expectedUserId && String(payload.id || "") !== String(expectedUserId)) {
     throw new Error(
@@ -242,28 +292,18 @@ async function verifyInstagramAccessToken(accessToken, expectedUserId) {
   return payload;
 }
 
-async function readJsonResponse(response, errorPrefix) {
-  const raw = await response.text();
-  const payload = raw ? JSON.parse(raw) : {};
-  if (!response.ok) {
-    throw new Error(`${errorPrefix} failed with status ${response.status}: ${raw}`);
-  }
-  return payload;
-}
-
 async function waitForInstagramContainer(accessToken, creationId) {
   const pollIntervalMs = Number(process.env.INSTAGRAM_CONTAINER_POLL_INTERVAL_MS || 5000);
   const maxAttempts = Number(process.env.INSTAGRAM_CONTAINER_POLL_MAX_ATTEMPTS || 24);
 
   for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
-    const statusResponse = await fetch(
-      buildInstagramApiUrl(creationId, {
+    const statusPayload = await fetchInstagramJson(creationId, {
+      query: {
         access_token: accessToken,
         fields: "status,status_code",
-      }),
-      { method: "GET" },
-    );
-    const statusPayload = await readJsonResponse(statusResponse, "Instagram container status");
+      },
+      errorPrefix: "Instagram container status",
+    });
     const statusCode = String(statusPayload.status_code || statusPayload.status || "").toUpperCase();
 
     if (statusCode === "FINISHED" || statusCode === "PUBLISHED") {
@@ -298,7 +338,7 @@ async function uploadToInstagram(videoPath, scriptData) {
     throw new Error("Instagram video URL is missing. Provide INSTAGRAM_VIDEO_URL or Cloudinary credentials.");
   }
 
-  const containerResponse = await fetch(buildInstagramApiUrl(`${igUserId}/media`), {
+  const containerPayload = await fetchInstagramJson(`${igUserId}/media`, {
     method: "POST",
     headers: { "Content-Type": "application/x-www-form-urlencoded" },
     body: new URLSearchParams({
@@ -308,8 +348,8 @@ async function uploadToInstagram(videoPath, scriptData) {
       caption,
       share_to_feed: "true",
     }).toString(),
+    errorPrefix: "Instagram media container",
   });
-  const containerPayload = await readJsonResponse(containerResponse, "Instagram media container");
   const creationId = containerPayload.id;
 
   if (!creationId) {
@@ -318,31 +358,27 @@ async function uploadToInstagram(videoPath, scriptData) {
 
   await waitForInstagramContainer(accessToken, creationId);
 
-  const publishResponse = await fetch(buildInstagramApiUrl(`${igUserId}/media_publish`), {
+  const publishPayload = await fetchInstagramJson(`${igUserId}/media_publish`, {
     method: "POST",
     headers: { "Content-Type": "application/x-www-form-urlencoded" },
     body: new URLSearchParams({
       access_token: accessToken,
       creation_id: creationId,
     }).toString(),
+    errorPrefix: "Instagram publish",
   });
-  const publishPayload = await readJsonResponse(publishResponse, "Instagram publish");
   const mediaId = publishPayload.id || null;
 
   let permalink = null;
   if (mediaId) {
-    const infoResponse = await fetch(
-      buildInstagramApiUrl(mediaId, {
+    const infoPayload = await fetchInstagramJson(mediaId, {
+      query: {
         access_token: accessToken,
         fields: "permalink",
-      }),
-      { method: "GET" },
-    );
-
-    if (infoResponse.ok) {
-      const infoPayload = await readJsonResponse(infoResponse, "Instagram media info");
-      permalink = infoPayload.permalink || null;
-    }
+      },
+      errorPrefix: "Instagram media info",
+    });
+    permalink = infoPayload.permalink || null;
   }
 
   if (cloudinaryAsset && isTruthyEnv("CLOUDINARY_DELETE_AFTER_INSTAGRAM", true)) {
