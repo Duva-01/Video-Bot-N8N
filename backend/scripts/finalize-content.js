@@ -44,6 +44,7 @@ async function main() {
         topic: scriptData.topic,
         search_query: scriptData.search_query,
         privacy_status: youtubeResult.privacyStatus || null,
+        youtube_result: youtubeResult,
         social_posts: socialResult,
       },
     });
@@ -55,6 +56,7 @@ async function main() {
       source: "finalize-content",
       message: "Content finalized in database",
       metadata: {
+        youtube_result: youtubeResult,
         youtube_video_id: youtubeResult.videoId || null,
         youtube_url: youtubeResult.url || null,
         privacy_status: youtubeResult.privacyStatus || null,
@@ -69,6 +71,7 @@ async function main() {
       external_url: youtubeResult.url || null,
       mime_type: "application/json",
       metadata: {
+        youtube_result: youtubeResult,
         youtube_video_id: youtubeResult.videoId || null,
         title: scriptData.title,
         privacy_status: youtubeResult.privacyStatus || null,

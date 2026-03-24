@@ -89,7 +89,22 @@ FILTER="scale=${WIDTH}:${HEIGHT}:force_original_aspect_ratio=increase,crop=${WID
 VIDEO_FILTER="$FILTER"
 
 if [[ -n "$SUBTITLE_FILE" ]]; then
-  [[ -f "$SUBTITLE_FILE" ]] || fail "No existe el archivo de subtitulos: $SUBTITLE_FILE"
+  if [[ ! -f "$SUBTITLE_FILE" ]]; then
+    if [[ "$SUBTITLE_FILE" == *.srt ]]; then
+      ALT_ASS_FILE="${SUBTITLE_FILE%.srt}.ass"
+      if [[ -f "$ALT_ASS_FILE" ]]; then
+        log "Subtitulos SRT no encontrados; usando ASS compatible: $ALT_ASS_FILE"
+        SUBTITLE_FILE="$ALT_ASS_FILE"
+      elif [[ -f "/tmp/bot-videos/subtitles.ass" ]]; then
+        log "Subtitulos SRT no encontrados; usando ASS por defecto: /tmp/bot-videos/subtitles.ass"
+        SUBTITLE_FILE="/tmp/bot-videos/subtitles.ass"
+      else
+        fail "No existe el archivo de subtitulos: $SUBTITLE_FILE"
+      fi
+    else
+      fail "No existe el archivo de subtitulos: $SUBTITLE_FILE"
+    fi
+  fi
   SFX_EVENTS_FILE="${SUBTITLE_FILE%.ass}.events.json"
   if [[ -f "$SFX_EVENTS_FILE" ]]; then
     SFX_AUDIO_FILE="$TMP_DIR/sfx.wav"

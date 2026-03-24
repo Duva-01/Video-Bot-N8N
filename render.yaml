@@ -226,6 +226,34 @@ services:
         value: "5000"
       - key: INSTAGRAM_CONTAINER_POLL_MAX_ATTEMPTS
         value: "24"
+      - key: TIKTOK_PUBLISH_ENABLED
+        value: "false"
+      - key: TIKTOK_ACCESS_TOKEN
+        sync: false
+      - key: TIKTOK_REFRESH_TOKEN
+        sync: false
+      - key: TIKTOK_ACCESS_TOKEN_EXPIRES_AT
+        sync: false
+      - key: TIKTOK_REFRESH_TOKEN_EXPIRES_AT
+        sync: false
+      - key: TIKTOK_CLIENT_KEY
+        sync: false
+      - key: TIKTOK_CLIENT_SECRET
+        sync: false
+      - key: TIKTOK_OPEN_ID
+        sync: false
+      - key: TIKTOK_REDIRECT_URI
+        sync: false
+      - key: TIKTOK_STATE_PATH
+        value: /tmp/tiktok-auth-state.json
+      - key: TIKTOK_TOKEN_MIN_VALIDITY_SECONDS
+        value: "3600"
+      - key: TIKTOK_PRIVACY_LEVEL
+        value: SELF_ONLY
+      - key: TIKTOK_DEFAULT_TITLE
+        value: Dato curioso rapido
+      - key: TIKTOK_HASHTAGS
+        value: curiosidades,datoscuriosos,shorts
       - key: CLOUDINARY_CLOUD_NAME
         sync: false
       - key: CLOUDINARY_API_KEY
@@ -236,3 +264,5 @@ services:
         value: bot-videos
       - key: CLOUDINARY_DELETE_AFTER_INSTAGRAM
         value: "true"
+      - key: MANUAL_PUBLISH_DIR
+        value: /tmp/bot-videos/manual-publish-fallback

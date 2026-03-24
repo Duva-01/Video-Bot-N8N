@@ -1,11 +1,13 @@
 require("dotenv").config();
 
-const crypto = require("crypto");
 const fs = require("fs");
 const path = require("path");
 const fetch = global.fetch || require("node-fetch");
 const { logArtifact, logStepEvent, readJsonIfExists, withOptionalPool } = require("./lib/script-observer");
 const { ensureFreshInstagramAccessToken, verifyInstagramAccessToken } = require("./lib/instagram-token");
+const { deleteCloudinaryAsset } = require("./lib/cloudinary-utils");
+const { ensureCloudinaryFallbackVideo, getManualPublishDir, writeManualPublishFallback } = require("./lib/manual-publish-fallback");
+const { uploadToTikTok } = require("./upload-tiktok");
 
 function fail(message) {
   console.error(`[upload-socials][error] ${message}`);
@@ -38,35 +40,6 @@ function sanitizeHashtags(tagsValue) {
     .filter((tag) => tag !== "#");
 }
 
-function buildMultipartBody(fields, fileField) {
-  const boundary = `----factsengine${crypto.randomBytes(8).toString("hex")}`;
-  const chunks = [];
-
-  for (const [name, value] of Object.entries(fields || {})) {
-    chunks.push(Buffer.from(`--${boundary}\r\n`));
-    chunks.push(Buffer.from(`Content-Disposition: form-data; name="${name}"\r\n\r\n`));
-    chunks.push(Buffer.from(String(value)));
-    chunks.push(Buffer.from("\r\n"));
-  }
-
-  if (fileField) {
-    chunks.push(Buffer.from(`--${boundary}\r\n`));
-    chunks.push(
-      Buffer.from(`Content-Disposition: form-data; name="${fileField.name}"; filename="${fileField.filename}"\r\n`),
-    );
-    chunks.push(Buffer.from(`Content-Type: ${fileField.contentType || "application/octet-stream"}\r\n\r\n`));
-    chunks.push(fileField.data);
-    chunks.push(Buffer.from("\r\n"));
-  }
-
-  chunks.push(Buffer.from(`--${boundary}--\r\n`));
-
-  return {
-    boundary,
-    buffer: Buffer.concat(chunks),
-  };
-}
-
 function buildCaption(scriptData, platform) {
   const title = String(scriptData.title || "").trim();
   const description = String(scriptData.description || "").trim();
@@ -87,6 +60,14 @@ function buildCaption(scriptData, platform) {
     .join("\n\n")
     .trim()
     .slice(0, 2200);
+}
+
+function buildTikTokTitle(scriptData) {
+  const baseTitle = String(scriptData.title || process.env.TIKTOK_DEFAULT_TITLE || "Curious fact").trim();
+  const hashtags = sanitizeHashtags(
+    (Array.isArray(scriptData.tags) ? scriptData.tags.join(",") : "") || process.env.TIKTOK_HASHTAGS || "",
+  );
+  return [baseTitle, hashtags.join(" ")].filter(Boolean).join(" ").trim().slice(0, 150);
 }
 
 async function logPlatformSuccess(topicKey, platform, resultPath, result) {
@@ -124,16 +105,6 @@ async function logPlatformWarning(topicKey, platform, error) {
   });
 }
 
-function buildCloudinarySignature(params, apiSecret) {
-  const payload = Object.entries(params)
-    .filter(([, value]) => value !== undefined && value !== null && value !== "")
-    .sort(([left], [right]) => left.localeCompare(right))
-    .map(([key, value]) => `${key}=${value}`)
-    .join("&");
-
-  return crypto.createHash("sha1").update(`${payload}${apiSecret}`).digest("hex");
-}
-
 function isTruthyEnv(name, defaultValue = false) {
   const raw = process.env[name];
   if (raw === undefined) {
@@ -142,95 +113,12 @@ function isTruthyEnv(name, defaultValue = false) {
   return String(raw).toLowerCase() === "true";
 }
 
-async function uploadVideoToCloudinary(videoPath, topicKey) {
-  const cloudName = getRequiredEnv("CLOUDINARY_CLOUD_NAME");
-  const apiKey = getRequiredEnv("CLOUDINARY_API_KEY");
-  const apiSecret = getRequiredEnv("CLOUDINARY_API_SECRET");
-  const timestamp = Math.floor(Date.now() / 1000);
-  const publicId = String(topicKey || `short-${Date.now()}`)
-    .trim()
-    .replace(/[^a-zA-Z0-9/_-]+/g, "-")
-    .replace(/^-+|-+$/g, "");
-  const paramsToSign = {
-    folder: process.env.CLOUDINARY_FOLDER || "bot-videos",
-    public_id: publicId || `short-${timestamp}`,
-    timestamp,
-  };
-  const signature = buildCloudinarySignature(paramsToSign, apiSecret);
-  const multipart = buildMultipartBody(
-    {
-      api_key: apiKey,
-      folder: paramsToSign.folder,
-      public_id: paramsToSign.public_id,
-      signature,
-      timestamp,
-    },
-    {
-      name: "file",
-      filename: path.basename(videoPath),
-      contentType: "video/mp4",
-      data: fs.readFileSync(videoPath),
-    },
-  );
-
-  const response = await fetch(`https://api.cloudinary.com/v1_1/${cloudName}/video/upload`, {
-    method: "POST",
-    headers: {
-      "Content-Type": `multipart/form-data; boundary=${multipart.boundary}`,
-    },
-    body: multipart.buffer,
-  });
-  const payload = await readJsonResponse(response, "Cloudinary upload");
-
-  return {
-    publicId: payload.public_id,
-    resourceType: payload.resource_type || "video",
-    url: payload.secure_url || payload.url || null,
-  };
-}
-
-async function deleteCloudinaryAsset(publicId, resourceType = "video") {
-  const cloudName = getRequiredEnv("CLOUDINARY_CLOUD_NAME");
-  const apiKey = getRequiredEnv("CLOUDINARY_API_KEY");
-  const apiSecret = getRequiredEnv("CLOUDINARY_API_SECRET");
-  const timestamp = Math.floor(Date.now() / 1000);
-  const paramsToSign = {
-    invalidate: "true",
-    public_id: publicId,
-    timestamp,
-  };
-  const signature = buildCloudinarySignature(paramsToSign, apiSecret);
-
-  const response = await fetch(`https://api.cloudinary.com/v1_1/${cloudName}/${resourceType}/destroy`, {
-    method: "POST",
-    headers: { "Content-Type": "application/x-www-form-urlencoded" },
-    body: new URLSearchParams({
-      api_key: apiKey,
-      invalidate: "true",
-      public_id: publicId,
-      signature,
-      timestamp: String(timestamp),
-    }).toString(),
-  });
-  const payload = await readJsonResponse(response, "Cloudinary destroy");
-  return payload.result || null;
-}
-
 function buildInstagramApiUrl(resourcePath, query = {}) {
   const baseUrl = "https://graph.instagram.com";
   const apiVersion = process.env.INSTAGRAM_GRAPH_API_VERSION || "v25.0";
   const cleanPath = String(resourcePath || "").replace(/^\/+/, "");
   const params = new URLSearchParams(query);
   return params.size ? `${baseUrl}/${apiVersion}/${cleanPath}?${params.toString()}` : `${baseUrl}/${apiVersion}/${cleanPath}`;
-}
-
-async function readJsonResponse(response, errorPrefix) {
-  const raw = await response.text();
-  const payload = raw ? JSON.parse(raw) : {};
-  if (!response.ok) {
-    throw new Error(`${errorPrefix} failed with status ${response.status}: ${raw}`);
-  }
-  return payload;
 }
 
 function shouldRetryInstagramRequest(status, raw) {
@@ -303,11 +191,11 @@ async function waitForInstagramContainer(accessToken, creationId) {
   throw new Error(`Instagram container was not ready after ${maxAttempts} attempts`);
 }
 
-async function uploadToInstagram(videoPath, scriptData) {
+async function uploadToInstagram(videoPath, scriptData, options = {}) {
   const igUserId = getRequiredEnv("INSTAGRAM_IG_USER_ID");
   let accessToken = null;
   let videoUrl = process.env.INSTAGRAM_VIDEO_URL || null;
-  let cloudinaryAsset = null;
+  let cloudinaryAsset = options.sharedCloudinaryAsset || null;
   const caption = buildCaption(scriptData, "instagram");
   const apiVersion = process.env.INSTAGRAM_GRAPH_API_VERSION || "v25.0";
 
@@ -332,7 +220,8 @@ async function uploadToInstagram(videoPath, scriptData) {
   }
 
   if (!videoUrl) {
-    cloudinaryAsset = await uploadVideoToCloudinary(videoPath, scriptData.topic_key || scriptData.title || null);
+    cloudinaryAsset =
+      cloudinaryAsset || (await ensureCloudinaryFallbackVideo(videoPath, scriptData, options.logger || log));
     videoUrl = cloudinaryAsset.url;
   }
 
@@ -383,10 +272,6 @@ async function uploadToInstagram(videoPath, scriptData) {
     permalink = infoPayload.permalink || null;
   }
 
-  if (cloudinaryAsset && isTruthyEnv("CLOUDINARY_DELETE_AFTER_INSTAGRAM", true)) {
-    await deleteCloudinaryAsset(cloudinaryAsset.publicId, cloudinaryAsset.resourceType);
-  }
-
   return {
     creationId,
     cloudinaryPublicId: cloudinaryAsset?.publicId || null,
@@ -418,6 +303,7 @@ async function main() {
   const scriptData = readJsonIfExists(scriptPath) || {};
   const youtubeResult = readJsonIfExists(youtubeResultPath) || {};
   const topicKey = scriptData.topic_key || null;
+  let sharedCloudinaryAsset = null;
 
   const results = {
     channelUrl:
@@ -425,10 +311,14 @@ async function main() {
       process.env.YOUTUBE_CHANNEL_URL ||
       null,
     youtube: {
+      status: youtubeResult.status || (youtubeResult.videoId ? "published" : "unknown"),
       url: youtubeResult.url || null,
       privacyStatus: youtubeResult.privacyStatus || null,
+      error: youtubeResult.error || null,
+      manualFallback: youtubeResult.manualFallback || null,
     },
     instagram: { enabled: isEnabled("INSTAGRAM_PUBLISH_ENABLED"), status: "skipped" },
+    tiktok: { enabled: isEnabled("TIKTOK_PUBLISH_ENABLED"), status: "skipped" },
   };
 
   await withOptionalPool(async (pool) => {
@@ -440,6 +330,7 @@ async function main() {
       message: "Publishing to social platforms",
       metadata: {
         instagramEnabled: results.instagram.enabled,
+        tiktokEnabled: results.tiktok.enabled,
       },
     });
   });
@@ -448,7 +339,17 @@ async function main() {
     results.instagram.reason = "disabled";
   } else {
     try {
-      const instagramResult = await uploadToInstagram(resolvedVideoPath, scriptData);
+      const instagramResult = await uploadToInstagram(resolvedVideoPath, scriptData, {
+        sharedCloudinaryAsset,
+        logger: log,
+      });
+      if (instagramResult.cloudinaryPublicId && instagramResult.cloudinaryUrl) {
+        sharedCloudinaryAsset = {
+          publicId: instagramResult.cloudinaryPublicId,
+          resourceType: "video",
+          url: instagramResult.cloudinaryUrl,
+        };
+      }
       results.instagram = {
         enabled: true,
         status: "published",
@@ -459,13 +360,126 @@ async function main() {
       await logPlatformSuccess(topicKey, "instagram", resultPath, results.instagram);
       log("instagram publish completed", results.instagram);
     } catch (error) {
+      const manualFallback = await writeManualPublishFallback({
+        videoPath: resolvedVideoPath,
+        scriptData,
+        platform: "instagram",
+        title: scriptData.title,
+        description: scriptData.description,
+        caption: buildCaption(scriptData, "instagram"),
+        error: error.message,
+        logger: log,
+        metadata: {
+          youtubeUrl: youtubeResult.url || null,
+        },
+      });
+      if (manualFallback.cloudinaryPublicId && manualFallback.videoUrl) {
+        sharedCloudinaryAsset = {
+          publicId: manualFallback.cloudinaryPublicId,
+          resourceType: "video",
+          url: manualFallback.videoUrl,
+        };
+      }
       results.instagram = {
         enabled: true,
         status: "failed",
         error: error.message,
+        manualFallback: {
+          dir: manualFallback.dir,
+          txtPath: manualFallback.txtPath,
+          jsonPath: manualFallback.jsonPath,
+          videoUrl: manualFallback.videoUrl,
+          localVideoPath: manualFallback.localVideoPath,
+        },
       };
       await logPlatformWarning(topicKey, "instagram", error.message);
       log("instagram publish failed", { error: error.message });
+    }
+  }
+
+  if (!results.tiktok.enabled) {
+    results.tiktok.reason = "disabled";
+  } else {
+    try {
+      const tiktokResult = await uploadToTikTok(resolvedVideoPath, {
+        ...scriptData,
+        title: buildTikTokTitle(scriptData),
+      }, {
+        logger: log,
+      });
+
+      if (tiktokResult?.skipped) {
+        results.tiktok = {
+          enabled: true,
+          status: "skipped",
+          reason: tiktokResult.reason || "missing_access_token",
+        };
+      } else {
+        results.tiktok = {
+          enabled: true,
+          status: "published",
+          ...tiktokResult,
+        };
+        fs.writeFileSync(resultPath, JSON.stringify(results, null, 2));
+        await logPlatformSuccess(topicKey, "tiktok", resultPath, results.tiktok);
+        log("tiktok publish completed", results.tiktok);
+      }
+    } catch (error) {
+      const manualFallback = await writeManualPublishFallback({
+        videoPath: resolvedVideoPath,
+        scriptData,
+        platform: "tiktok",
+        title: buildTikTokTitle(scriptData),
+        description: scriptData.description,
+        caption: buildTikTokTitle(scriptData),
+        error: error.message,
+        logger: log,
+        metadata: {
+          privacyLevel: process.env.TIKTOK_PRIVACY_LEVEL || "SELF_ONLY",
+        },
+      });
+      if (manualFallback.cloudinaryPublicId && manualFallback.videoUrl) {
+        sharedCloudinaryAsset = {
+          publicId: manualFallback.cloudinaryPublicId,
+          resourceType: "video",
+          url: manualFallback.videoUrl,
+        };
+      }
+      results.tiktok = {
+        enabled: true,
+        status: "failed",
+        error: error.message,
+        manualFallback: {
+          dir: manualFallback.dir,
+          txtPath: manualFallback.txtPath,
+          jsonPath: manualFallback.jsonPath,
+          videoUrl: manualFallback.videoUrl,
+          localVideoPath: manualFallback.localVideoPath,
+        },
+      };
+      await logPlatformWarning(topicKey, "tiktok", error.message);
+      log("tiktok publish failed", { error: error.message });
+    }
+  }
+
+  const shouldPreserveCloudinaryAsset =
+    results.youtube.status === "failed" ||
+    results.instagram.status === "failed" ||
+    results.tiktok.status === "failed";
+
+  if (
+    sharedCloudinaryAsset?.publicId &&
+    !shouldPreserveCloudinaryAsset &&
+    isTruthyEnv("CLOUDINARY_DELETE_AFTER_INSTAGRAM", true)
+  ) {
+    await deleteCloudinaryAsset(sharedCloudinaryAsset.publicId, sharedCloudinaryAsset.resourceType || "video");
+    try {
+      const statePath = path.join(getManualPublishDir(resolvedVideoPath), "cloudinary-video.json");
+      if (fs.existsSync(statePath)) {
+        fs.unlinkSync(statePath);
+      }
+    } catch {
+      // Ignore local cleanup failures.
     }
   }
 
@@ -492,6 +506,7 @@ async function main() {
 
   log("social publishing stage finished", {
     instagram: results.instagram.status,
+    tiktok: results.tiktok.status,
   });
 }
 

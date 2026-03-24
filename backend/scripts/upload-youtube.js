@@ -4,6 +4,7 @@ const fs = require("fs");
 const path = require("path");
 const { google } = require("googleapis");
 const { logArtifact, logFailure, logStepEvent, readJsonIfExists, withOptionalPool } = require("./lib/script-observer");
+const { writeManualPublishFallback } = require("./lib/manual-publish-fallback");
 
 function fail(message) {
   console.error(`[youtube-upload][error] ${message}`);
@@ -17,7 +18,7 @@ function log(message, meta = {}) {
 function getRequiredEnv(name) {
   const value = process.env[name];
   if (!value) {
-    fail(`Missing required environment variable: ${name}`);
+    throw new Error(`Missing required environment variable: ${name}`);
   }
   return value;
 }
@@ -99,9 +100,6 @@ async function main() {
 
   const scriptData = readJsonIfExists(scriptPath) || {};
   const topicKey = scriptData.topic_key || null;
-  const clientId = getRequiredEnv("YOUTUBE_CLIENT_ID");
-  const clientSecret = getRequiredEnv("YOUTUBE_CLIENT_SECRET");
-  const refreshToken = getRequiredEnv("YOUTUBE_REFRESH_TOKEN");
   const defaultTitle = scriptData.title || process.env.YOUTUBE_DEFAULT_TITLE || `Short IA ${new Date().toISOString().slice(0, 10)}`;
   const defaultDescription = scriptData.description || process.env.YOUTUBE_DEFAULT_DESCRIPTION || "Video generado automaticamente con n8n.";
   const defaultTags = (scriptData.tags || []).join(",") || process.env.YOUTUBE_DEFAULT_TAGS || "ia,automatizacion,shorts";
@@ -124,6 +122,9 @@ async function main() {
   });
 
   try {
+    const clientId = getRequiredEnv("YOUTUBE_CLIENT_ID");
+    const clientSecret = getRequiredEnv("YOUTUBE_CLIENT_SECRET");
+    const refreshToken = getRequiredEnv("YOUTUBE_REFRESH_TOKEN");
     const auth = new google.auth.OAuth2(clientId, clientSecret);
     auth.setCredentials({ refresh_token: refreshToken });
 
@@ -171,6 +172,36 @@ async function main() {
 
     log("youtube upload completed", result);
   } catch (error) {
+    const manualFallback = await writeManualPublishFallback({
+      videoPath: resolvedVideoPath,
+      scriptData,
+      platform: "youtube",
+      title,
+      description,
+      error: error.message,
+      logger: log,
+      metadata: {
+        privacyStatus,
+        categoryId,
+        tags,
+      },
+    });
+    const failedResult = {
+      status: "failed",
+      error: error.message,
+      videoId: null,
+      url: null,
+      privacyStatus,
+      manualFallback: {
+        dir: manualFallback.dir,
+        txtPath: manualFallback.txtPath,
+        jsonPath: manualFallback.jsonPath,
+        videoUrl: manualFallback.videoUrl,
+        localVideoPath: manualFallback.localVideoPath,
+      },
+    };
+    fs.writeFileSync(resultPath, JSON.stringify(failedResult, null, 2));
+
     await withOptionalPool(async (pool) => {
       await logFailure(pool, {
         topic_key: topicKey,
@@ -179,8 +210,26 @@ async function main() {
         error: error.message,
         metadata: { title, privacyStatus },
       });
+      await logArtifact(pool, {
+        topic_key: topicKey,
+        artifact_type: "youtube_manual_publish_fallback",
+        label: "YouTube manual publish fallback",
+        file_path: manualFallback.txtPath,
+        external_url: manualFallback.videoUrl || null,
+        mime_type: "text/plain",
+        metadata: failedResult,
+      });
+      await logStepEvent(pool, {
+        topic_key: topicKey,
+        event_type: "step_warning",
+        stage: "youtube_upload",
+        source: "upload-youtube",
+        message: "YouTube upload failed, manual fallback prepared",
+        metadata: failedResult,
+      });
     });
-    throw error;
+
+    log("youtube upload failed, manual fallback prepared", failedResult);
   }
 }
 
