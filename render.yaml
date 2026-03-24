@@ -203,7 +203,7 @@ services:
       - key: SOCIAL_CHANNEL_URL
         sync: false
       - key: INSTAGRAM_PUBLISH_ENABLED
-        value: "true"
+        value: "false"
       - key: INSTAGRAM_AUTO_REFRESH_TOKEN
         value: "true"
       - key: INSTAGRAM_GRAPH_API_VERSION

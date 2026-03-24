@@ -164,8 +164,8 @@
       { label: "Errors", value: counts.byLevel?.error || 0 },
       { label: "Warnings", value: warningCount },
       { label: "YouTube", value: counts.byPlatform?.youtube || 0 },
-      { label: "Instagram", value: counts.byPlatform?.instagram || 0 },
-      { label: "TikTok", value: counts.byPlatform?.tiktok || 0 },
+      { label: "API", value: counts.byKind?.api || 0 },
+      { label: "Artifacts", value: counts.byKind?.artifact || 0 },
     ];
 
     logCounts.innerHTML = cards

@@ -153,46 +153,7 @@
     },
     {
       "parameters": {
-        "command": "node /app/scripts/check-instagram-token.js"
-      },
-      "id": "check-instagram-token",
-      "name": "Check Instagram Token",
-      "type": "n8n-nodes-base.executeCommand",
-      "typeVersion": 1,
-      "position": [
-        2540,
-        260
-      ]
-    },
-    {
-      "parameters": {
-        "command": "node /app/scripts/refresh-instagram-token.js"
-      },
-      "id": "refresh-instagram-token",
-      "name": "Refresh Instagram Token",
-      "type": "n8n-nodes-base.executeCommand",
-      "typeVersion": 1,
-      "position": [
-        2540,
-        420
-      ]
-    },
-    {
-      "parameters": {
-        "command": "node /app/scripts/upload-socials.js /tmp/bot-videos/final.mp4 /tmp/bot-videos/script.json /tmp/bot-videos/youtube-result.json /tmp/bot-videos/social-result.json"
-      },
-      "id": "upload-socials",
-      "name": "Upload Socials",
-      "type": "n8n-nodes-base.executeCommand",
-      "typeVersion": 1,
-      "position": [
-        2800,
-        260
-      ]
-    },
-    {
-      "parameters": {
-        "command": "node /app/scripts/finalize-content.js /tmp/bot-videos/script.json /tmp/bot-videos/youtube-result.json /tmp/bot-videos/social-result.json"
+        "command": "node /app/scripts/finalize-content.js /tmp/bot-videos/script.json /tmp/bot-videos/youtube-result.json"
       },
       "id": "finalize-content",
       "name": "Finalize Content",
@@ -317,17 +278,6 @@
       ]
     },
     "YouTube Upload": {
-      "main": [
-        [
-          {
-            "node": "Upload Socials",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Upload Socials": {
       "main": [
         [
           {
