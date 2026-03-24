@@ -127,7 +127,7 @@
     },
     {
       "parameters": {
-        "command": "bash /app/scripts/build-short.sh /tmp/bot-videos/final.mp4 /tmp/bot-videos/narration.wav /tmp/bot-videos/clips /tmp/bot-videos/subtitles.ass && node /app/scripts/record-build-output.js /tmp/bot-videos/final.mp4 /tmp/bot-videos/script.json"
+        "command": "node /app/scripts/run-build-video.js /tmp/bot-videos/final.mp4 /tmp/bot-videos/narration.wav /tmp/bot-videos/clips /tmp/bot-videos/subtitles.ass /tmp/bot-videos/script.json"
       },
       "id": "build-video",
       "name": "Build Video",
