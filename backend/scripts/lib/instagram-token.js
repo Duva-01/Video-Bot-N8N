@@ -68,21 +68,52 @@ function saveInstagramTokenState(state) {
   return statePath;
 }
 
-function getConfiguredInstagramToken() {
-  const state = loadInstagramTokenState();
-  if (state?.accessToken) {
-    return {
-      accessToken: state.accessToken,
-      expiresAt: state.expiresAt,
-      source: "state",
-    };
+function compareInstagramTokens(left, right) {
+  const leftExpiry = left?.expiresAt ? left.expiresAt.getTime() : 0;
+  const rightExpiry = right?.expiresAt ? right.expiresAt.getTime() : 0;
+  if (leftExpiry !== rightExpiry) {
+    return leftExpiry - rightExpiry;
   }
 
-  return {
+  const leftRefreshed = left?.refreshedAt ? left.refreshedAt.getTime() : 0;
+  const rightRefreshed = right?.refreshedAt ? right.refreshedAt.getTime() : 0;
+  if (leftRefreshed !== rightRefreshed) {
+    return leftRefreshed - rightRefreshed;
+  }
+
+  if (left?.source === "env" && right?.source !== "env") {
+    return 1;
+  }
+  if (right?.source === "env" && left?.source !== "env") {
+    return -1;
+  }
+
+  return 0;
+}
+
+function getConfiguredInstagramToken() {
+  const envToken = {
     accessToken: process.env.INSTAGRAM_ACCESS_TOKEN || null,
     expiresAt: parseDateValue(process.env.INSTAGRAM_ACCESS_TOKEN_EXPIRES_AT),
     source: "env",
+    refreshedAt: null,
   };
+  const state = loadInstagramTokenState();
+  const stateToken = state?.accessToken
+    ? {
+        accessToken: state.accessToken,
+        expiresAt: state.expiresAt,
+        source: "state",
+        refreshedAt: state.refreshedAt,
+      }
+    : null;
+
+  const candidates = [envToken, stateToken].filter((candidate) => candidate?.accessToken);
+  if (!candidates.length) {
+    return envToken;
+  }
+
+  return candidates.sort(compareInstagramTokens).at(-1);
 }
 
 async function readJsonResponse(response, errorPrefix) {
