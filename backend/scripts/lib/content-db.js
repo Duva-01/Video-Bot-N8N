@@ -397,6 +397,12 @@ async function getDashboardSummary(pool) {
     artifactSummaryResult,
     memorySamplesResult,
     workflowStateResult,
+    youtubeSummaryResult,
+    instagramSummaryResult,
+    tiktokSummaryResult,
+    youtubeRecentResult,
+    instagramRecentResult,
+    tiktokRecentResult,
   ] = await Promise.all([
     pool.query(
       `
@@ -495,6 +501,143 @@ async function getDashboardSummary(pool) {
         LIMIT 1
       `,
     ),
+    pool.query(
+      `
+        SELECT
+          COUNT(*) FILTER (
+            WHERE metadata ? 'youtube_result'
+               OR youtube_url IS NOT NULL
+               OR youtube_video_id IS NOT NULL
+          )::int AS attempted,
+          COUNT(*) FILTER (
+            WHERE youtube_url IS NOT NULL
+               OR youtube_video_id IS NOT NULL
+          )::int AS published,
+          COUNT(*) FILTER (
+            WHERE COALESCE(metadata -> 'youtube_result' ->> 'status', '') = 'failed'
+          )::int AS failed,
+          MAX(COALESCE(published_at, updated_at, selected_at)) FILTER (
+            WHERE youtube_url IS NOT NULL
+               OR youtube_video_id IS NOT NULL
+          ) AS last_published_at
+        FROM content_runs
+      `,
+    ),
+    pool.query(
+      `
+        SELECT
+          COUNT(*) FILTER (
+            WHERE metadata -> 'social_posts' ? 'instagram'
+          )::int AS attempted,
+          COUNT(*) FILTER (
+            WHERE COALESCE(metadata -> 'social_posts' -> 'instagram' ->> 'status', '') = 'published'
+          )::int AS published,
+          COUNT(*) FILTER (
+            WHERE COALESCE(metadata -> 'social_posts' -> 'instagram' ->> 'status', '') = 'failed'
+          )::int AS failed,
+          MAX(COALESCE(published_at, updated_at, selected_at)) FILTER (
+            WHERE COALESCE(metadata -> 'social_posts' -> 'instagram' ->> 'status', '') = 'published'
+          ) AS last_published_at
+        FROM content_runs
+      `,
+    ),
+    pool.query(
+      `
+        SELECT
+          COUNT(*) FILTER (
+            WHERE metadata -> 'social_posts' ? 'tiktok'
+               OR tiktok_publish_id IS NOT NULL
+               OR tiktok_status IS NOT NULL
+          )::int AS attempted,
+          COUNT(*) FILTER (
+            WHERE COALESCE(metadata -> 'social_posts' -> 'tiktok' ->> 'status', '') = 'published'
+               OR COALESCE(tiktok_status, '') = 'PUBLISH_COMPLETE'
+          )::int AS published,
+          COUNT(*) FILTER (
+            WHERE COALESCE(metadata -> 'social_posts' -> 'tiktok' ->> 'status', '') = 'failed'
+          )::int AS failed,
+          MAX(COALESCE(published_at, updated_at, selected_at)) FILTER (
+            WHERE COALESCE(metadata -> 'social_posts' -> 'tiktok' ->> 'status', '') = 'published'
+               OR COALESCE(tiktok_status, '') = 'PUBLISH_COMPLETE'
+          ) AS last_published_at
+        FROM content_runs
+      `,
+    ),
+    pool.query(
+      `
+        SELECT
+          topic_key,
+          category,
+          topic,
+          angle,
+          title,
+          status,
+          current_stage,
+          source,
+          youtube_url,
+          youtube_video_id,
+          selected_at,
+          published_at,
+          updated_at,
+          metadata
+        FROM content_runs
+        WHERE metadata ? 'youtube_result'
+           OR youtube_url IS NOT NULL
+           OR youtube_video_id IS NOT NULL
+        ORDER BY COALESCE(published_at, updated_at, selected_at) DESC
+        LIMIT 8
+      `,
+    ),
+    pool.query(
+      `
+        SELECT
+          topic_key,
+          category,
+          topic,
+          angle,
+          title,
+          status,
+          current_stage,
+          source,
+          youtube_url,
+          youtube_video_id,
+          selected_at,
+          published_at,
+          updated_at,
+          metadata
+        FROM content_runs
+        WHERE metadata -> 'social_posts' ? 'instagram'
+        ORDER BY COALESCE(published_at, updated_at, selected_at) DESC
+        LIMIT 8
+      `,
+    ),
+    pool.query(
+      `
+        SELECT
+          topic_key,
+          category,
+          topic,
+          angle,
+          title,
+          status,
+          current_stage,
+          source,
+          youtube_url,
+          youtube_video_id,
+          selected_at,
+          published_at,
+          updated_at,
+          metadata,
+          tiktok_publish_id,
+          tiktok_status
+        FROM content_runs
+        WHERE metadata -> 'social_posts' ? 'tiktok'
+           OR tiktok_publish_id IS NOT NULL
+           OR tiktok_status IS NOT NULL
+        ORDER BY COALESCE(published_at, updated_at, selected_at) DESC
+        LIMIT 8
+      `,
+    ),
   ]);
 
   return {
@@ -514,6 +657,26 @@ async function getDashboardSummary(pool) {
     artifactSummary: artifactSummaryResult.rows,
     memorySamples: memorySamplesResult.rows.reverse(),
     workflowSnapshot: workflowStateResult.rows[0] || null,
+    platforms: {
+      youtube: {
+        name: "YouTube",
+        key: "youtube",
+        ...youtubeSummaryResult.rows[0],
+        recentItems: youtubeRecentResult.rows,
+      },
+      instagram: {
+        name: "Instagram",
+        key: "instagram",
+        ...instagramSummaryResult.rows[0],
+        recentItems: instagramRecentResult.rows,
+      },
+      tiktok: {
+        name: "TikTok",
+        key: "tiktok",
+        ...tiktokSummaryResult.rows[0],
+        recentItems: tiktokRecentResult.rows,
+      },
+    },
   };
 }
 

@@ -1,7 +1,9 @@
 require("dotenv").config();
 
 const fs = require("fs");
+const os = require("os");
 const path = require("path");
+const { spawnSync } = require("child_process");
 const fetch = global.fetch || require("node-fetch");
 const { ensureFreshTikTokAccessToken } = require("./lib/tiktok-auth");
 
@@ -36,6 +38,67 @@ function chunkRanges(totalBytes) {
   }
 
   return ranges;
+}
+
+function transcodeVideoForTikTok(videoPath, logger = () => {}) {
+  const tempPath = path.join(
+    os.tmpdir(),
+    `${path.basename(videoPath, path.extname(videoPath))}-tiktok-${Date.now()}.mp4`,
+  );
+  const width = Number(process.env.TIKTOK_TRANSCODE_WIDTH || process.env.SHORTS_WIDTH || 540);
+  const height = Number(process.env.TIKTOK_TRANSCODE_HEIGHT || process.env.SHORTS_HEIGHT || 960);
+  const fps = Number(process.env.TIKTOK_TRANSCODE_FPS || 30);
+  const audioRate = Number(process.env.TIKTOK_TRANSCODE_AUDIO_RATE || 44100);
+
+  logger("tiktok upload transcoding video", {
+    source: videoPath,
+    target: tempPath,
+    width,
+    height,
+    fps,
+    audioRate,
+  });
+
+  const result = spawnSync(
+    "ffmpeg",
+    [
+      "-y",
+      "-i",
+      videoPath,
+      "-vf",
+      `fps=${fps},scale=${width}:${height}:force_original_aspect_ratio=increase,crop=${width}:${height},format=yuv420p`,
+      "-c:v",
+      "libx264",
+      "-preset",
+      process.env.TIKTOK_TRANSCODE_PRESET || "veryfast",
+      "-crf",
+      process.env.TIKTOK_TRANSCODE_CRF || "23",
+      "-profile:v",
+      "main",
+      "-pix_fmt",
+      "yuv420p",
+      "-movflags",
+      "+faststart",
+      "-c:a",
+      "aac",
+      "-b:a",
+      process.env.TIKTOK_TRANSCODE_AUDIO_BITRATE || "128k",
+      "-ar",
+      String(audioRate),
+      tempPath,
+    ],
+    {
+      encoding: "utf8",
+      maxBuffer: 1024 * 1024 * 20,
+    },
+  );
+
+  if (result.status !== 0 || !fs.existsSync(tempPath)) {
+    const stderr = String(result.stderr || "").trim();
+    throw new Error(`TikTok transcode failed${stderr ? `: ${stderr}` : ""}`);
+  }
+
+  return tempPath;
 }
 
 async function putChunk(uploadUrl, chunk, start, end, totalSize) {
@@ -132,6 +195,8 @@ function resolvePrivacyLevel(creatorInfoPayload, preferredPrivacyLevel) {
 }
 
 async function uploadToTikTok(videoPath, scriptData = {}, options = {}) {
+  let uploadVideoPath = videoPath;
+  let cleanupUploadVideo = false;
   let accessToken = options.accessToken || null;
   if (!accessToken) {
     const tokenInfo = await ensureFreshTikTokAccessToken({
@@ -156,11 +221,16 @@ async function uploadToTikTok(videoPath, scriptData = {}, options = {}) {
     throw new Error(`Video file not found: ${path.resolve(videoPath)}`);
   }
 
+  if (String(process.env.TIKTOK_TRANSCODE_ENABLED || "true").toLowerCase() === "true") {
+    uploadVideoPath = transcodeVideoForTikTok(videoPath, options.logger || log);
+    cleanupUploadVideo = true;
+  }
+
   const preferredPrivacyLevel = options.privacyLevel || process.env.TIKTOK_PRIVACY_LEVEL || "SELF_ONLY";
   const title = String(scriptData.title || process.env.TIKTOK_DEFAULT_TITLE || "Curious fact")
     .trim()
     .slice(0, 150);
-  const buffer = fs.readFileSync(videoPath);
+  const buffer = fs.readFileSync(uploadVideoPath);
   const size = buffer.length;
   const ranges = chunkRanges(size);
   const chunkSize = ranges[0][1] - ranges[0][0];
@@ -170,6 +240,7 @@ async function uploadToTikTok(videoPath, scriptData = {}, options = {}) {
   const logger = options.logger || log;
   logger("tiktok upload initializing", {
     videoPath,
+    uploadVideoPath,
     size,
     chunks: ranges.length,
     privacyLevel,
@@ -225,27 +296,47 @@ async function uploadToTikTok(videoPath, scriptData = {}, options = {}) {
     throw new Error("TikTok init response missing upload_url or publish_id");
   }
 
-  for (const [start, end] of ranges) {
-    await putChunk(uploadUrl, buffer.slice(start, end), start, end, size);
-  }
+  try {
+    for (const [start, end] of ranges) {
+      await putChunk(uploadUrl, buffer.slice(start, end), start, end, size);
+    }
 
-  let statusPayload = null;
-  for (let attempt = 0; attempt < 5; attempt += 1) {
-    await new Promise((resolve) => setTimeout(resolve, 3000));
-    statusPayload = await fetchPublishStatus(accessToken, publishId);
-    const status = statusPayload?.data?.status;
-    if (status && status !== "PROCESSING_UPLOAD") {
-      break;
+    let statusPayload = null;
+    for (let attempt = 0; attempt < 5; attempt += 1) {
+      await new Promise((resolve) => setTimeout(resolve, 3000));
+      statusPayload = await fetchPublishStatus(accessToken, publishId);
+      const status = statusPayload?.data?.status;
+      if (status && status !== "PROCESSING_UPLOAD") {
+        break;
+      }
+    }
+
+    const finalStatus = statusPayload?.data?.status || "PROCESSING_UPLOAD";
+    if (finalStatus !== "PUBLISH_COMPLETE" && finalStatus !== "PROCESSING_DOWNLOAD") {
+      const failReason = statusPayload?.data?.fail_reason || "unknown_tiktok_failure";
+      const error = new Error(`TikTok publish failed with status ${finalStatus}: ${failReason}`);
+      error.publishResult = {
+        publish_id: publishId,
+        status: finalStatus,
+        privacyLevel,
+        creatorInfo: creatorInfoPayload?.data || null,
+        raw: statusPayload,
+      };
+      throw error;
+    }
+
+    return {
+      publish_id: publishId,
+      status: finalStatus,
+      privacyLevel,
+      creatorInfo: creatorInfoPayload?.data || null,
+      raw: statusPayload,
+    };
+  } finally {
+    if (cleanupUploadVideo && uploadVideoPath && fs.existsSync(uploadVideoPath)) {
+      fs.unlinkSync(uploadVideoPath);
     }
   }
-
-  return {
-    publish_id: publishId,
-    status: statusPayload?.data?.status || "PROCESSING_UPLOAD",
-    privacyLevel,
-    creatorInfo: creatorInfoPayload?.data || null,
-    raw: statusPayload,
-  };
 }
 
 async function main() {

@@ -388,6 +388,8 @@ async function main() {
           dir: manualFallback.dir,
           txtPath: manualFallback.txtPath,
           jsonPath: manualFallback.jsonPath,
+          txtUrl: manualFallback.txtUrl,
+          jsonUrl: manualFallback.jsonUrl,
           videoUrl: manualFallback.videoUrl,
           localVideoPath: manualFallback.localVideoPath,
         },
@@ -425,6 +427,7 @@ async function main() {
         log("tiktok publish completed", results.tiktok);
       }
     } catch (error) {
+      const publishResult = error.publishResult || {};
       const manualFallback = await writeManualPublishFallback({
         videoPath: resolvedVideoPath,
         scriptData,
@@ -436,6 +439,7 @@ async function main() {
         logger: log,
         metadata: {
           privacyLevel: process.env.TIKTOK_PRIVACY_LEVEL || "SELF_ONLY",
+          publishResult,
         },
       });
       if (manualFallback.cloudinaryPublicId && manualFallback.videoUrl) {
@@ -449,10 +453,16 @@ async function main() {
         enabled: true,
         status: "failed",
         error: error.message,
+        raw: publishResult.raw || null,
+        publish_id: publishResult.publish_id || null,
+        creatorInfo: publishResult.creatorInfo || null,
+        privacyLevel: publishResult.privacyLevel || process.env.TIKTOK_PRIVACY_LEVEL || "SELF_ONLY",
         manualFallback: {
           dir: manualFallback.dir,
           txtPath: manualFallback.txtPath,
           jsonPath: manualFallback.jsonPath,
+          txtUrl: manualFallback.txtUrl,
+          jsonUrl: manualFallback.jsonUrl,
           videoUrl: manualFallback.videoUrl,
           localVideoPath: manualFallback.localVideoPath,
         },

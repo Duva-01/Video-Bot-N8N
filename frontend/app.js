@@ -2,49 +2,20 @@
   const TOKEN_KEY = "facts_engine_token";
   const API_BASE_KEY = "facts_engine_api_base";
   const config = window.FACTS_APP_CONFIG || {};
-  const views = {
-    dashboard: {
-      title: "Dashboard",
-      description: "Overview operativo del bot: �ltimos runs, cobertura de categor�as, v�deo reciente y telemetr�a.",
-    },
-    console: {
-      title: "Console",
-      description: "Eventos persistidos en Neon: eventos de pipeline, ejecuciones, artefactos, auditor�a y runner logs.",
-    },
-    health: {
-      title: "Health",
-      description: "Estado t�cnico del backend, persistencia, perfil low-memory y salida cruda del endpoint health.",
-    },
-  };
+  const views = ["global", "youtube", "instagram", "tiktok", "console"];
 
-  const landingView = document.getElementById("landingView");
-  const loginModal = document.getElementById("loginModal");
+  const loginView = document.getElementById("loginView");
   const appView = document.getElementById("appView");
   const loginForm = document.getElementById("loginForm");
   const loginMessage = document.getElementById("loginMessage");
   const apiBaseUrlInput = document.getElementById("apiBaseUrl");
   const usernameInput = document.getElementById("username");
   const passwordInput = document.getElementById("password");
+  const refreshButton = document.getElementById("refreshButton");
   const logoutButton = document.getElementById("logoutButton");
-  const openN8nButton = document.getElementById("openN8nButton");
-  const runNowButton = document.getElementById("runNowButton");
-  const toggleAutomationButton = document.getElementById("toggleAutomationButton");
-  const refreshDashboardButton = document.getElementById("refreshDashboardButton");
-  const refreshHealthButton = document.getElementById("refreshHealthButton");
-  const refreshLogsButton = document.getElementById("refreshLogsButton");
-  const titleNode = document.getElementById("viewTitle");
-  const descriptionNode = document.getElementById("viewDescription");
   const backendLabelNode = document.getElementById("backendLabel");
-  const runnerStatusNode = document.getElementById("runnerStatus");
-  const runnerCopyNode = document.getElementById("runnerCopy");
-  const runnerDotNode = document.getElementById("runnerDot");
-  const runnerMetaNode = document.getElementById("runnerMeta");
-  const runnerLogsNode = document.getElementById("runnerLogs");
-  const logsConsoleNode = document.getElementById("logsConsole");
-  const healthJsonNode = document.getElementById("healthJson");
 
-  let runPollTimer = null;
-  let autoRefreshTimer = null;
+  let refreshTimer = null;
 
   function qs(id) {
     return document.getElementById(id);
@@ -72,23 +43,9 @@
     window.localStorage.removeItem(TOKEN_KEY);
   }
 
-  function openLoginModal() {
-    loginModal.classList.remove("login-modal--hidden");
-    loginModal.setAttribute("aria-hidden", "false");
-    loginMessage.textContent = "";
-  }
-
-  function closeLoginModal() {
-    loginModal.classList.add("login-modal--hidden");
-    loginModal.setAttribute("aria-hidden", "true");
-  }
-
-  function setViewMode(authenticated) {
-    landingView.classList.toggle("landing-shell--hidden", authenticated);
+  function setAuthenticated(authenticated) {
+    loginView.style.display = authenticated ? "none" : "grid";
     appView.classList.toggle("app-shell--hidden", !authenticated);
-    if (authenticated) {
-      closeLoginModal();
-    }
   }
 
   function formatDate(value) {
@@ -98,12 +55,11 @@
     return new Intl.DateTimeFormat("es-ES", { dateStyle: "medium", timeStyle: "short" }).format(date);
   }
 
-  function formatDuration(ms) {
-    if (ms == null) return "-";
-    const totalSeconds = Math.max(0, Math.round(Number(ms) / 1000));
-    const minutes = Math.floor(totalSeconds / 60);
-    const seconds = totalSeconds % 60;
-    return minutes > 0 ? `${minutes}m ${seconds}s` : `${seconds}s`;
+  function formatCompactDate(value) {
+    if (!value) return "-";
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return "-";
+    return new Intl.DateTimeFormat("es-ES", { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" }).format(date);
   }
 
   function escapeHtml(value) {
@@ -116,19 +72,17 @@
   }
 
   function getStatusClass(status) {
-    if (["published", "success", "completed"].includes(String(status))) return "status-chip status-chip--success";
-    if (["running", "generated", "selected", "active", "info"].includes(String(status))) return "status-chip status-chip--running";
-    if (["failed", "error", "inactive"].includes(String(status))) return "status-chip status-chip--error";
-    return "status-chip status-chip--info";
+    const normalized = String(status || "").toLowerCase();
+    if (["published", "success", "completed", "publish_complete", "on"].includes(normalized)) return "status-pill status-pill--success";
+    if (["failed", "error", "off"].includes(normalized)) return "status-pill status-pill--error";
+    if (["running", "generated", "selected", "pending", "warning"].includes(normalized)) return "status-pill status-pill--warn";
+    return "status-pill status-pill--idle";
   }
 
-  function extractYouTubeEmbed(item) {
-    const id = item?.youtube_video_id || (() => {
-      const url = String(item?.youtube_url || "");
-      const match = url.match(/[?&]v=([^&]+)/);
-      return match ? match[1] : null;
-    })();
-    return id ? `https://www.youtube.com/embed/${id}` : null;
+  function getConnectionStateClass(connected, enabled) {
+    if (connected && enabled) return "status-pill status-pill--success";
+    if (connected) return "status-pill status-pill--warn";
+    return "status-pill status-pill--idle";
   }
 
   async function apiFetch(path, options = {}) {
@@ -145,29 +99,15 @@
     return payload;
   }
 
-  async function publicFetch(path) {
-    const baseUrl = getApiBaseUrl();
-    const response = await fetch(`${baseUrl}${path}`, { headers: { accept: "application/json" } });
-    const payload = await response.json().catch(() => ({}));
-    if (!response.ok) throw new Error(payload.error || `Request failed with status ${response.status}`);
-    return payload;
-  }
-
-  function setActiveButtons(activeView) {
-    document.querySelectorAll("[data-view]").forEach((node) => {
-      const isActive = node.getAttribute("data-view") === activeView;
-      node.classList.toggle("nav-button--active", isActive && node.classList.contains("nav-button"));
-    });
-  }
-
   function setActiveView(view, pushHistory) {
-    const selected = views[view] ? view : "dashboard";
+    const selected = views.includes(view) ? view : "global";
     document.querySelectorAll("[data-view-panel]").forEach((panel) => {
       panel.classList.toggle("view--active", panel.getAttribute("data-view-panel") === selected);
     });
-    titleNode.textContent = views[selected].title;
-    descriptionNode.textContent = views[selected].description;
-    setActiveButtons(selected);
+    document.querySelectorAll("[data-view]").forEach((button) => {
+      button.classList.toggle("nav-tab--active", button.getAttribute("data-view") === selected);
+    });
+
     if (pushHistory) {
       const url = new URL(window.location.href);
       url.searchParams.set("view", selected);
@@ -175,45 +115,90 @@
     }
   }
 
-  function renderLatest(item, options = {}) {
-    const card = qs(options.cardId || "latestCard");
-    const embed = options.embedId ? qs(options.embedId) : null;
-    const emptyCardText = options.emptyCardText || "No short available yet.";
-    const emptyEmbedText = options.emptyEmbedText || "No video yet.";
+  function normalizeRecentItem(item) {
+    return {
+      topicKey: item?.topic_key || "-",
+      title: item?.title || item?.topic || item?.topic_key || "Untitled",
+      category: item?.category || "-",
+      stage: item?.current_stage || "-",
+      status: item?.status || "unknown",
+      updatedAt: item?.published_at || item?.updated_at || item?.selected_at || null,
+      metadata: item?.metadata || {},
+      youtubeUrl: item?.youtube_url || null,
+      youtubeVideoId: item?.youtube_video_id || null,
+      tiktokStatus: item?.tiktok_status || null,
+      tiktokPublishId: item?.tiktok_publish_id || null,
+    };
+  }
+
+  function getPlatformResult(item, platformKey) {
+    const metadata = item?.metadata || {};
+    const socialPosts = metadata.social_posts || {};
+
+    if (platformKey === "youtube") {
+      const youtubeResult = metadata.youtube_result || {};
+      return {
+        status: item.youtubeUrl || item.youtubeVideoId ? "published" : youtubeResult.status || item.status || "unknown",
+        url: item.youtubeUrl || youtubeResult.url || null,
+        error: youtubeResult.error || null,
+        manualFallback: youtubeResult.manualFallback || null,
+      };
+    }
+
+    if (platformKey === "instagram") {
+      const instagram = socialPosts.instagram || {};
+      return {
+        status: instagram.status || "unknown",
+        url: instagram.url || null,
+        error: instagram.error || null,
+        manualFallback: instagram.manualFallback || null,
+      };
+    }
+
+    const tiktok = socialPosts.tiktok || {};
+    return {
+      status: tiktok.status || item.tiktokStatus || "unknown",
+      url: tiktok.url || null,
+      error: tiktok.error || null,
+      manualFallback: tiktok.manualFallback || null,
+      publishId: tiktok.publishId || item.tiktokPublishId || null,
+    };
+  }
+
+  function renderSimpleCard(nodeId, item, platformKey) {
+    const node = qs(nodeId);
+    if (!node) return;
 
     if (!item) {
-      card.innerHTML = `<div class="empty-state">${escapeHtml(emptyCardText)}</div>`;
-      if (embed) {
-        embed.innerHTML = `<div class="empty-state">${escapeHtml(emptyEmbedText)}</div>`;
-      }
+      node.innerHTML = '<div class="empty-state small-empty">No data yet.</div>';
       return;
     }
 
-    const embedUrl = extractYouTubeEmbed(item);
-    const privacyStatus = String(item?.metadata?.privacy_status || item?.status || "unknown").trim() || "unknown";
-    const isPrivate = privacyStatus.toLowerCase() === "private";
-    const meta = `${escapeHtml(item.category || "general")} | ${escapeHtml(item.source || "catalog")} | ${escapeHtml(formatDate(item.published_at || item.selected_at || item.updated_at))}`;
-    card.innerHTML = `
-      <div class="latest-card__body">
-        <h3>${escapeHtml(item.title || item.topic || "Latest short")}</h3>
-        <p>${meta}</p>
-        <p style="margin-top:12px"><span class="${getStatusClass(isPrivate ? "error" : "success")}">${escapeHtml(privacyStatus)}</span></p>
-        ${item.youtube_url ? `<p style="margin-top:12px"><a class="nav-button nav-button--primary" href="${item.youtube_url}" target="_blank" rel="noreferrer">Open on YouTube</a></p>` : ""}
-      </div>
-    `;
+    const normalized = normalizeRecentItem(item);
+    const result = platformKey ? getPlatformResult(normalized, platformKey) : null;
+    const actionUrl = result?.url || normalized.youtubeUrl || null;
 
-    if (embed) {
-      embed.innerHTML = embedUrl
-        ? `<iframe src="${embedUrl}" title="Latest short" loading="lazy" allowfullscreen></iframe>`
-        : '<div class="empty-state">Published item without embed URL.</div>';
-    }
+    node.innerHTML = `
+      <article class="story-card">
+        <div class="story-card__meta">
+          <span>${escapeHtml(normalized.category)}</span>
+          <span>${escapeHtml(formatCompactDate(normalized.updatedAt))}</span>
+        </div>
+        <h4>${escapeHtml(normalized.title)}</h4>
+        <div class="story-card__actions">
+          <span class="${getStatusClass(result?.status || normalized.status)}">${escapeHtml(result?.status || normalized.status)}</span>
+          ${actionUrl ? `<a href="${escapeHtml(actionUrl)}" target="_blank" rel="noreferrer">Open</a>` : ""}
+        </div>
+      </article>
+    `;
   }
 
   function renderBarList(nodeId, items, labelKey, valueKey) {
     const node = qs(nodeId);
     if (!node) return;
+
     if (!Array.isArray(items) || items.length === 0) {
-      node.innerHTML = '<div class="empty-state">No data yet.</div>';
+      node.innerHTML = '<div class="empty-state small-empty">No data yet.</div>';
       return;
     }
 
@@ -235,146 +220,260 @@
       .join("");
   }
 
-  function renderTimeline(nodeId, items, mode) {
+  function renderTimelineList(nodeId, items, formatter) {
     const node = qs(nodeId);
     if (!node) return;
+
     if (!Array.isArray(items) || items.length === 0) {
-      node.innerHTML = '<div class="empty-state">No records yet.</div>';
+      node.innerHTML = '<div class="empty-state small-empty">No entries yet.</div>';
       return;
     }
 
-    node.innerHTML = items
-      .map((item) => {
-        if (mode === "runs") {
-          return `
-            <article class="timeline-item">
-              <div class="timeline-item__top">
-                <strong>${escapeHtml(item.title || item.topic || item.topic_key || "run")}</strong>
-                <span class="${getStatusClass(item.status)}">${escapeHtml(item.status || "unknown")}</span>
-              </div>
-              <div class="timeline-item__meta">
-                <span>${escapeHtml(item.category || "-")}</span>
-                <span>${escapeHtml(item.current_stage || "-")}</span>
-                <span>${escapeHtml(item.source || "-")}</span>
-                <span>${escapeHtml(formatDate(item.published_at || item.updated_at || item.selected_at))}</span>
-              </div>
-            </article>
-          `;
-        }
-
-        return `
-          <article class="timeline-item">
-            <div class="timeline-item__top">
-              <strong>${escapeHtml(item.message || item.event_type || "event")}</strong>
-              <span class="${getStatusClass(item.level || "info")}">${escapeHtml(item.level || "info")}</span>
-            </div>
-            <div class="timeline-item__meta">
-              <span>${escapeHtml(item.stage || item.source || "-")}</span>
-              <span>${escapeHtml(item.topic_key || "global")}</span>
-              <span>${escapeHtml(formatDate(item.created_at))}</span>
-            </div>
-          </article>
-        `;
-      })
-      .join("");
-  }
-
-  function renderMemoryChart(items) {
-    const node = qs("memoryChart");
-    if (!node) return;
-    const samples = (Array.isArray(items) ? items : []).filter((item) => item.metric_name === "rss_mb").slice(-12);
-    if (!samples.length) {
-      node.innerHTML = '<div class="empty-state">No memory samples yet.</div>';
-      return;
-    }
-
-    const maxValue = Math.max(...samples.map((item) => Number(item.metric_value || 0)), 1);
-    node.innerHTML = samples
-      .map((item) => {
-        const value = Number(item.metric_value || 0);
-        const height = Math.max(8, Math.round((value / maxValue) * 180));
-        return `
-          <div class="memory-bar">
-            <div class="memory-bar__fill" style="height:${height}px"></div>
-            <div class="memory-bar__label">${Math.round(value)} MB</div>
-          </div>
-        `;
-      })
-      .join("");
-  }
-
-  function renderConsoleList(nodeId, items, formatter) {
-    const node = qs(nodeId);
-    if (!node) return;
-    if (!Array.isArray(items) || items.length === 0) {
-      node.innerHTML = '<div class="empty-state">No entries yet.</div>';
-      return;
-    }
     node.innerHTML = items.map(formatter).join("");
   }
 
-  function renderRunnerState(runner) {
-    const state = runner || {};
-    const isRunning = Boolean(state.running);
-    const isError = !isRunning && (state.exitCode || state.lastError);
-    const isSuccess = !isRunning && state.finishedAt && !state.exitCode && !state.lastError;
+  function renderPlatformStrip(platformConfig, platforms) {
+    const node = qs("platformConnectionStrip");
+    if (!node) return;
 
-    runnerStatusNode.textContent = isRunning ? "Running" : isError ? "Error" : isSuccess ? "Completed" : "Idle";
-    runnerDotNode.className = "runner-dot";
-    if (isRunning) runnerDotNode.classList.add("is-running");
-    if (isError) runnerDotNode.classList.add("is-error");
-    if (isSuccess) runnerDotNode.classList.add("is-success");
-
-    if (isRunning) {
-      runnerCopyNode.textContent = `Executing ${state.workflowName || "workflow"} since ${formatDate(state.startedAt)}.`;
-    } else if (isError) {
-      runnerCopyNode.textContent = state.lastError || `Execution exited with code ${state.exitCode}.`;
-    } else if (isSuccess) {
-      runnerCopyNode.textContent = `Last run completed at ${formatDate(state.finishedAt)}.`;
-    } else {
-      runnerCopyNode.textContent = "No recent runs from the control panel.";
-    }
-
-    runnerMetaNode.textContent = [`Workflow: ${state.workflowName || "-"}`, `Start: ${formatDate(state.startedAt)}`, `End: ${formatDate(state.finishedAt)}`, `Exit: ${state.exitCode ?? "-"}`].join(" | ");
-    const logText = String(state.lastError || state.stderrTail || state.stdoutTail || "No logs yet.").trim();
-    runnerLogsNode.textContent = logText;
-    logsConsoleNode.textContent = logText;
-    runNowButton.disabled = isRunning;
-    runNowButton.textContent = isRunning ? "Running..." : "Run now";
+    const order = ["youtube", "instagram", "tiktok"];
+    node.innerHTML = order.map((key) => {
+      const configEntry = platformConfig?.[key] || {};
+      const summary = platforms?.[key] || {};
+      const stateLabel = configEntry.connected ? (configEntry.enabled ? "connected" : "configured") : "not configured";
+      return `
+        <article class="connection-card">
+          <div>
+            <span>${escapeHtml(summary.name || key)}</span>
+            <strong>${escapeHtml(stateLabel)}</strong>
+          </div>
+          <div class="connection-card__meta">
+            <span class="${getConnectionStateClass(configEntry.connected, configEntry.enabled)}">${configEntry.enabled ? "enabled" : "disabled"}</span>
+            <small>${summary.published || 0} published</small>
+          </div>
+        </article>
+      `;
+    }).join("");
   }
 
-  function renderWorkflowState(workflow, snapshot) {
-    const state = workflow || snapshot || {};
-    qs("workflowName").textContent = state.name || state.workflow_name || "-";
-    qs("workflowActive").textContent = state.active ? "ON" : "OFF";
-    qs("workflowTriggerCount").textContent = state.triggerCount ?? state.trigger_count ?? "-";
-    qs("workflowUpdatedAt").textContent = formatDate(state.updatedAt || state.updated_at);
-    qs("workflowBadge").textContent = state.active ? "active" : "inactive";
-    toggleAutomationButton.textContent = state.active ? "Automation ON" : "Automation OFF";
-    toggleAutomationButton.classList.toggle("nav-button--active", Boolean(state.active));
+  function renderGlobalStats(dashboard) {
+    const totals = dashboard?.totals || {};
+    const platforms = dashboard?.platforms || {};
+    const node = qs("globalStats");
+    if (!node) return;
+
+    const cards = [
+      { label: "Tracked videos", value: totals.total_videos || 0 },
+      { label: "Published records", value: totals.published_videos || 0 },
+      { label: "Failed runs", value: totals.failed_videos || 0 },
+      { label: "Categories", value: totals.categories_covered || 0 },
+      { label: "Instagram published", value: platforms.instagram?.published || 0 },
+      { label: "TikTok published", value: platforms.tiktok?.published || 0 },
+    ];
+
+    node.innerHTML = cards.map((card) => `
+      <article class="stat-card shell-card">
+        <span>${escapeHtml(card.label)}</span>
+        <strong>${escapeHtml(String(card.value))}</strong>
+      </article>
+    `).join("");
   }
 
-  function renderN8nExecutionConsole(items) {
-    renderConsoleList("executionConsole", items, (item) => `
-      <article class="console-item">
-        <div class="console-item__top">
-          <strong>#${escapeHtml(item.id || item.execution_id || "-")}</strong>
-          <span class="${getStatusClass(item.status || item.level || "info")}">${escapeHtml(item.status || item.level || "info")}</span>
+  function renderPlatformCards(dashboard) {
+    const node = qs("platformCards");
+    if (!node) return;
+
+    const platformConfig = dashboard?.platformConfig || {};
+    const platforms = dashboard?.platforms || {};
+    node.innerHTML = ["youtube", "instagram", "tiktok"].map((key) => {
+      const platform = platforms[key] || { name: key };
+      const configEntry = platformConfig[key] || {};
+      return `
+        <article class="platform-card shell-card">
+          <div class="platform-card__head">
+            <div>
+              <p class="eyebrow">Platform</p>
+              <h3>${escapeHtml(platform.name || key)}</h3>
+            </div>
+            <span class="${getConnectionStateClass(configEntry.connected, configEntry.enabled)}">${configEntry.enabled ? "active" : "off"}</span>
+          </div>
+          <div class="platform-card__stats">
+            <article><span>Attempted</span><strong>${platform.attempted || 0}</strong></article>
+            <article><span>Published</span><strong>${platform.published || 0}</strong></article>
+            <article><span>Failed</span><strong>${platform.failed || 0}</strong></article>
+          </div>
+          <p class="platform-card__meta">Last success: ${escapeHtml(formatDate(platform.last_published_at))}</p>
+        </article>
+      `;
+    }).join("");
+  }
+
+  function collectManualFallbacks(platforms) {
+    const fallbackItems = [];
+    ["youtube", "instagram", "tiktok"].forEach((platformKey) => {
+      (platforms?.[platformKey]?.recentItems || []).forEach((item) => {
+        const normalized = normalizeRecentItem(item);
+        const result = getPlatformResult(normalized, platformKey);
+        if (result.manualFallback) {
+          fallbackItems.push({
+            platformKey,
+            title: normalized.title,
+            updatedAt: normalized.updatedAt,
+            error: result.error || "Manual fallback ready",
+            fallback: result.manualFallback,
+          });
+        }
+      });
+    });
+
+    return fallbackItems.slice(0, 10);
+  }
+
+  function renderGlobalView(data) {
+    const dashboard = data.dashboard || {};
+    const totals = dashboard.totals || {};
+
+    qs("headerTotalVideos").textContent = String(totals.total_videos || 0);
+    qs("headerPublishedVideos").textContent = String(totals.published_videos || 0);
+    qs("headerFailedVideos").textContent = String(totals.failed_videos || 0);
+    qs("headerLastPublished").textContent = formatDate(totals.last_published_at);
+    backendLabelNode.textContent = getApiBaseUrl() || "Backend not configured";
+
+    renderPlatformStrip(dashboard.platformConfig || {}, dashboard.platforms || {});
+    renderGlobalStats(dashboard);
+    renderPlatformCards(dashboard);
+    renderSimpleCard("latestGeneratedCard", dashboard.latestGenerated || dashboard.recentRuns?.[0] || null, null);
+    renderSimpleCard("latestPublishedCard", dashboard.latestPublished || null, "youtube");
+    renderBarList("categoryBars", dashboard.byCategory || [], "category", "total");
+
+    renderTimelineList("recentEventsList", dashboard.recentEvents || [], (item) => `
+      <article class="list-item">
+        <div class="list-item__top">
+          <strong>${escapeHtml(item.message || item.event_type || "event")}</strong>
+          <span class="${getStatusClass(item.level || "info")}">${escapeHtml(item.level || "info")}</span>
         </div>
-        <div class="console-item__meta">
-          <span>${escapeHtml(item.mode || item.source || "-")}</span>
-          <span>${escapeHtml(formatDate(item.startedAt || item.created_at))}</span>
-          <span>${escapeHtml(formatDuration(item.durationMs))}</span>
+        <div class="list-item__meta">
+          <span>${escapeHtml(item.stage || "-")}</span>
+          <span>${escapeHtml(item.topic_key || "global")}</span>
+          <span>${escapeHtml(formatCompactDate(item.created_at))}</span>
         </div>
-        ${item.message ? `<pre>${escapeHtml(item.message)}</pre>` : ""}
+      </article>
+    `);
+
+    const manualFallbacks = collectManualFallbacks(dashboard.platforms || {});
+    renderTimelineList("manualFallbackList", manualFallbacks, (item) => `
+      <article class="list-item">
+        <div class="list-item__top">
+          <strong>${escapeHtml(item.title)}</strong>
+          <span class="${getStatusClass("warning")}">${escapeHtml(item.platformKey)}</span>
+        </div>
+        <div class="list-item__meta">
+          <span>${escapeHtml(item.error)}</span>
+          <span>${escapeHtml(formatCompactDate(item.updatedAt))}</span>
+        </div>
+        <div class="list-item__links">
+          ${item.fallback.videoUrl ? `<a href="${escapeHtml(item.fallback.videoUrl)}" target="_blank" rel="noreferrer">Cloudinary video</a>` : ""}
+          ${item.fallback.txtPath ? `<span>${escapeHtml(item.fallback.txtPath)}</span>` : ""}
+        </div>
       </article>
     `);
   }
 
-  function renderOperations(operations) {
-    const data = operations || {};
+  function renderPlatformSection(nodeId, platformKey, dashboard) {
+    const node = qs(nodeId);
+    if (!node) return;
 
-    renderConsoleList("eventConsole", data.events || [], (item) => `
+    const platform = dashboard?.platforms?.[platformKey] || { name: platformKey, recentItems: [] };
+    const configEntry = dashboard?.platformConfig?.[platformKey] || {};
+    const recentItems = Array.isArray(platform.recentItems) ? platform.recentItems.map(normalizeRecentItem) : [];
+
+    node.innerHTML = `
+      <div class="platform-view-grid">
+        <section class="module shell-card">
+          <div class="module-head">
+            <div>
+              <p class="eyebrow">Status</p>
+              <h3>${escapeHtml(platform.name || platformKey)}</h3>
+            </div>
+            <span class="${getConnectionStateClass(configEntry.connected, configEntry.enabled)}">${configEntry.enabled ? "enabled" : "disabled"}</span>
+          </div>
+          <div class="platform-kpis">
+            <article><span>Attempted</span><strong>${platform.attempted || 0}</strong></article>
+            <article><span>Published</span><strong>${platform.published || 0}</strong></article>
+            <article><span>Failed</span><strong>${platform.failed || 0}</strong></article>
+            <article><span>Last success</span><strong>${escapeHtml(formatDate(platform.last_published_at))}</strong></article>
+          </div>
+          <div class="platform-tags">
+            <span class="${getConnectionStateClass(configEntry.connected, configEntry.enabled)}">${configEntry.connected ? "credentials ready" : "missing credentials"}</span>
+            <span class="status-pill status-pill--idle">view: ${escapeHtml(platformKey)}</span>
+          </div>
+        </section>
+
+        <section class="module shell-card module--wide">
+          <div class="module-head">
+            <div>
+              <p class="eyebrow">Recent items</p>
+              <h3>Latest ${escapeHtml(platform.name || platformKey)} attempts</h3>
+            </div>
+          </div>
+          <div class="list-stack">
+            ${recentItems.length ? recentItems.map((item) => {
+              const result = getPlatformResult(item, platformKey);
+              return `
+                <article class="list-item">
+                  <div class="list-item__top">
+                    <strong>${escapeHtml(item.title)}</strong>
+                    <span class="${getStatusClass(result.status || item.status)}">${escapeHtml(result.status || item.status)}</span>
+                  </div>
+                  <div class="list-item__meta">
+                    <span>${escapeHtml(item.category)}</span>
+                    <span>${escapeHtml(item.stage)}</span>
+                    <span>${escapeHtml(formatCompactDate(item.updatedAt))}</span>
+                  </div>
+                  <div class="list-item__links">
+                    ${result.url ? `<a href="${escapeHtml(result.url)}" target="_blank" rel="noreferrer">Open post</a>` : ""}
+                    ${result.manualFallback?.videoUrl ? `<a href="${escapeHtml(result.manualFallback.videoUrl)}" target="_blank" rel="noreferrer">Manual fallback</a>` : ""}
+                    ${result.publishId ? `<span>${escapeHtml(result.publishId)}</span>` : ""}
+                    ${result.error ? `<span>${escapeHtml(result.error)}</span>` : ""}
+                  </div>
+                </article>
+              `;
+            }).join("") : '<div class="empty-state small-empty">No platform activity yet.</div>'}
+          </div>
+        </section>
+      </div>
+    `;
+  }
+
+  function renderConsoleView(data) {
+    const runner = data.runner || {};
+    const operations = data.dashboard?.operations || {};
+    const executions = Array.isArray(data.executions) ? data.executions : [];
+
+    const runnerStatus = runner.running ? "running" : runner.lastError ? "error" : runner.finishedAt ? "completed" : "idle";
+    qs("runnerStatusBadge").className = getStatusClass(runnerStatus);
+    qs("runnerStatusBadge").textContent = runnerStatus;
+    qs("runnerStatus").textContent = runner.running ? "Running" : runner.lastError ? "Error" : runner.finishedAt ? "Completed" : "Idle";
+    qs("runnerWorkflow").textContent = runner.workflowName || "-";
+    qs("runnerStartedAt").textContent = formatDate(runner.startedAt);
+    qs("runnerFinishedAt").textContent = formatDate(runner.finishedAt);
+    qs("runnerLogs").textContent = String(runner.lastError || runner.stderrTail || runner.stdoutTail || "No logs yet.").trim() || "No logs yet.";
+
+    renderTimelineList("executionConsole", executions, (item) => `
+      <article class="console-item">
+        <div class="console-item__top">
+          <strong>#${escapeHtml(item.id || item.execution_id || "-")}</strong>
+          <span class="${getStatusClass(item.status || "info")}">${escapeHtml(item.status || "info")}</span>
+        </div>
+        <div class="console-item__meta">
+          <span>${escapeHtml(item.mode || "-")}</span>
+          <span>${escapeHtml(formatCompactDate(item.startedAt || item.created_at))}</span>
+          <span>${escapeHtml(item.durationMs ? `${Math.round(item.durationMs / 1000)}s` : "-")}</span>
+        </div>
+      </article>
+    `);
+
+    renderTimelineList("eventConsole", operations.events || [], (item) => `
       <article class="console-item">
         <div class="console-item__top">
           <strong>${escapeHtml(item.message || item.event_type || "event")}</strong>
@@ -382,15 +481,13 @@
         </div>
         <div class="console-item__meta">
           <span>${escapeHtml(item.stage || "-")}</span>
-          <span>${escapeHtml(item.source || "-")}</span>
           <span>${escapeHtml(item.topic_key || "global")}</span>
-          <span>${escapeHtml(formatDate(item.created_at))}</span>
+          <span>${escapeHtml(formatCompactDate(item.created_at))}</span>
         </div>
-        <pre>${escapeHtml(JSON.stringify(item.metadata || {}, null, 2))}</pre>
       </article>
     `);
 
-    renderConsoleList("artifactConsole", data.artifacts || [], (item) => `
+    renderTimelineList("artifactConsole", operations.artifacts || [], (item) => `
       <article class="console-item">
         <div class="console-item__top">
           <strong>${escapeHtml(item.artifact_type || "artifact")}</strong>
@@ -400,13 +497,11 @@
           <span>${escapeHtml(item.topic_key || "-")}</span>
           <span>${escapeHtml(item.mime_type || "-")}</span>
           <span>${escapeHtml(item.size_bytes ? `${Math.round(item.size_bytes / 1024)} KB` : "-")}</span>
-          <span>${escapeHtml(formatDate(item.created_at))}</span>
         </div>
-        <pre>${escapeHtml(JSON.stringify({ file_path: item.file_path, external_url: item.external_url, metadata: item.metadata || {} }, null, 2))}</pre>
       </article>
     `);
 
-    renderConsoleList("auditConsole", data.apiAudit || [], (item) => `
+    renderTimelineList("auditConsole", operations.apiAudit || [], (item) => `
       <article class="console-item">
         <div class="console-item__top">
           <strong>${escapeHtml(item.action || "request")}</strong>
@@ -415,166 +510,49 @@
         <div class="console-item__meta">
           <span>${escapeHtml(item.actor || "anonymous")}</span>
           <span>${escapeHtml(item.path || "/")}</span>
-          <span>${escapeHtml(item.ip_address || "-")}</span>
-          <span>${escapeHtml(formatDate(item.created_at))}</span>
+          <span>${escapeHtml(formatCompactDate(item.created_at))}</span>
         </div>
-        <pre>${escapeHtml(JSON.stringify(item.metadata || {}, null, 2))}</pre>
       </article>
     `);
   }
 
-  function renderControlCenter(data) {
-    const dashboard = data.dashboard || {};
-    const totals = dashboard.totals || {};
-    const latestGenerated = dashboard.latestGenerated || null;
-    const latestPublished = dashboard.latestPublished || null;
-    const health = data.health || {};
-    const operations = dashboard.operations || {};
-
-    qs("headerPublishedCount").textContent = String(totals.total_videos || 0);
-    qs("headerLatestTitle").textContent = latestGenerated?.title || latestGenerated?.topic || "No data";
-    qs("headerLastPublished").textContent = formatDate(totals.last_published_at);
-    qs("totalVideos").textContent = String(totals.total_videos || 0);
-    qs("generatedVideos").textContent = String(totals.generated_videos || 0);
-    qs("publishedVideos").textContent = String(totals.published_videos || 0);
-    qs("failedVideos").textContent = String(totals.failed_videos || 0);
-    qs("categoriesCovered").textContent = String(totals.categories_covered || 0);
-
-    qs("healthStatus").textContent = health.status || "-";
-    qs("healthPersistence").textContent = health.persistence?.n8nDatabase ? "Neon" : "Local";
-    qs("healthMode").textContent = health.performance?.lowMemoryMode ? "Low memory" : "Standard";
-    backendLabelNode.textContent = getApiBaseUrl() || "Backend not set";
-
-    renderLatest(latestGenerated, {
-      cardId: "latestCard",
-      embedId: "latestEmbed",
-      emptyCardText: "No generated short yet.",
-      emptyEmbedText: "No video yet.",
-    });
-    renderLatest(latestPublished, {
-      cardId: "latestPublicCard",
-      embedId: null,
-      emptyCardText: "No public short yet.",
-    });
-    renderBarList("categoryBars", dashboard.byCategory || [], "category", "total");
-    renderBarList("artifactBars", dashboard.artifactSummary || [], "artifact_type", "total");
-    renderTimeline("recentRunsList", dashboard.recentRuns || [], "runs");
-    renderTimeline("recentEventsList", dashboard.recentEvents || [], "events");
-    renderMemoryChart(dashboard.memorySamples || []);
-    renderRunnerState(data.runner);
-    renderWorkflowState(data.workflow, dashboard.workflowSnapshot);
-    renderN8nExecutionConsole(data.executions || []);
-    renderOperations(operations);
+  function renderPayload(data) {
+    renderGlobalView(data);
+    renderPlatformSection("youtubeView", "youtube", data.dashboard || {});
+    renderPlatformSection("instagramView", "instagram", data.dashboard || {});
+    renderPlatformSection("tiktokView", "tiktok", data.dashboard || {});
+    renderConsoleView(data);
   }
 
-  async function loadControlCenter() {
+  async function loadAppData() {
     const payload = await apiFetch("/api/control-center");
-    renderControlCenter(payload);
+    renderPayload(payload);
     return payload;
-  }
-
-  async function loadLogs() {
-    const payload = await apiFetch("/api/logs");
-    renderRunnerState(payload.runner);
-    renderWorkflowState(payload.workflow, payload.dashboard?.workflowSnapshot);
-    renderN8nExecutionConsole(payload.executions || []);
-    renderOperations(payload.dashboard?.operations || {});
-    return payload;
-  }
-
-  async function loadHealth() {
-    const payload = await publicFetch("/health");
-    qs("healthStatus").textContent = payload.status || "-";
-    qs("healthPersistence").textContent = payload.persistence?.n8nDatabase ? "Neon" : "Local";
-    qs("healthMode").textContent = payload.performance?.lowMemoryMode ? "Low memory" : "Standard";
-    qs("healthService").textContent = payload.service || "-";
-    qs("healthN8nPath").textContent = payload.routing?.n8nPath || "/";
-    qs("healthResolution").textContent = `${payload.performance?.shortsWidth || "-"}x${payload.performance?.shortsHeight || "-"}`;
-    qs("healthThreads").textContent = String(payload.performance?.ffmpegThreads || "-");
-    healthJsonNode.textContent = JSON.stringify(payload, null, 2);
-    return payload;
-  }
-
-  async function triggerRunNow() {
-    runNowButton.disabled = true;
-    runNowButton.textContent = "Starting...";
-    try {
-      const payload = await apiFetch("/api/run-now", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-      });
-      renderRunnerState(payload);
-      if (runPollTimer) window.clearInterval(runPollTimer);
-      runPollTimer = window.setInterval(async () => {
-        try {
-          const statePayload = await apiFetch("/api/run-now");
-          renderRunnerState(statePayload);
-          if (!statePayload.running) {
-            window.clearInterval(runPollTimer);
-            runPollTimer = null;
-            await Promise.all([loadControlCenter(), loadLogs(), loadHealth()]);
-          }
-        } catch (error) {
-          window.clearInterval(runPollTimer);
-          runPollTimer = null;
-          renderFatalError(error);
-        }
-      }, 5000);
-    } catch (error) {
-      renderFatalError(error);
-    }
-  }
-
-  async function toggleAutomation() {
-    const nextActive = (toggleAutomationButton.textContent || "").includes("OFF");
-    toggleAutomationButton.disabled = true;
-    toggleAutomationButton.textContent = nextActive ? "Activating..." : "Deactivating...";
-    try {
-      await apiFetch("/api/workflow-automation", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ active: nextActive }),
-      });
-      await Promise.all([loadControlCenter(), loadLogs()]);
-    } catch (error) {
-      renderFatalError(error);
-    } finally {
-      toggleAutomationButton.disabled = false;
-    }
-  }
-
-  function renderFatalError(error) {
-    const message = error?.message || "Unknown error";
-    runnerCopyNode.textContent = message;
-    runnerLogsNode.textContent = message;
-    logsConsoleNode.textContent = message;
-    loginMessage.textContent = message;
-  }
-
-  async function hydrateApp() {
-    const apiBase = getApiBaseUrl();
-    backendLabelNode.textContent = apiBase || "Backend not configured";
-    openN8nButton.href = `${apiBase}/`;
-    await Promise.all([loadControlCenter(), loadLogs(), loadHealth()]);
   }
 
   function startAutoRefresh() {
-    if (autoRefreshTimer) window.clearInterval(autoRefreshTimer);
-    autoRefreshTimer = window.setInterval(() => {
-      Promise.all([loadControlCenter(), loadLogs(), loadHealth()]).catch(renderFatalError);
+    window.clearInterval(refreshTimer);
+    refreshTimer = window.setInterval(() => {
+      loadAppData().catch(handleFatalError);
     }, 30000);
   }
 
-  function stopAllTimers() {
-    if (runPollTimer) window.clearInterval(runPollTimer);
-    if (autoRefreshTimer) window.clearInterval(autoRefreshTimer);
-    runPollTimer = null;
-    autoRefreshTimer = null;
+  function stopAutoRefresh() {
+    window.clearInterval(refreshTimer);
+    refreshTimer = null;
+  }
+
+  function handleFatalError(error) {
+    const message = error?.message || "Unknown error";
+    loginMessage.textContent = message;
+    backendLabelNode.textContent = message;
+    qs("runnerLogs").textContent = message;
   }
 
   async function handleLogin(event) {
     event.preventDefault();
     loginMessage.textContent = "";
+
     try {
       const apiBase = setApiBaseUrl(apiBaseUrlInput.value);
       const response = await fetch(`${apiBase}/api/auth/login`, {
@@ -585,9 +563,9 @@
       const payload = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(payload.error || `Login failed with status ${response.status}`);
       setToken(payload.token);
-      setViewMode(true);
-      await hydrateApp();
-      setActiveView("dashboard", true);
+      setAuthenticated(true);
+      await loadAppData();
+      setActiveView(new URLSearchParams(window.location.search).get("view") || "global", true);
       startAutoRefresh();
     } catch (error) {
       loginMessage.textContent = error.message;
@@ -595,24 +573,12 @@
   }
 
   loginForm.addEventListener("submit", handleLogin);
+  refreshButton.addEventListener("click", () => loadAppData().catch(handleFatalError));
   logoutButton.addEventListener("click", () => {
     clearSession();
-    stopAllTimers();
-    setViewMode(false);
-    openLoginModal();
+    stopAutoRefresh();
+    setAuthenticated(false);
   });
-  refreshDashboardButton.addEventListener("click", () => loadControlCenter().catch(renderFatalError));
-  refreshHealthButton.addEventListener("click", () => loadHealth().catch(renderFatalError));
-  refreshLogsButton.addEventListener("click", () => loadLogs().catch(renderFatalError));
-  runNowButton.addEventListener("click", () => triggerRunNow());
-  toggleAutomationButton.addEventListener("click", () => toggleAutomation());
-
-  ["openLoginButton", "openLoginButtonHero", "openLoginButtonFooter"].forEach((id) => {
-    const node = qs(id);
-    if (node) node.addEventListener("click", openLoginModal);
-  });
-  qs("closeLoginButton").addEventListener("click", closeLoginModal);
-  qs("loginBackdrop").addEventListener("click", closeLoginModal);
 
   document.addEventListener("click", (event) => {
     const trigger = event.target.closest("[data-view]");
@@ -621,29 +587,25 @@
   });
 
   window.addEventListener("popstate", () => {
-    const params = new URLSearchParams(window.location.search);
-    setActiveView(params.get("view") || "dashboard", false);
+    setActiveView(new URLSearchParams(window.location.search).get("view") || "global", false);
   });
 
   apiBaseUrlInput.value = getApiBaseUrl() || config.API_BASE_URL || "";
   usernameInput.value = config.DEFAULT_USERNAME || "admin";
 
   if (getToken() && getApiBaseUrl()) {
-    setViewMode(true);
-    hydrateApp()
+    setAuthenticated(true);
+    loadAppData()
       .then(() => {
-        const params = new URLSearchParams(window.location.search);
-        setActiveView(params.get("view") || "dashboard", true);
+        setActiveView(new URLSearchParams(window.location.search).get("view") || "global", true);
         startAutoRefresh();
       })
       .catch((error) => {
         clearSession();
-        setViewMode(false);
+        setAuthenticated(false);
         loginMessage.textContent = error.message;
       });
   } else {
-    setViewMode(false);
-    closeLoginModal();
+    setAuthenticated(false);
   }
 })();
-

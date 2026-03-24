@@ -196,6 +196,8 @@ async function main() {
         dir: manualFallback.dir,
         txtPath: manualFallback.txtPath,
         jsonPath: manualFallback.jsonPath,
+        txtUrl: manualFallback.txtUrl,
+        jsonUrl: manualFallback.jsonUrl,
         videoUrl: manualFallback.videoUrl,
         localVideoPath: manualFallback.localVideoPath,
       },

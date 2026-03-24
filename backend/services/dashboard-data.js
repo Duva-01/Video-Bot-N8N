@@ -24,6 +24,24 @@ async function loadDashboardData() {
     service: "bot-de-videos",
     mode: "youtube-facts-only",
     databaseConfigured: hasDatabase(),
+    platformConfig: {
+      youtube: {
+        connected: Boolean(
+          process.env.YOUTUBE_CLIENT_ID &&
+            process.env.YOUTUBE_CLIENT_SECRET &&
+            process.env.YOUTUBE_REFRESH_TOKEN,
+        ),
+        enabled: true,
+      },
+      instagram: {
+        connected: Boolean(process.env.INSTAGRAM_ACCESS_TOKEN),
+        enabled: String(process.env.INSTAGRAM_PUBLISH_ENABLED || "false").toLowerCase() === "true",
+      },
+      tiktok: {
+        connected: Boolean(process.env.TIKTOK_ACCESS_TOKEN && process.env.TIKTOK_OPEN_ID),
+        enabled: String(process.env.TIKTOK_PUBLISH_ENABLED || "false").toLowerCase() === "true",
+      },
+    },
     defaults: {
       durationSeconds: Number(process.env.VIDEO_DEFAULT_DURATION_SECONDS || 15),
       clipsPerVideo: Number(process.env.PEXELS_CLIPS_COUNT || 1),
@@ -55,6 +73,11 @@ async function loadDashboardData() {
       memorySamples: [],
       workflowSnapshot: null,
       latestPublished: null,
+      platforms: {
+        youtube: { name: "YouTube", key: "youtube", attempted: 0, published: 0, failed: 0, last_published_at: null, recentItems: [] },
+        instagram: { name: "Instagram", key: "instagram", attempted: 0, published: 0, failed: 0, last_published_at: null, recentItems: [] },
+        tiktok: { name: "TikTok", key: "tiktok", attempted: 0, published: 0, failed: 0, last_published_at: null, recentItems: [] },
+      },
       operations: {
         events: [],
         executionLogs: [],

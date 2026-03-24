@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>TikTok Callback | Facts Engine</title>
+    <style>
+      body { margin: 0; font-family: Arial, sans-serif; background: #111; color: #f7f7f7; }
+      main { max-width: 780px; margin: 0 auto; padding: 48px 20px 72px; }
+      section { background: #1c1c1c; border: 1px solid #343434; border-radius: 18px; padding: 24px; margin-top: 18px; }
+      code, pre { background: #0a0a0a; border-radius: 12px; padding: 12px; display: block; overflow: auto; }
+      button { margin-top: 12px; padding: 12px 16px; border-radius: 999px; border: 0; background: #ff4f57; color: #fff; cursor: pointer; }
+      a { color: #ff878c; }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>TikTok callback</h1>
+      <p>Use this page only to capture the authorization code returned by TikTok.</p>
+      <section>
+        <h2>Authorization code</h2>
+        <pre id="codeBox">No code in query string.</pre>
+        <button type="button" id="copyButton">Copy code</button>
+      </section>
+      <section>
+        <h2>State</h2>
+        <pre id="stateBox">-</pre>
+      </section>
+      <p><a href="../../">Back to dashboard</a></p>
+    </main>
+    <script>
+      const params = new URLSearchParams(window.location.search);
+      const code = params.get('code') || 'No code in query string.';
+      const state = params.get('state') || '-';
+      document.getElementById('codeBox').textContent = code;
+      document.getElementById('stateBox').textContent = state;
+      document.getElementById('copyButton').addEventListener('click', async () => {
+        if (!params.get('code')) return;
+        await navigator.clipboard.writeText(params.get('code'));
+        document.getElementById('copyButton').textContent = 'Copied';
+      });
+    </script>
+  </body>
+</html>

@@ -58,6 +58,19 @@ function buildMultipartBody(fields, fileField) {
   };
 }
 
+function inferContentType(filePath, fallback = "application/octet-stream") {
+  const extension = String(path.extname(filePath || "")).toLowerCase();
+  const byExtension = {
+    ".json": "application/json",
+    ".txt": "text/plain",
+    ".mp4": "video/mp4",
+    ".mov": "video/quicktime",
+    ".webm": "video/webm",
+  };
+
+  return byExtension[extension] || fallback;
+}
+
 async function readJsonResponse(response, errorPrefix) {
   const raw = await response.text();
   const payload = raw ? JSON.parse(raw) : {};
@@ -121,6 +134,54 @@ async function uploadVideoToCloudinary(videoPath, options = {}) {
   };
 }
 
+async function uploadFileToCloudinary(filePath, options = {}) {
+  const cloudName = getRequiredEnv("CLOUDINARY_CLOUD_NAME");
+  const apiKey = getRequiredEnv("CLOUDINARY_API_KEY");
+  const apiSecret = getRequiredEnv("CLOUDINARY_API_SECRET");
+  const timestamp = Math.floor(Date.now() / 1000);
+  const resourceType = options.resourceType || "raw";
+  const folder = options.folder || process.env.CLOUDINARY_FOLDER || "bot-videos";
+  const publicId = sanitizePublicId(options.publicId || path.basename(filePath, path.extname(filePath)));
+  const paramsToSign = {
+    folder,
+    public_id: publicId,
+    timestamp,
+  };
+  const signature = buildCloudinarySignature(paramsToSign, apiSecret);
+  const multipart = buildMultipartBody(
+    {
+      api_key: apiKey,
+      folder,
+      public_id: publicId,
+      signature,
+      timestamp,
+    },
+    {
+      name: "file",
+      filename: path.basename(filePath),
+      contentType: options.contentType || inferContentType(filePath),
+      data: fs.readFileSync(filePath),
+    },
+  );
+
+  const response = await fetch(`https://api.cloudinary.com/v1_1/${cloudName}/${resourceType}/upload`, {
+    method: "POST",
+    headers: {
+      "Content-Type": `multipart/form-data; boundary=${multipart.boundary}`,
+    },
+    body: multipart.buffer,
+  });
+  const payload = await readJsonResponse(response, "Cloudinary file upload");
+
+  return {
+    publicId: payload.public_id,
+    resourceType: payload.resource_type || resourceType,
+    url: payload.secure_url || payload.url || null,
+    bytes: payload.bytes || null,
+    format: payload.format || null,
+  };
+}
+
 async function deleteCloudinaryAsset(publicId, resourceType = "video") {
   const cloudName = getRequiredEnv("CLOUDINARY_CLOUD_NAME");
   const apiKey = getRequiredEnv("CLOUDINARY_API_KEY");
@@ -153,6 +214,8 @@ module.exports = {
   buildMultipartBody,
   deleteCloudinaryAsset,
   hasCloudinaryConfig,
+  inferContentType,
   readJsonResponse,
+  uploadFileToCloudinary,
   uploadVideoToCloudinary,
 };
