@@ -5,6 +5,7 @@ const fs = require("fs");
 const path = require("path");
 const fetch = global.fetch || require("node-fetch");
 const { logArtifact, logStepEvent, readJsonIfExists, withOptionalPool } = require("./lib/script-observer");
+const { ensureFreshInstagramAccessToken, verifyInstagramAccessToken } = require("./lib/instagram-token");
 
 function fail(message) {
   console.error(`[upload-socials][error] ${message}`);
@@ -274,24 +275,6 @@ async function fetchInstagramJson(resourcePath, { method = "GET", query = {}, bo
   throw lastError || new Error(`${errorPrefix} failed`);
 }
 
-async function verifyInstagramAccessToken(accessToken, expectedUserId) {
-  const payload = await fetchInstagramJson("me", {
-    query: {
-      fields: "id,username",
-      access_token: accessToken,
-    },
-    errorPrefix: "Instagram token preflight",
-  });
-
-  if (expectedUserId && String(payload.id || "") !== String(expectedUserId)) {
-    throw new Error(
-      `Instagram token preflight returned unexpected user id ${payload.id || "unknown"} instead of ${expectedUserId}`,
-    );
-  }
-
-  return payload;
-}
-
 async function waitForInstagramContainer(accessToken, creationId) {
   const pollIntervalMs = Number(process.env.INSTAGRAM_CONTAINER_POLL_INTERVAL_MS || 5000);
   const maxAttempts = Number(process.env.INSTAGRAM_CONTAINER_POLL_MAX_ATTEMPTS || 24);
@@ -322,12 +305,31 @@ async function waitForInstagramContainer(accessToken, creationId) {
 
 async function uploadToInstagram(videoPath, scriptData) {
   const igUserId = getRequiredEnv("INSTAGRAM_IG_USER_ID");
-  const accessToken = getRequiredEnv("INSTAGRAM_ACCESS_TOKEN");
+  let accessToken = null;
   let videoUrl = process.env.INSTAGRAM_VIDEO_URL || null;
   let cloudinaryAsset = null;
   const caption = buildCaption(scriptData, "instagram");
+  const apiVersion = process.env.INSTAGRAM_GRAPH_API_VERSION || "v25.0";
 
-  await verifyInstagramAccessToken(accessToken, igUserId);
+  try {
+    const tokenInfo = await ensureFreshInstagramAccessToken({
+      logger: log,
+    });
+    accessToken = tokenInfo.accessToken;
+    await verifyInstagramAccessToken(accessToken, apiVersion, igUserId);
+  } catch (error) {
+    if (!String(error.message || "").includes('"code":190')) {
+      throw error;
+    }
+
+    log("instagram token preflight failed, trying forced refresh", { error: error.message });
+    const tokenInfo = await ensureFreshInstagramAccessToken({
+      logger: log,
+      forceRefresh: true,
+    });
+    accessToken = tokenInfo.accessToken;
+    await verifyInstagramAccessToken(accessToken, apiVersion, igUserId);
+  }
 
   if (!videoUrl) {
     cloudinaryAsset = await uploadVideoToCloudinary(videoPath, scriptData.topic_key || scriptData.title || null);

@@ -198,8 +198,20 @@ services:
         sync: false
       - key: INSTAGRAM_PUBLISH_ENABLED
         value: "true"
+      - key: INSTAGRAM_AUTO_REFRESH_TOKEN
+        value: "true"
       - key: INSTAGRAM_GRAPH_API_VERSION
         value: v25.0
+      - key: INSTAGRAM_APP_ID
+        sync: false
+      - key: INSTAGRAM_APP_SECRET
+        sync: false
+      - key: INSTAGRAM_REDIRECT_URI
+        value: https://localhost/
+      - key: INSTAGRAM_TOKEN_STATE_PATH
+        value: tmp/instagram-token-state.json
+      - key: INSTAGRAM_TOKEN_MIN_VALIDITY_SECONDS
+        value: "86400"
       - key: INSTAGRAM_IG_USER_ID
         sync: false
       - key: INSTAGRAM_ACCESS_TOKEN

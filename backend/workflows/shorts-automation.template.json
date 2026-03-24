@@ -166,6 +166,19 @@
     },
     {
       "parameters": {
+        "command": "node /app/scripts/refresh-instagram-token.js"
+      },
+      "id": "refresh-instagram-token",
+      "name": "Refresh Instagram Token",
+      "type": "n8n-nodes-base.executeCommand",
+      "typeVersion": 1,
+      "position": [
+        2540,
+        420
+      ]
+    },
+    {
+      "parameters": {
         "command": "node /app/scripts/upload-socials.js /tmp/bot-videos/final.mp4 /tmp/bot-videos/script.json /tmp/bot-videos/youtube-result.json /tmp/bot-videos/social-result.json"
       },
       "id": "upload-socials",

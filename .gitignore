@@ -11,4 +11,4 @@ exports/
 .n8n/
 n8n_data/
 *.log
-
+migration-output/

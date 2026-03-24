@@ -1,0 +1,52 @@
+name: Refresh Instagram Token
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "0 3 * * 1"
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install dependencies
+        run: npm ci --omit=dev
+
+      - name: Refresh token
+        env:
+          INSTAGRAM_AUTO_REFRESH_TOKEN: "true"
+          INSTAGRAM_GRAPH_API_VERSION: v25.0
+          INSTAGRAM_TOKEN_STATE_PATH: tmp/instagram-token-state.json
+          INSTAGRAM_ACCESS_TOKEN: ${{ secrets.INSTAGRAM_ACCESS_TOKEN }}
+          INSTAGRAM_APP_ID: ${{ secrets.INSTAGRAM_APP_ID }}
+          INSTAGRAM_APP_SECRET: ${{ secrets.INSTAGRAM_APP_SECRET }}
+          INSTAGRAM_REDIRECT_URI: ${{ secrets.INSTAGRAM_REDIRECT_URI }}
+        run: |
+          node backend/scripts/refresh-instagram-token.js > refresh-output.json
+          cat refresh-output.json
+
+      - name: Install GitHub CLI
+        run: sudo apt-get update && sudo apt-get install -y gh jq
+
+      - name: Update GitHub secrets
+        env:
+          GH_TOKEN: ${{ secrets.GH_ACTIONS_ADMIN_TOKEN }}
+        run: |
+          ACCESS_TOKEN=$(jq -r '.accessToken' refresh-output.json)
+          EXPIRES_AT=$(jq -r '.tokenExpiresAt' refresh-output.json)
+          if [ -z "$ACCESS_TOKEN" ] || [ "$ACCESS_TOKEN" = "null" ]; then
+            echo "Missing refreshed access token"
+            exit 1
+          fi
+          printf "%s" "$ACCESS_TOKEN" | gh secret set INSTAGRAM_ACCESS_TOKEN
+          printf "%s" "$EXPIRES_AT" | gh secret set INSTAGRAM_ACCESS_TOKEN_EXPIRES_AT
