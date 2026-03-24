@@ -4,6 +4,7 @@ const crypto = require("crypto");
 const fs = require("fs");
 const path = require("path");
 const fetch = global.fetch || require("node-fetch");
+const FormData = require("form-data");
 
 function getRequiredEnv(name) {
   const value = process.env[name];
@@ -30,32 +31,21 @@ function buildCloudinarySignature(params, apiSecret) {
 }
 
 function buildMultipartBody(fields, fileField) {
-  const boundary = `----factsengine${crypto.randomBytes(8).toString("hex")}`;
-  const chunks = [];
+  const form = new FormData();
 
   for (const [name, value] of Object.entries(fields || {})) {
-    chunks.push(Buffer.from(`--${boundary}\r\n`));
-    chunks.push(Buffer.from(`Content-Disposition: form-data; name="${name}"\r\n\r\n`));
-    chunks.push(Buffer.from(String(value)));
-    chunks.push(Buffer.from("\r\n"));
+    form.append(name, String(value));
   }
 
   if (fileField) {
-    chunks.push(Buffer.from(`--${boundary}\r\n`));
-    chunks.push(
-      Buffer.from(`Content-Disposition: form-data; name="${fileField.name}"; filename="${fileField.filename}"\r\n`),
-    );
-    chunks.push(Buffer.from(`Content-Type: ${fileField.contentType || "application/octet-stream"}\r\n\r\n`));
-    chunks.push(fileField.data);
-    chunks.push(Buffer.from("\r\n"));
+    form.append(fileField.name, fileField.data, {
+      filename: fileField.filename,
+      contentType: fileField.contentType || "application/octet-stream",
+      knownLength: fileField.knownLength || undefined,
+    });
   }
 
-  chunks.push(Buffer.from(`--${boundary}--\r\n`));
-
-  return {
-    boundary,
-    buffer: Buffer.concat(chunks),
-  };
+  return form;
 }
 
 function inferContentType(filePath, fallback = "application/octet-stream") {
@@ -112,16 +102,15 @@ async function uploadVideoToCloudinary(videoPath, options = {}) {
       name: "file",
       filename: path.basename(videoPath),
       contentType: "video/mp4",
-      data: fs.readFileSync(videoPath),
+      knownLength: fs.statSync(videoPath).size,
+      data: fs.createReadStream(videoPath),
     },
   );
 
   const response = await fetch(`https://api.cloudinary.com/v1_1/${cloudName}/video/upload`, {
     method: "POST",
-    headers: {
-      "Content-Type": `multipart/form-data; boundary=${multipart.boundary}`,
-    },
-    body: multipart.buffer,
+    headers: multipart.getHeaders(),
+    body: multipart,
   });
   const payload = await readJsonResponse(response, "Cloudinary upload");
 
@@ -160,16 +149,15 @@ async function uploadFileToCloudinary(filePath, options = {}) {
       name: "file",
       filename: path.basename(filePath),
       contentType: options.contentType || inferContentType(filePath),
-      data: fs.readFileSync(filePath),
+      knownLength: fs.statSync(filePath).size,
+      data: fs.createReadStream(filePath),
     },
   );
 
   const response = await fetch(`https://api.cloudinary.com/v1_1/${cloudName}/${resourceType}/upload`, {
     method: "POST",
-    headers: {
-      "Content-Type": `multipart/form-data; boundary=${multipart.boundary}`,
-    },
-    body: multipart.buffer,
+    headers: multipart.getHeaders(),
+    body: multipart,
   });
   const payload = await readJsonResponse(response, "Cloudinary file upload");
 

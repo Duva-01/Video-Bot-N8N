@@ -2,7 +2,7 @@ require("dotenv").config();
 
 const fs = require("fs");
 const path = require("path");
-const { hasCloudinaryConfig, uploadFileToCloudinary, uploadVideoToCloudinary } = require("./cloudinary-utils");
+const { hasCloudinaryConfig, uploadVideoToCloudinary } = require("./cloudinary-utils");
 
 function sanitizeFileStem(value) {
   return String(value || "manual")
@@ -27,10 +27,6 @@ function getManualPublishDir(videoPath) {
 
 function getCloudinaryStatePath(baseDir) {
   return path.join(baseDir, "cloudinary-video.json");
-}
-
-function getCloudinaryMetadataStatePath(baseDir) {
-  return path.join(baseDir, "cloudinary-metadata.json");
 }
 
 function readJsonIfExists(filePath) {
@@ -68,49 +64,6 @@ async function ensureCloudinaryFallbackVideo(videoPath, scriptData = {}, logger 
   return asset;
 }
 
-async function ensureCloudinaryFallbackMetadata(baseDir, scriptData = {}, txtPath, jsonPath, logger = () => {}) {
-  const statePath = getCloudinaryMetadataStatePath(baseDir);
-  const existing = readJsonIfExists(statePath);
-  if (existing?.txt?.url || existing?.json?.url) {
-    return existing;
-  }
-
-  if (!hasCloudinaryConfig()) {
-    return {
-      txt: null,
-      json: null,
-    };
-  }
-
-  const topicKey = scriptData.topic_key || scriptData.title || "manual";
-  const stem = sanitizeFileStem(topicKey);
-  const [txtAsset, jsonAsset] = await Promise.all([
-    uploadFileToCloudinary(txtPath, {
-      resourceType: "raw",
-      publicId: `${stem}-manual-caption`,
-      contentType: "text/plain",
-    }),
-    uploadFileToCloudinary(jsonPath, {
-      resourceType: "raw",
-      publicId: `${stem}-manual-data`,
-      contentType: "application/json",
-    }),
-  ]);
-
-  const payload = {
-    txt: txtAsset,
-    json: jsonAsset,
-  };
-
-  fs.writeFileSync(statePath, JSON.stringify(payload, null, 2));
-  logger("manual fallback metadata stored in cloudinary", {
-    txtUrl: txtAsset?.url || null,
-    jsonUrl: jsonAsset?.url || null,
-  });
-
-  return payload;
-}
-
 function buildManualText(payload) {
   const lines = [
     `Platform: ${payload.platform}`,
@@ -143,18 +96,6 @@ async function writeManualPublishFallback({
 }) {
   const baseDir = getManualPublishDir(videoPath);
   const stem = sanitizeFileStem(platform || "manual");
-  let cloudinaryAsset = null;
-  let cloudinaryError = null;
-
-  try {
-    cloudinaryAsset = await ensureCloudinaryFallbackVideo(videoPath, scriptData, logger);
-  } catch (innerError) {
-    cloudinaryError = innerError.message;
-    logger("manual fallback cloudinary upload skipped", {
-      platform,
-      error: innerError.message,
-    });
-  }
 
   const payload = {
     platform,
@@ -163,10 +104,7 @@ async function writeManualPublishFallback({
     title: title || scriptData.title || "",
     description: description || scriptData.description || "",
     caption: caption || "",
-    videoUrl: cloudinaryAsset?.url || null,
-    cloudinaryPublicId: cloudinaryAsset?.publicId || null,
-    cloudinaryResourceType: cloudinaryAsset?.resourceType || null,
-    cloudinaryError,
+    videoUrl: null,
     localVideoPath: path.resolve(videoPath),
     error: error || null,
     topicKey: scriptData.topic_key || null,
@@ -178,26 +116,13 @@ async function writeManualPublishFallback({
   fs.writeFileSync(jsonPath, JSON.stringify(payload, null, 2));
   fs.writeFileSync(txtPath, buildManualText(payload));
 
-  let cloudinaryTextAssets = {
-    txt: null,
-    json: null,
-  };
-  try {
-    cloudinaryTextAssets = await ensureCloudinaryFallbackMetadata(baseDir, scriptData, txtPath, jsonPath, logger);
-  } catch (innerError) {
-    logger("manual fallback metadata cloudinary upload skipped", {
-      platform,
-      error: innerError.message,
-    });
-  }
-
   return {
     ...payload,
     dir: baseDir,
     jsonPath,
     txtPath,
-    txtUrl: cloudinaryTextAssets?.txt?.url || null,
-    jsonUrl: cloudinaryTextAssets?.json?.url || null,
+    txtUrl: null,
+    jsonUrl: null,
   };
 }
 
