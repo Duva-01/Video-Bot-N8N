@@ -18,6 +18,7 @@ RUN npm ci --omit=dev
 
 COPY backend/services ./services
 COPY backend/public ./public
+COPY backend/assets ./assets
 COPY backend/scripts ./scripts
 COPY backend/data ./data
 COPY backend/workflows ./workflows

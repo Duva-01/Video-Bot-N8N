@@ -35,6 +35,36 @@ function extractJson(text) {
   fail("Model response did not contain valid JSON text");
 }
 
+function cleanSentence(value) {
+  return String(value || "")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function ensurePunctuation(value) {
+  const cleaned = cleanSentence(value);
+  if (!cleaned) {
+    return "";
+  }
+
+  return /[.!?…]$/.test(cleaned) ? cleaned : `${cleaned}.`;
+}
+
+function buildNarration(parsed, fallbackCta) {
+  if (cleanSentence(parsed.narration)) {
+    return cleanSentence(parsed.narration);
+  }
+
+  const parts = [
+    ensurePunctuation(parsed.hook),
+    ensurePunctuation(parsed.setup),
+    ensurePunctuation(parsed.payoff),
+    ensurePunctuation(parsed.cta_line || fallbackCta),
+  ].filter(Boolean);
+
+  return parts.join(" ");
+}
+
 async function main() {
   const outputPath = process.argv[2] || "/tmp/bot-videos/script.json";
   const topicFilePath = process.argv[3] && process.argv[3].endsWith(".json") ? process.argv[3] : null;
@@ -63,12 +93,20 @@ async function main() {
     "No repitas el tema de forma generica; enfoca el guion en el angulo concreto indicado.",
     "No menciones portfolio, servicios, clientes, productos SaaS ni llamadas a contratar nada.",
     "No metas introducciones largas, relleno, ni opiniones.",
+    "La narracion debe abrir con un hook fuerte en la primera frase.",
+    "Estructura obligatoria: hook corto, contexto minimo, dato sorprendente y cierre/remate.",
+    "El hook debe despertar curiosidad o contradiccion en menos de 10 palabras.",
+    "La narracion completa debe sonar natural, compacta y lista para locucion vertical.",
     "Devuelve solo JSON valido, sin markdown ni explicaciones.",
     "Schema esperado:",
     "{",
     '  "title": "titulo corto y atractivo",',
     '  "description": "descripcion corta para publicacion",',
-    '  "narration": "texto completo para locucion en menos de 90 palabras",',
+    '  "hook": "frase inicial con tension o curiosidad en menos de 10 palabras",',
+    '  "setup": "1 o 2 frases que den contexto rapido",',
+    '  "payoff": "frase final con el dato o giro principal",',
+    '  "cta_line": "cierre opcional muy corto alineado con el CTA dado",',
+    '  "narration": "texto completo para locucion, integrando hook, setup, payoff y cierre, en menos de 90 palabras",',
     '  "visual_keywords": ["keyword1", "keyword2", "keyword3", "keyword4"],',
     '  "search_query": "consulta breve para buscar clips en Pexels",',
     '  "tags": ["tag1", "tag2", "tag3", "tag4"]',
@@ -96,6 +134,7 @@ async function main() {
     outputText = result.text;
 
     const parsed = JSON.parse(extractJson(outputText));
+    const narration = buildNarration(parsed, cta);
     const payload = {
       topic_key: topicKey,
       topic_source: topicFile?.source || "catalog",
@@ -108,7 +147,11 @@ async function main() {
       language,
       title: parsed.title,
       description: parsed.description,
-      narration: parsed.narration,
+      hook: cleanSentence(parsed.hook),
+      setup: cleanSentence(parsed.setup),
+      payoff: cleanSentence(parsed.payoff),
+      cta_line: cleanSentence(parsed.cta_line || cta),
+      narration,
       visual_keywords: Array.isArray(parsed.visual_keywords) ? parsed.visual_keywords : [],
       search_query: parsed.search_query || topicFile?.search_hint || topic,
       tags: Array.isArray(parsed.tags) ? parsed.tags : [],
@@ -141,6 +184,7 @@ async function main() {
           provider,
           model,
           title: payload.title,
+          hook: payload.hook,
           search_query: payload.search_query,
           tag_count: payload.tags.length,
         },
@@ -150,6 +194,7 @@ async function main() {
     log("script generation completed", {
       outputPath,
       title: payload.title,
+      hook: payload.hook,
       searchQuery: payload.search_query,
       provider,
     });

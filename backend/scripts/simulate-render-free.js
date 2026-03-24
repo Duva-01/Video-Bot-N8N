@@ -81,9 +81,9 @@ async function startContainer() {
     `node backend/scripts/select-fact-topic.js ${workDirInContainer}/tmp/render-free-sim/topic.json`,
     `node backend/scripts/generate-script.js ${workDirInContainer}/tmp/render-free-sim/script.json ${workDirInContainer}/tmp/render-free-sim/topic.json`,
     `node backend/scripts/generate-voice.js ${workDirInContainer}/tmp/render-free-sim/script.json ${workDirInContainer}/tmp/render-free-sim/narration.wav`,
-    `node backend/scripts/generate-subtitles.js ${workDirInContainer}/tmp/render-free-sim/script.json ${workDirInContainer}/tmp/render-free-sim/narration.wav ${workDirInContainer}/tmp/render-free-sim/subtitles.srt`,
+    `node backend/scripts/generate-subtitles.js ${workDirInContainer}/tmp/render-free-sim/script.json ${workDirInContainer}/tmp/render-free-sim/narration.wav ${workDirInContainer}/tmp/render-free-sim/subtitles.ass`,
     `node backend/scripts/fetch-pexels.js ${workDirInContainer}/tmp/render-free-sim/script.json ${workDirInContainer}/tmp/render-free-sim/clips`,
-    `bash backend/scripts/build-short.sh ${workDirInContainer}/tmp/render-free-sim/final.mp4 ${workDirInContainer}/tmp/render-free-sim/narration.wav ${workDirInContainer}/tmp/render-free-sim/clips ${workDirInContainer}/tmp/render-free-sim/subtitles.srt`,
+    `bash backend/scripts/build-short.sh ${workDirInContainer}/tmp/render-free-sim/final.mp4 ${workDirInContainer}/tmp/render-free-sim/narration.wav ${workDirInContainer}/tmp/render-free-sim/clips ${workDirInContainer}/tmp/render-free-sim/subtitles.ass`,
   ].join(" && ");
 
   const workspaceMount = `${rootDir.replace(/\\/g, "/")}:/workspace`;
