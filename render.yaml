@@ -161,23 +161,29 @@ services:
       - key: RENDER_LOW_MEMORY_MODE
         value: "true"
       - key: SHORTS_WIDTH
-        value: "540"
+        value: "432"
       - key: SHORTS_HEIGHT
-        value: "960"
+        value: "768"
       - key: SHORTS_FPS
-        value: "20"
+        value: "18"
       - key: FFMPEG_THREADS
         value: "1"
       - key: FFMPEG_PRESET
         value: ultrafast
       - key: FFMPEG_CRF
-        value: "30"
+        value: "32"
       - key: FFMPEG_VIDEO_BITRATE
-        value: 1200k
+        value: 900k
       - key: FFMPEG_AUDIO_BITRATE
-        value: 64k
+        value: 48k
       - key: FFMPEG_AUDIO_RATE
         value: "22050"
+      - key: FFMPEG_X264_TUNE
+        value: zerolatency
+      - key: SFX_ENABLED
+        value: "false"
+      - key: CLIP_TRANSITIONS_ENABLED
+        value: "false"
       - key: YOUTUBE_CLIENT_ID
         sync: false
       - key: YOUTUBE_CLIENT_SECRET

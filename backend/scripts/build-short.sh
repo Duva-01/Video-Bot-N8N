@@ -34,18 +34,25 @@ AUDIO_RATE="${FFMPEG_AUDIO_RATE:-24000}"
 X264_PARAMS="${FFMPEG_X264_PARAMS:-rc-lookahead=0:sync-lookahead=0:ref=1:bframes=0}"
 OUTRO_ENABLED="${OUTRO_ENABLED:-false}"
 OUTRO_VIDEO_FILE="${OUTRO_VIDEO_FILE:-/app/assets/video/outro.mp4}"
+SFX_ENABLED="${SFX_ENABLED:-true}"
+TRANSITIONS_ENABLED="${CLIP_TRANSITIONS_ENABLED:-true}"
+SUBTITLES_ENABLED="${SUBTITLES_ENABLED:-true}"
+X264_TUNE="${FFMPEG_X264_TUNE:-}"
 
 if [[ "$LOW_MEMORY_MODE" == "true" ]]; then
-  WIDTH="${SHORTS_WIDTH:-540}"
-  HEIGHT="${SHORTS_HEIGHT:-960}"
-  FPS="${SHORTS_FPS:-20}"
+  WIDTH="${SHORTS_WIDTH:-432}"
+  HEIGHT="${SHORTS_HEIGHT:-768}"
+  FPS="${SHORTS_FPS:-18}"
   THREADS="${FFMPEG_THREADS:-1}"
   PRESET="${FFMPEG_PRESET:-ultrafast}"
-  CRF="${FFMPEG_CRF:-30}"
-  VIDEO_BITRATE="${FFMPEG_VIDEO_BITRATE:-1200k}"
-  AUDIO_BITRATE="${FFMPEG_AUDIO_BITRATE:-64k}"
+  CRF="${FFMPEG_CRF:-32}"
+  VIDEO_BITRATE="${FFMPEG_VIDEO_BITRATE:-900k}"
+  AUDIO_BITRATE="${FFMPEG_AUDIO_BITRATE:-48k}"
   AUDIO_RATE="${FFMPEG_AUDIO_RATE:-22050}"
-  X264_PARAMS="${FFMPEG_X264_PARAMS:-rc-lookahead=0:sync-lookahead=0:ref=1:bframes=0:me=dia:subme=0}"
+  X264_PARAMS="${FFMPEG_X264_PARAMS:-rc-lookahead=0:sync-lookahead=0:ref=1:bframes=0:me=dia:subme=0:trellis=0:aq-mode=0}"
+  SFX_ENABLED="${SFX_ENABLED:-false}"
+  TRANSITIONS_ENABLED="${CLIP_TRANSITIONS_ENABLED:-false}"
+  X264_TUNE="${FFMPEG_X264_TUNE:-zerolatency}"
 fi
 
 X264_PARAMS="${X264_PARAMS}:threads=${THREADS}"
@@ -106,7 +113,7 @@ if [[ -n "$SUBTITLE_FILE" ]]; then
     fi
   fi
   SFX_EVENTS_FILE="${SUBTITLE_FILE%.ass}.events.json"
-  if [[ -f "$SFX_EVENTS_FILE" ]]; then
+  if [[ -f "$SFX_EVENTS_FILE" && "$SFX_ENABLED" == "true" ]]; then
     SFX_AUDIO_FILE="$TMP_DIR/sfx.wav"
     HOOK_TRANSITION_TIME="$(node -e "const fs=require('fs'); const data=JSON.parse(fs.readFileSync(process.argv[1],'utf8')); const value=Number(data.hookDuration || 0); if (Number.isFinite(value) && value > 0) process.stdout.write(value.toFixed(3));" "$SFX_EVENTS_FILE")"
     log "Generando pista de efectos"
@@ -122,6 +129,9 @@ log "Clips: $CLIPS_DIR"
 log "Salida: $OUTPUT_FILE"
 log "Modo memoria reducida: $LOW_MEMORY_MODE"
 log "Resolucion: ${WIDTH}x${HEIGHT} @ ${FPS}fps"
+log "SFX habilitados: $SFX_ENABLED"
+log "Transiciones habilitadas: $TRANSITIONS_ENABLED"
+log "Subtitulos habilitados: $SUBTITLES_ENABLED"
 
 log "Normalizando clips base"
 ffmpeg -y \
@@ -134,9 +144,12 @@ ffmpeg -y \
   -vf "$VIDEO_FILTER" \
   -c:v libx264 \
   -preset "$PRESET" \
+  ${X264_TUNE:+-tune "$X264_TUNE"} \
   -crf "$CRF" \
   -maxrate "$VIDEO_BITRATE" \
   -bufsize "$VIDEO_BITRATE" \
+  -g "$((FPS * 2))" \
+  -keyint_min "$FPS" \
   -x264-params "$X264_PARAMS" \
   -movflags +faststart \
   "$BASE_VIDEO"
@@ -146,11 +159,11 @@ AUDIO_DURATION="$(ffprobe -v error -show_entries format=duration -of csv=p=0 "$A
 
 FINAL_FILTER="$FILTER"
 
-if [[ -n "$SUBTITLE_FILE" ]]; then
+if [[ -n "$SUBTITLE_FILE" && "$SUBTITLES_ENABLED" == "true" ]]; then
   FINAL_FILTER="${FINAL_FILTER},subtitles=${SUBTITLE_FILE}"
 fi
 
-if [[ ( ${#TRANSITION_TIMES[@]} -gt 0 || -n "$HOOK_TRANSITION_TIME" ) ]] && [[ "${CLIP_TRANSITIONS_ENABLED:-true}" != "false" ]]; then
+if [[ ( ${#TRANSITION_TIMES[@]} -gt 0 || -n "$HOOK_TRANSITION_TIME" ) ]] && [[ "$TRANSITIONS_ENABLED" != "false" ]]; then
   FLASH_DURATION="${CLIP_TRANSITION_FLASH_DURATION:-0.14}"
   FLASH_LEAD="${CLIP_TRANSITION_FLASH_LEAD:-0.05}"
   FLASH_TRAIL="$(awk "BEGIN {printf \"%.3f\", $FLASH_DURATION - $FLASH_LEAD}")"
@@ -221,9 +234,12 @@ if [[ -n "$SFX_AUDIO_FILE" && -f "$SFX_AUDIO_FILE" ]]; then
     -map "[aout]" \
     -c:v libx264 \
     -preset "$PRESET" \
+    ${X264_TUNE:+-tune "$X264_TUNE"} \
     -crf "$CRF" \
     -maxrate "$VIDEO_BITRATE" \
     -bufsize "$VIDEO_BITRATE" \
+    -g "$((FPS * 2))" \
+    -keyint_min "$FPS" \
     -x264-params "$X264_PARAMS" \
     -c:a aac \
     -b:a "$AUDIO_BITRATE" \
@@ -243,9 +259,12 @@ else
     -map 1:a:0 \
     -c:v libx264 \
     -preset "$PRESET" \
+    ${X264_TUNE:+-tune "$X264_TUNE"} \
     -crf "$CRF" \
     -maxrate "$VIDEO_BITRATE" \
     -bufsize "$VIDEO_BITRATE" \
+    -g "$((FPS * 2))" \
+    -keyint_min "$FPS" \
     -x264-params "$X264_PARAMS" \
     -c:a aac \
     -b:a "$AUDIO_BITRATE" \
@@ -272,9 +291,12 @@ if [[ "$OUTRO_ENABLED" == "true" && -f "$OUTRO_VIDEO_FILE" ]]; then
     -vf "$FILTER" \
     -c:v libx264 \
     -preset "$PRESET" \
+    ${X264_TUNE:+-tune "$X264_TUNE"} \
     -crf "$CRF" \
     -maxrate "$VIDEO_BITRATE" \
     -bufsize "$VIDEO_BITRATE" \
+    -g "$((FPS * 2))" \
+    -keyint_min "$FPS" \
     -x264-params "$X264_PARAMS" \
     -c:a aac \
     -b:a "$AUDIO_BITRATE" \
