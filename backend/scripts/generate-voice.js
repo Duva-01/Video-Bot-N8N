@@ -442,6 +442,71 @@ async function runElevenLabsTts({ text, topicKey, outputPath }) {
   log("voice generation completed", { outputPath, bytes: buffer.length, provider: "elevenlabs", voiceId, modelId });
 }
 
+async function runDeepgramTts({ text, topicKey, outputPath }) {
+  const apiKey = getRequiredEnv("DEEPGRAM_API_KEY");
+  const model = process.env.DEEPGRAM_TTS_MODEL || "aura-2-nestor-es";
+  const encoding = process.env.DEEPGRAM_TTS_ENCODING || "linear16";
+  const container = process.env.DEEPGRAM_TTS_CONTAINER || "wav";
+  const sampleRate = process.env.DEEPGRAM_TTS_SAMPLE_RATE || "24000";
+
+  const response = await fetch(
+    `https://api.deepgram.com/v1/speak?model=${encodeURIComponent(model)}&encoding=${encodeURIComponent(
+      encoding,
+    )}&container=${encodeURIComponent(container)}&sample_rate=${encodeURIComponent(sampleRate)}`,
+    {
+      method: "POST",
+      headers: {
+        Authorization: `Token ${apiKey}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ text }),
+    },
+  );
+
+  if (!response.ok) {
+    throw new Error(`Deepgram TTS request failed with status ${response.status}: ${await response.text()}`);
+  }
+
+  const buffer = Buffer.from(await response.arrayBuffer());
+  fs.writeFileSync(outputPath, buffer);
+
+  await withOptionalPool(async (pool) => {
+    await logArtifact(pool, {
+      topic_key: topicKey,
+      artifact_type: "voice_track",
+      label: "Narration audio",
+      file_path: outputPath,
+      mime_type: "audio/wav",
+      metadata: { provider: "deepgram", model, encoding, container, sampleRate: Number(sampleRate) },
+    });
+    await logStepEvent(pool, {
+      topic_key: topicKey,
+      event_type: "step_completed",
+      stage: "generate_voice",
+      source: "generate-voice",
+      message: "Voice generated",
+      metadata: {
+        provider: "deepgram",
+        model,
+        encoding,
+        container,
+        sampleRate: Number(sampleRate),
+        bytes: buffer.length,
+      },
+    });
+  });
+
+  log("voice generation completed", {
+    outputPath,
+    bytes: buffer.length,
+    provider: "deepgram",
+    model,
+    encoding,
+    container,
+    sampleRate: Number(sampleRate),
+  });
+}
+
 function normalizeProviderName(provider) {
   const value = String(provider || "").trim().toLowerCase();
   if (!value) {
@@ -518,6 +583,11 @@ async function runProvider(provider, context) {
 
   if (provider === "elevenlabs") {
     await runElevenLabsTts(context);
+    return;
+  }
+
+  if (provider === "deepgram") {
+    await runDeepgramTts(context);
     return;
   }
 

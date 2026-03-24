@@ -61,7 +61,7 @@ services:
       - key: TTS_PROVIDER
         value: gemini
       - key: TTS_PROVIDER_CHAIN
-        value: gemini,cloudflare,espeak
+        value: gemini,cloudflare,elevenlabs,deepgram,espeak
       - key: TTS_FALLBACK_ENABLED
         value: "true"
       - key: TTS_FALLBACK_PROVIDER
@@ -134,6 +134,16 @@ services:
         sync: false
       - key: ELEVENLABS_MODEL_ID
         value: eleven_multilingual_v2
+      - key: DEEPGRAM_API_KEY
+        sync: false
+      - key: DEEPGRAM_TTS_MODEL
+        value: aura-2-alvaro-es
+      - key: DEEPGRAM_TTS_ENCODING
+        value: linear16
+      - key: DEEPGRAM_TTS_CONTAINER
+        value: wav
+      - key: DEEPGRAM_TTS_SAMPLE_RATE
+        value: "24000"
       - key: PEXELS_API_KEY
         sync: false
       - key: PEXELS_CLIPS_COUNT
