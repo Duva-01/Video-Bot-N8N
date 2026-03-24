@@ -61,11 +61,11 @@ services:
       - key: TTS_PROVIDER
         value: gemini
       - key: TTS_PROVIDER_CHAIN
-        value: gemini,cloudflare,piper,espeak
+        value: gemini,cloudflare,espeak
       - key: TTS_FALLBACK_ENABLED
         value: "true"
       - key: TTS_FALLBACK_PROVIDER
-        value: piper
+        value: espeak
       - key: PIPER_VOICE
         value: es_ES-carlfm-x_low
       - key: PIPER_DATA_DIR

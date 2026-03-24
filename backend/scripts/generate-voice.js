@@ -480,7 +480,7 @@ function resolveProviderChain() {
 
   const primaryProvider = normalizeProviderName(getDefaultProvider());
   const fallbackEnabled = (process.env.TTS_FALLBACK_ENABLED || "true") === "true";
-  const fallbackProvider = normalizeProviderName(process.env.TTS_FALLBACK_PROVIDER || "piper");
+  const fallbackProvider = normalizeProviderName(process.env.TTS_FALLBACK_PROVIDER || "espeak");
   const providers = [primaryProvider];
 
   if (fallbackEnabled && fallbackProvider) {
