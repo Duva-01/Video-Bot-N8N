@@ -1,7 +1,6 @@
 (function () {
   const TOKEN_KEY = "facts_engine_token";
   const API_BASE_KEY = "facts_engine_api_base";
-  const config = window.FACTS_APP_CONFIG || {};
   const views = ["global", "youtube", "instagram", "tiktok", "console"];
 
   const loginView = document.getElementById("loginView");
@@ -13,16 +12,15 @@
   const passwordInput = document.getElementById("password");
   const refreshButton = document.getElementById("refreshButton");
   const logoutButton = document.getElementById("logoutButton");
-  const backendLabelNode = document.getElementById("backendLabel");
 
   let refreshTimer = null;
 
-  function qs(id) {
+  function byId(id) {
     return document.getElementById(id);
   }
 
   function getApiBaseUrl() {
-    return String(window.localStorage.getItem(API_BASE_KEY) || config.API_BASE_URL || "").replace(/\/+$/, "");
+    return String(window.localStorage.getItem(API_BASE_KEY) || "").replace(/\/+$/, "");
   }
 
   function setApiBaseUrl(value) {
@@ -44,8 +42,17 @@
   }
 
   function setAuthenticated(authenticated) {
-    loginView.style.display = authenticated ? "none" : "grid";
+    loginView.style.display = authenticated ? "none" : "block";
     appView.classList.toggle("app-shell--hidden", !authenticated);
+  }
+
+  function escapeHtml(value) {
+    return String(value || "")
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;")
+      .replace(/'/g, "&#39;");
   }
 
   function formatDate(value) {
@@ -59,47 +66,51 @@
     if (!value) return "-";
     const date = new Date(value);
     if (Number.isNaN(date.getTime())) return "-";
-    return new Intl.DateTimeFormat("es-ES", { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" }).format(date);
+    return new Intl.DateTimeFormat("es-ES", { month: "short", day: "numeric" }).format(date);
   }
 
-  function escapeHtml(value) {
-    return String(value || "")
-      .replace(/&/g, "&amp;")
-      .replace(/</g, "&lt;")
-      .replace(/>/g, "&gt;")
-      .replace(/"/g, "&quot;")
-      .replace(/'/g, "&#39;");
+  function formatNumber(value) {
+    return new Intl.NumberFormat("es-ES", { notation: "compact", maximumFractionDigits: 1 }).format(Number(value || 0));
   }
 
-  function getStatusClass(status) {
-    const normalized = String(status || "").toLowerCase();
-    if (["published", "success", "completed", "publish_complete", "on"].includes(normalized)) return "status-pill status-pill--success";
-    if (["failed", "error", "off"].includes(normalized)) return "status-pill status-pill--error";
-    if (["running", "generated", "selected", "pending", "warning"].includes(normalized)) return "status-pill status-pill--warn";
-    return "status-pill status-pill--idle";
+  function getStatusClass(state) {
+    const normalized = String(state || "").toLowerCase();
+    if (["ok", "active", "available", "published", "connected"].includes(normalized)) {
+      return "status-pill status-pill--success";
+    }
+    if (["warning", "limited", "configured"].includes(normalized)) {
+      return "status-pill status-pill--warn";
+    }
+    return "status-pill status-pill--error";
   }
 
-  function getConnectionStateClass(connected, enabled) {
-    if (connected && enabled) return "status-pill status-pill--success";
-    if (connected) return "status-pill status-pill--warn";
-    return "status-pill status-pill--idle";
+  function platformAccent(platformKey) {
+    if (platformKey === "youtube") return "#ff5a36";
+    if (platformKey === "instagram") return "#f0ba49";
+    return "#11b18a";
   }
 
   async function apiFetch(path, options = {}) {
     const token = getToken();
     const baseUrl = getApiBaseUrl();
-    if (!baseUrl) throw new Error("Missing API_BASE_URL");
+    if (!baseUrl) {
+      throw new Error("Missing API base URL");
+    }
 
     const headers = { accept: "application/json", ...(options.headers || {}) };
-    if (token) headers.Authorization = `Bearer ${token}`;
+    if (token) {
+      headers.Authorization = `Bearer ${token}`;
+    }
 
     const response = await fetch(`${baseUrl}${path}`, { ...options, headers });
     const payload = await response.json().catch(() => ({}));
-    if (!response.ok) throw new Error(payload.error || `Request failed with status ${response.status}`);
+    if (!response.ok) {
+      throw new Error(payload.error || `Request failed with status ${response.status}`);
+    }
     return payload;
   }
 
-  function setActiveView(view, pushHistory) {
+  function setActiveView(view, syncUrl) {
     const selected = views.includes(view) ? view : "global";
     document.querySelectorAll("[data-view-panel]").forEach((panel) => {
       panel.classList.toggle("view--active", panel.getAttribute("data-view-panel") === selected);
@@ -108,504 +119,584 @@
       button.classList.toggle("nav-tab--active", button.getAttribute("data-view") === selected);
     });
 
-    if (pushHistory) {
+    if (syncUrl) {
       const url = new URL(window.location.href);
       url.searchParams.set("view", selected);
       window.history.replaceState({}, "", url);
     }
   }
 
-  function normalizeRecentItem(item) {
-    return {
-      topicKey: item?.topic_key || "-",
-      title: item?.title || item?.topic || item?.topic_key || "Untitled",
-      category: item?.category || "-",
-      stage: item?.current_stage || "-",
-      status: item?.status || "unknown",
-      updatedAt: item?.published_at || item?.updated_at || item?.selected_at || null,
-      metadata: item?.metadata || {},
-      youtubeUrl: item?.youtube_url || null,
-      youtubeVideoId: item?.youtube_video_id || null,
-      tiktokStatus: item?.tiktok_status || null,
-      tiktokPublishId: item?.tiktok_publish_id || null,
-    };
+  function makeKpiCards(items) {
+    if (!items.length) {
+      return '<div class="empty-state">No metrics yet.</div>';
+    }
+
+    return items
+      .map(
+        (item) => `
+          <article class="kpi-card">
+            <span>${escapeHtml(item.label)}</span>
+            <strong>${escapeHtml(item.value)}</strong>
+            ${item.note ? `<p>${escapeHtml(item.note)}</p>` : ""}
+          </article>
+        `,
+      )
+      .join("");
   }
 
-  function getPlatformResult(item, platformKey) {
-    const metadata = item?.metadata || {};
-    const socialPosts = metadata.social_posts || {};
-
-    if (platformKey === "youtube") {
-      const youtubeResult = metadata.youtube_result || {};
-      return {
-        status: item.youtubeUrl || item.youtubeVideoId ? "published" : youtubeResult.status || item.status || "unknown",
-        url: item.youtubeUrl || youtubeResult.url || null,
-        error: youtubeResult.error || null,
-        manualFallback: youtubeResult.manualFallback || null,
-      };
+  function createLineChart(series, valueKey, color) {
+    if (!Array.isArray(series) || series.length === 0) {
+      return '<div class="empty-state small-empty">No time series available.</div>';
     }
 
-    if (platformKey === "instagram") {
-      const instagram = socialPosts.instagram || {};
-      return {
-        status: instagram.status || "unknown",
-        url: instagram.url || null,
-        error: instagram.error || null,
-        manualFallback: instagram.manualFallback || null,
-      };
-    }
+    const width = 640;
+    const height = 220;
+    const padding = 20;
+    const values = series.map((item) => Number(item[valueKey] || 0));
+    const max = Math.max(...values, 1);
+    const stepX = values.length === 1 ? 0 : (width - padding * 2) / (values.length - 1);
 
-    const tiktok = socialPosts.tiktok || {};
-    return {
-      status: tiktok.status || item.tiktokStatus || "unknown",
-      url: tiktok.url || null,
-      error: tiktok.error || null,
-      manualFallback: tiktok.manualFallback || null,
-      publishId: tiktok.publishId || item.tiktokPublishId || null,
-    };
-  }
+    const points = values
+      .map((value, index) => {
+        const x = padding + index * stepX;
+        const y = height - padding - (value / max) * (height - padding * 2);
+        return `${x},${y}`;
+      })
+      .join(" ");
 
-  function renderSimpleCard(nodeId, item, platformKey) {
-    const node = qs(nodeId);
-    if (!node) return;
+    const labels = series
+      .filter((_, index) => index === 0 || index === series.length - 1 || index === Math.floor(series.length / 2))
+      .map((item, index) => {
+        const sourceIndex = index === 0 ? 0 : index === 1 && series.length > 2 ? Math.floor(series.length / 2) : series.length - 1;
+        const x = padding + sourceIndex * stepX;
+        return `<text x="${x}" y="${height - 4}" text-anchor="middle">${escapeHtml(
+          formatCompactDate(item.date || item.publishedAt || item.label),
+        )}</text>`;
+      })
+      .join("");
 
-    if (!item) {
-      node.innerHTML = '<div class="empty-state small-empty">No data yet.</div>';
-      return;
-    }
-
-    const normalized = normalizeRecentItem(item);
-    const result = platformKey ? getPlatformResult(normalized, platformKey) : null;
-    const actionUrl = result?.url || normalized.youtubeUrl || null;
-
-    node.innerHTML = `
-      <article class="story-card">
-        <div class="story-card__meta">
-          <span>${escapeHtml(normalized.category)}</span>
-          <span>${escapeHtml(formatCompactDate(normalized.updatedAt))}</span>
-        </div>
-        <h4>${escapeHtml(normalized.title)}</h4>
-        <div class="story-card__actions">
-          <span class="${getStatusClass(result?.status || normalized.status)}">${escapeHtml(result?.status || normalized.status)}</span>
-          ${actionUrl ? `<a href="${escapeHtml(actionUrl)}" target="_blank" rel="noreferrer">Open</a>` : ""}
-        </div>
-      </article>
+    return `
+      <svg class="line-chart" viewBox="0 0 ${width} ${height}" role="img" aria-label="${escapeHtml(valueKey)} chart">
+        <defs>
+          <linearGradient id="chart-gradient-${escapeHtml(valueKey)}" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stop-color="${color}" stop-opacity="0.32"></stop>
+            <stop offset="100%" stop-color="${color}" stop-opacity="0"></stop>
+          </linearGradient>
+        </defs>
+        <polyline class="line-chart__grid" points="${padding},${padding} ${padding},${height - padding} ${width - padding},${height - padding}"></polyline>
+        <polyline class="line-chart__area" points="${padding},${height - padding} ${points} ${width - padding},${height - padding}" fill="url(#chart-gradient-${escapeHtml(
+          valueKey,
+        )})"></polyline>
+        <polyline class="line-chart__line" points="${points}" style="--chart-color:${color}"></polyline>
+        ${labels}
+      </svg>
     `;
   }
 
-  function renderBarList(nodeId, items, labelKey, valueKey) {
-    const node = qs(nodeId);
-    if (!node) return;
-
-    if (!Array.isArray(items) || items.length === 0) {
-      node.innerHTML = '<div class="empty-state small-empty">No data yet.</div>';
-      return;
+  function createWarnings(warnings) {
+    if (!Array.isArray(warnings) || warnings.length === 0) {
+      return '<div class="empty-state small-empty">No warnings.</div>';
     }
 
-    const maxValue = Math.max(...items.map((item) => Number(item[valueKey] || 0)), 1);
-    node.innerHTML = items
-      .map((item) => {
-        const value = Number(item[valueKey] || 0);
-        const width = Math.max(8, Math.round((value / maxValue) * 100));
+    return warnings
+      .map(
+        (warning) => `
+          <article class="warning-item">
+            <strong>${escapeHtml(warning.type || "warning")}</strong>
+            <p>${escapeHtml(warning.message || "Unknown warning")}</p>
+          </article>
+        `,
+      )
+      .join("");
+  }
+
+  function createVideoCards(videos, accentColor) {
+    if (!Array.isArray(videos) || videos.length === 0) {
+      return '<div class="empty-state small-empty">No videos available.</div>';
+    }
+
+    return `
+      <div class="video-grid">
+        ${videos
+          .map(
+            (video) => `
+              <article class="video-card">
+                ${
+                  video.thumbnailUrl
+                    ? `<div class="video-card__thumb" style="background-image:url('${escapeHtml(video.thumbnailUrl)}')"></div>`
+                    : '<div class="video-card__thumb video-card__thumb--empty"></div>'
+                }
+                <div class="video-card__body">
+                  <span class="video-card__date">${escapeHtml(formatCompactDate(video.publishedAt))}</span>
+                  <h4>${escapeHtml(video.title || "Untitled")}</h4>
+                  <div class="video-card__stats">
+                    <span style="--chip-accent:${accentColor}">${formatNumber(video.views || video.likes || 0)} views</span>
+                    <span>${formatNumber(video.likes || 0)} likes</span>
+                    <span>${formatNumber(video.comments || 0)} comments</span>
+                  </div>
+                  ${video.url ? `<a href="${escapeHtml(video.url)}" target="_blank" rel="noreferrer">Open post</a>` : ""}
+                </div>
+              </article>
+            `,
+          )
+          .join("")}
+      </div>
+    `;
+  }
+
+  function createTopTable(videos, accentColor) {
+    if (!Array.isArray(videos) || videos.length === 0) {
+      return '<div class="empty-state small-empty">No top content available.</div>';
+    }
+
+    return `
+      <div class="top-table">
+        ${videos
+          .map(
+            (video) => `
+              <article class="top-row">
+                <div>
+                  <span class="top-row__label">${escapeHtml(formatCompactDate(video.publishedAt))}</span>
+                  <strong>${escapeHtml(video.title || "Untitled")}</strong>
+                </div>
+                <div class="top-row__meta">
+                  <span style="color:${accentColor}">${formatNumber(video.analytics?.views || video.views || 0)} views</span>
+                  <span>${formatNumber(video.analytics?.likes || video.likes || 0)} likes</span>
+                </div>
+              </article>
+            `,
+          )
+          .join("")}
+      </div>
+    `;
+  }
+
+  function renderHeaderSummary(global) {
+    const node = byId("headerSummary");
+    node.innerHTML = makeKpiCards([
+      { label: "Followers", value: formatNumber(global.followers || 0) },
+      { label: "Recent views", value: formatNumber(global.recentViews || 0) },
+      { label: "Interactions", value: formatNumber(global.recentInteractions || 0) },
+      { label: "Tracked posts", value: formatNumber(global.trackedVideos || 0) },
+    ]);
+  }
+
+  function renderPlatformStatusStrip(platforms) {
+    const node = byId("platformStatusStrip");
+    node.innerHTML = Object.entries(platforms)
+      .map(([key, platform]) => {
+        const status = platform.available ? (platform.warnings?.length ? "limited" : "active") : "unavailable";
         return `
-          <div class="bar-row">
-            <div class="bar-head">
-              <span>${escapeHtml(item[labelKey] || "-")}</span>
-              <strong>${value}</strong>
+          <article class="strip-card">
+            <div>
+              <span>${escapeHtml(platform.name)}</span>
+              <strong>${escapeHtml(platform.account?.displayName || platform.account?.title || platform.account?.username || status)}</strong>
             </div>
-            <div class="bar-track"><div class="bar-fill" style="width:${width}%"></div></div>
-          </div>
+            <span class="${getStatusClass(status)}">${escapeHtml(status)}</span>
+          </article>
         `;
       })
       .join("");
   }
 
-  function renderTimelineList(nodeId, items, formatter) {
-    const node = qs(nodeId);
-    if (!node) return;
+  function renderGlobalView(live) {
+    byId("globalKpis").innerHTML = makeKpiCards([
+      { label: "Connected platforms", value: String(live.global.connectedPlatforms || 0) },
+      { label: "Followers", value: formatNumber(live.global.followers || 0) },
+      { label: "Recent views", value: formatNumber(live.global.recentViews || 0) },
+      { label: "Recent interactions", value: formatNumber(live.global.recentInteractions || 0) },
+      { label: "Tracked posts", value: formatNumber(live.global.trackedVideos || 0) },
+    ]);
 
-    if (!Array.isArray(items) || items.length === 0) {
-      node.innerHTML = '<div class="empty-state small-empty">No entries yet.</div>';
-      return;
-    }
+    byId("globalPlatformCards").innerHTML = Object.entries(live.platforms)
+      .map(([key, platform]) => {
+        const accent = platformAccent(key);
+        const status = platform.available ? (platform.warnings?.length ? "limited" : "active") : "unavailable";
+        const mainMetric =
+          key === "youtube"
+            ? `${formatNumber(platform.metrics?.subscribers || 0)} subscribers`
+            : `${formatNumber(platform.metrics?.followers || 0)} followers`;
 
-    node.innerHTML = items.map(formatter).join("");
-  }
-
-  function renderPlatformStrip(platformConfig, platforms) {
-    const node = qs("platformConnectionStrip");
-    if (!node) return;
-
-    const order = ["youtube", "instagram", "tiktok"];
-    node.innerHTML = order.map((key) => {
-      const configEntry = platformConfig?.[key] || {};
-      const summary = platforms?.[key] || {};
-      const stateLabel = configEntry.connected ? (configEntry.enabled ? "connected" : "configured") : "not configured";
-      return `
-        <article class="connection-card">
-          <div>
-            <span>${escapeHtml(summary.name || key)}</span>
-            <strong>${escapeHtml(stateLabel)}</strong>
-          </div>
-          <div class="connection-card__meta">
-            <span class="${getConnectionStateClass(configEntry.connected, configEntry.enabled)}">${configEntry.enabled ? "enabled" : "disabled"}</span>
-            <small>${summary.published || 0} published</small>
-          </div>
-        </article>
-      `;
-    }).join("");
-  }
-
-  function renderGlobalStats(dashboard) {
-    const totals = dashboard?.totals || {};
-    const platforms = dashboard?.platforms || {};
-    const node = qs("globalStats");
-    if (!node) return;
-
-    const cards = [
-      { label: "Tracked videos", value: totals.total_videos || 0 },
-      { label: "Published records", value: totals.published_videos || 0 },
-      { label: "Failed runs", value: totals.failed_videos || 0 },
-      { label: "Categories", value: totals.categories_covered || 0 },
-      { label: "Instagram published", value: platforms.instagram?.published || 0 },
-      { label: "TikTok published", value: platforms.tiktok?.published || 0 },
-    ];
-
-    node.innerHTML = cards.map((card) => `
-      <article class="stat-card shell-card">
-        <span>${escapeHtml(card.label)}</span>
-        <strong>${escapeHtml(String(card.value))}</strong>
-      </article>
-    `).join("");
-  }
-
-  function renderPlatformCards(dashboard) {
-    const node = qs("platformCards");
-    if (!node) return;
-
-    const platformConfig = dashboard?.platformConfig || {};
-    const platforms = dashboard?.platforms || {};
-    node.innerHTML = ["youtube", "instagram", "tiktok"].map((key) => {
-      const platform = platforms[key] || { name: key };
-      const configEntry = platformConfig[key] || {};
-      return `
-        <article class="platform-card shell-card">
-          <div class="platform-card__head">
-            <div>
-              <p class="eyebrow">Platform</p>
-              <h3>${escapeHtml(platform.name || key)}</h3>
+        return `
+          <article class="platform-card">
+            <div class="platform-card__header">
+              <div class="platform-card__identity">
+                <span class="platform-dot" style="--dot-color:${accent}"></span>
+                <div>
+                  <span>${escapeHtml(platform.name)}</span>
+                  <strong>${escapeHtml(platform.account?.displayName || platform.account?.title || platform.account?.username || "Not available")}</strong>
+                </div>
+              </div>
+              <span class="${getStatusClass(status)}">${escapeHtml(status)}</span>
             </div>
-            <span class="${getConnectionStateClass(configEntry.connected, configEntry.enabled)}">${configEntry.enabled ? "active" : "off"}</span>
-          </div>
-          <div class="platform-card__stats">
-            <article><span>Attempted</span><strong>${platform.attempted || 0}</strong></article>
-            <article><span>Published</span><strong>${platform.published || 0}</strong></article>
-            <article><span>Failed</span><strong>${platform.failed || 0}</strong></article>
-          </div>
-          <p class="platform-card__meta">Last success: ${escapeHtml(formatDate(platform.last_published_at))}</p>
-        </article>
-      `;
-    }).join("");
-  }
+            <p class="platform-card__metric">${escapeHtml(mainMetric)}</p>
+            <p class="platform-card__note">${escapeHtml(
+              key === "instagram"
+                ? `${formatNumber(platform.metrics?.reach || 0)} reach in recent insight window`
+                : key === "youtube"
+                  ? `${formatNumber(platform.metrics?.recentViews || 0)} recent views`
+                  : `${platform.warnings?.length || 0} warning(s)`,
+            )}</p>
+          </article>
+        `;
+      })
+      .join("");
 
-  function collectManualFallbacks(platforms) {
-    const fallbackItems = [];
-    ["youtube", "instagram", "tiktok"].forEach((platformKey) => {
-      (platforms?.[platformKey]?.recentItems || []).forEach((item) => {
-        const normalized = normalizeRecentItem(item);
-        const result = getPlatformResult(normalized, platformKey);
-        if (result.manualFallback) {
-          fallbackItems.push({
-            platformKey,
-            title: normalized.title,
-            updatedAt: normalized.updatedAt,
-            error: result.error || "Manual fallback ready",
-            fallback: result.manualFallback,
-          });
-        }
+    const alerts = [];
+    Object.entries(live.platforms).forEach(([key, platform]) => {
+      if (!platform.available) {
+        alerts.push({
+          title: `${platform.name} unavailable`,
+          body: platform.error?.message || platform.reason || "Unknown issue",
+        });
+      }
+      (platform.warnings || []).forEach((warning) => {
+        alerts.push({
+          title: `${platform.name}: ${warning.type}`,
+          body: warning.message,
+        });
       });
     });
 
-    return fallbackItems.slice(0, 10);
+    byId("globalAlerts").innerHTML = alerts.length
+      ? alerts
+          .map(
+            (alert) => `
+              <article class="alert-card">
+                <strong>${escapeHtml(alert.title)}</strong>
+                <p>${escapeHtml(alert.body)}</p>
+              </article>
+            `,
+          )
+          .join("")
+      : '<div class="empty-state">No platform alerts right now.</div>';
   }
 
-  function renderGlobalView(data) {
-    const dashboard = data.dashboard || {};
-    const totals = dashboard.totals || {};
+  function renderPlatformView(nodeId, platformKey, platform) {
+    const node = byId(nodeId);
+    const accent = platformAccent(platformKey);
 
-    qs("headerTotalVideos").textContent = String(totals.total_videos || 0);
-    qs("headerPublishedVideos").textContent = String(totals.published_videos || 0);
-    qs("headerFailedVideos").textContent = String(totals.failed_videos || 0);
-    qs("headerLastPublished").textContent = formatDate(totals.last_published_at);
-    backendLabelNode.textContent = getApiBaseUrl() || "Backend not configured";
+    if (!platform.available) {
+      node.innerHTML = `
+        <section class="dashboard-grid">
+          <article class="module shell-card">
+            <div class="section-heading">
+              <div>
+                <p class="eyebrow">${escapeHtml(platform.name)}</p>
+                <h2>Connection required</h2>
+              </div>
+            </div>
+            <div class="empty-state">
+              <strong>${escapeHtml(platform.reason || "Unavailable")}</strong>
+              <p>${escapeHtml(platform.error?.message || "This platform is not returning live metrics yet.")}</p>
+            </div>
+          </article>
+        </section>
+      `;
+      return;
+    }
 
-    renderPlatformStrip(dashboard.platformConfig || {}, dashboard.platforms || {});
-    renderGlobalStats(dashboard);
-    renderPlatformCards(dashboard);
-    renderSimpleCard("latestGeneratedCard", dashboard.latestGenerated || dashboard.recentRuns?.[0] || null, null);
-    renderSimpleCard("latestPublishedCard", dashboard.latestPublished || null, "youtube");
-    renderBarList("categoryBars", dashboard.byCategory || [], "category", "total");
+    const accountName =
+      platform.account?.displayName ||
+      platform.account?.title ||
+      platform.account?.username ||
+      platform.name;
+    const metrics = platform.metrics || {};
+    const chartSeries =
+      platformKey === "youtube"
+        ? platform.charts?.daily || []
+        : platformKey === "instagram"
+          ? platform.charts?.insights || []
+          : platform.charts?.recentVideos || [];
+    const chartKey = platformKey === "youtube" ? "views" : platformKey === "instagram" ? "reach" : "views";
 
-    renderTimelineList("recentEventsList", dashboard.recentEvents || [], (item) => `
-      <article class="list-item">
-        <div class="list-item__top">
-          <strong>${escapeHtml(item.message || item.event_type || "event")}</strong>
-          <span class="${getStatusClass(item.level || "info")}">${escapeHtml(item.level || "info")}</span>
-        </div>
-        <div class="list-item__meta">
-          <span>${escapeHtml(item.stage || "-")}</span>
-          <span>${escapeHtml(item.topic_key || "global")}</span>
-          <span>${escapeHtml(formatCompactDate(item.created_at))}</span>
-        </div>
-      </article>
-    `);
-
-    const manualFallbacks = collectManualFallbacks(dashboard.platforms || {});
-    renderTimelineList("manualFallbackList", manualFallbacks, (item) => `
-      <article class="list-item">
-        <div class="list-item__top">
-          <strong>${escapeHtml(item.title)}</strong>
-          <span class="${getStatusClass("warning")}">${escapeHtml(item.platformKey)}</span>
-        </div>
-        <div class="list-item__meta">
-          <span>${escapeHtml(item.error)}</span>
-          <span>${escapeHtml(formatCompactDate(item.updatedAt))}</span>
-        </div>
-        <div class="list-item__links">
-          ${item.fallback.videoUrl ? `<a href="${escapeHtml(item.fallback.videoUrl)}" target="_blank" rel="noreferrer">Cloudinary video</a>` : ""}
-          ${item.fallback.txtPath ? `<span>${escapeHtml(item.fallback.txtPath)}</span>` : ""}
-        </div>
-      </article>
-    `);
-  }
-
-  function renderPlatformSection(nodeId, platformKey, dashboard) {
-    const node = qs(nodeId);
-    if (!node) return;
-
-    const platform = dashboard?.platforms?.[platformKey] || { name: platformKey, recentItems: [] };
-    const configEntry = dashboard?.platformConfig?.[platformKey] || {};
-    const recentItems = Array.isArray(platform.recentItems) ? platform.recentItems.map(normalizeRecentItem) : [];
+    const kpiItems =
+      platformKey === "youtube"
+        ? [
+            { label: "Subscribers", value: formatNumber(metrics.subscribers || 0) },
+            { label: "Total views", value: formatNumber(metrics.totalViews || 0) },
+            { label: "Videos", value: formatNumber(metrics.videoCount || 0) },
+            { label: "Recent watch min", value: formatNumber(metrics.recentWatchMinutes || 0) },
+            { label: "Recent views", value: formatNumber(metrics.recentViews || 0) },
+            { label: "Recent likes", value: formatNumber(metrics.recentLikes || 0) },
+          ]
+        : platformKey === "instagram"
+          ? [
+              { label: "Followers", value: formatNumber(metrics.followers || 0) },
+              { label: "Following", value: formatNumber(metrics.following || 0) },
+              { label: "Media", value: formatNumber(metrics.mediaCount || 0) },
+              { label: "Reach", value: formatNumber(metrics.reach || 0) },
+              { label: "Likes", value: formatNumber(metrics.recentLikes || 0) },
+              { label: "Comments", value: formatNumber(metrics.recentComments || 0) },
+            ]
+          : [
+              { label: "Followers", value: formatNumber(metrics.followers || 0) },
+              { label: "Following", value: formatNumber(metrics.following || 0) },
+              { label: "Likes", value: formatNumber(metrics.totalLikes || 0) },
+              { label: "Videos", value: formatNumber(metrics.videoCount || 0) },
+              { label: "Recent views", value: formatNumber(metrics.recentViews || 0) },
+              { label: "Recent shares", value: formatNumber(metrics.recentShares || 0) },
+            ];
 
     node.innerHTML = `
-      <div class="platform-view-grid">
-        <section class="module shell-card">
-          <div class="module-head">
-            <div>
-              <p class="eyebrow">Status</p>
-              <h3>${escapeHtml(platform.name || platformKey)}</h3>
+      <section class="dashboard-grid">
+        <article class="module shell-card module--wide">
+          <div class="platform-hero">
+            <div class="platform-hero__identity">
+              ${
+                platform.account?.thumbnailUrl || platform.account?.profilePictureUrl || platform.account?.avatarUrl
+                  ? `<img class="platform-avatar" src="${escapeHtml(
+                      platform.account.thumbnailUrl || platform.account.profilePictureUrl || platform.account.avatarUrl,
+                    )}" alt="${escapeHtml(accountName)}" />`
+                  : `<div class="platform-avatar platform-avatar--placeholder" style="--avatar-accent:${accent}"></div>`
+              }
+              <div>
+                <p class="eyebrow">${escapeHtml(platform.name)}</p>
+                <h2>${escapeHtml(accountName)}</h2>
+                <p class="muted">${escapeHtml(
+                  platform.account?.description || platform.account?.biography || platform.account?.profileUrl || "Live data from the official API",
+                )}</p>
+              </div>
             </div>
-            <span class="${getConnectionStateClass(configEntry.connected, configEntry.enabled)}">${configEntry.enabled ? "enabled" : "disabled"}</span>
+            <div class="platform-hero__meta">
+              <span class="${getStatusClass(platform.warnings?.length ? "limited" : "active")}">${
+                platform.warnings?.length ? "limited" : "active"
+              }</span>
+              <small>${escapeHtml(platform.tokenExpiresAt ? `token ${formatDate(platform.tokenExpiresAt)}` : "live token")}</small>
+            </div>
           </div>
-          <div class="platform-kpis">
-            <article><span>Attempted</span><strong>${platform.attempted || 0}</strong></article>
-            <article><span>Published</span><strong>${platform.published || 0}</strong></article>
-            <article><span>Failed</span><strong>${platform.failed || 0}</strong></article>
-            <article><span>Last success</span><strong>${escapeHtml(formatDate(platform.last_published_at))}</strong></article>
-          </div>
-          <div class="platform-tags">
-            <span class="${getConnectionStateClass(configEntry.connected, configEntry.enabled)}">${configEntry.connected ? "credentials ready" : "missing credentials"}</span>
-            <span class="status-pill status-pill--idle">view: ${escapeHtml(platformKey)}</span>
-          </div>
-        </section>
+        </article>
 
-        <section class="module shell-card module--wide">
-          <div class="module-head">
+        <article class="module shell-card">
+          <div class="section-heading">
             <div>
-              <p class="eyebrow">Recent items</p>
-              <h3>Latest ${escapeHtml(platform.name || platformKey)} attempts</h3>
+              <p class="eyebrow">Metrics</p>
+              <h2>Primary KPIs</h2>
             </div>
           </div>
-          <div class="list-stack">
-            ${recentItems.length ? recentItems.map((item) => {
-              const result = getPlatformResult(item, platformKey);
-              return `
-                <article class="list-item">
-                  <div class="list-item__top">
-                    <strong>${escapeHtml(item.title)}</strong>
-                    <span class="${getStatusClass(result.status || item.status)}">${escapeHtml(result.status || item.status)}</span>
-                  </div>
-                  <div class="list-item__meta">
-                    <span>${escapeHtml(item.category)}</span>
-                    <span>${escapeHtml(item.stage)}</span>
-                    <span>${escapeHtml(formatCompactDate(item.updatedAt))}</span>
-                  </div>
-                  <div class="list-item__links">
-                    ${result.url ? `<a href="${escapeHtml(result.url)}" target="_blank" rel="noreferrer">Open post</a>` : ""}
-                    ${result.manualFallback?.videoUrl ? `<a href="${escapeHtml(result.manualFallback.videoUrl)}" target="_blank" rel="noreferrer">Manual fallback</a>` : ""}
-                    ${result.publishId ? `<span>${escapeHtml(result.publishId)}</span>` : ""}
-                    ${result.error ? `<span>${escapeHtml(result.error)}</span>` : ""}
-                  </div>
-                </article>
-              `;
-            }).join("") : '<div class="empty-state small-empty">No platform activity yet.</div>'}
+          <div class="kpi-grid">${makeKpiCards(kpiItems)}</div>
+        </article>
+
+        <article class="module shell-card">
+          <div class="section-heading">
+            <div>
+              <p class="eyebrow">Trend</p>
+              <h2>${escapeHtml(chartKey)} over time</h2>
+            </div>
           </div>
-        </section>
-      </div>
+          ${createLineChart(chartSeries, chartKey, accent)}
+        </article>
+
+        <article class="module shell-card">
+          <div class="section-heading">
+            <div>
+              <p class="eyebrow">Warnings</p>
+              <h2>Integration state</h2>
+            </div>
+          </div>
+          ${createWarnings(platform.warnings || [])}
+        </article>
+
+        <article class="module shell-card module--wide">
+          <div class="section-heading">
+            <div>
+              <p class="eyebrow">Recent</p>
+              <h2>Latest content</h2>
+            </div>
+          </div>
+          ${createVideoCards(platform.recentVideos || [], accent)}
+        </article>
+
+        <article class="module shell-card module--wide">
+          <div class="section-heading">
+            <div>
+              <p class="eyebrow">Top content</p>
+              <h2>Best performers</h2>
+            </div>
+          </div>
+          ${createTopTable(platform.topVideos || [], accent)}
+        </article>
+      </section>
     `;
   }
 
-  function renderConsoleView(data) {
-    const runner = data.runner || {};
-    const operations = data.dashboard?.operations || {};
-    const executions = Array.isArray(data.executions) ? data.executions : [];
+  function renderConsole(control) {
+    const runner = control.runner || {};
+    const workflow = control.workflow || {};
+    const dashboard = control.dashboard || {};
+    const executions = Array.isArray(control.executions) ? control.executions : [];
+    const events = Array.isArray(dashboard.recentEvents) ? dashboard.recentEvents : [];
+    const operations = dashboard.operations || {};
+    const recentRuns = Array.isArray(dashboard.recentRuns) ? dashboard.recentRuns : [];
 
-    const runnerStatus = runner.running ? "running" : runner.lastError ? "error" : runner.finishedAt ? "completed" : "idle";
-    qs("runnerStatusBadge").className = getStatusClass(runnerStatus);
-    qs("runnerStatusBadge").textContent = runnerStatus;
-    qs("runnerStatus").textContent = runner.running ? "Running" : runner.lastError ? "Error" : runner.finishedAt ? "Completed" : "Idle";
-    qs("runnerWorkflow").textContent = runner.workflowName || "-";
-    qs("runnerStartedAt").textContent = formatDate(runner.startedAt);
-    qs("runnerFinishedAt").textContent = formatDate(runner.finishedAt);
-    qs("runnerLogs").textContent = String(runner.lastError || runner.stderrTail || runner.stdoutTail || "No logs yet.").trim() || "No logs yet.";
+    byId("runnerStatusBadge").className = getStatusClass(runner.running ? "active" : "configured");
+    byId("runnerStatusBadge").textContent = runner.running ? "running" : "idle";
+    byId("runnerMeta").innerHTML = makeKpiCards([
+      { label: "Status", value: runner.running ? "Running" : "Idle" },
+      { label: "Workflow", value: workflow.name || "-" },
+      { label: "Started", value: runner.startedAt ? formatDate(runner.startedAt) : "-" },
+      { label: "Finished", value: runner.finishedAt ? formatDate(runner.finishedAt) : "-" },
+    ]);
+    byId("runnerLogs").textContent = [runner.stdoutTail, runner.stderrTail].filter(Boolean).join("\n\n") || "No logs yet.";
 
-    renderTimelineList("executionConsole", executions, (item) => `
-      <article class="console-item">
-        <div class="console-item__top">
-          <strong>#${escapeHtml(item.id || item.execution_id || "-")}</strong>
-          <span class="${getStatusClass(item.status || "info")}">${escapeHtml(item.status || "info")}</span>
-        </div>
-        <div class="console-item__meta">
-          <span>${escapeHtml(item.mode || "-")}</span>
-          <span>${escapeHtml(formatCompactDate(item.startedAt || item.created_at))}</span>
-          <span>${escapeHtml(item.durationMs ? `${Math.round(item.durationMs / 1000)}s` : "-")}</span>
-        </div>
-      </article>
-    `);
+    byId("executionConsole").innerHTML = executions.length
+      ? executions
+          .map(
+            (item) => `
+              <article class="stack-item">
+                <div>
+                  <span>${escapeHtml(item.name || "workflow")}</span>
+                  <strong>${escapeHtml(item.status || "-")}</strong>
+                </div>
+                <small>${escapeHtml(formatDate(item.startedAt || item.stoppedAt))}</small>
+              </article>
+            `,
+          )
+          .join("")
+      : '<div class="empty-state small-empty">No workflow executions yet.</div>';
 
-    renderTimelineList("eventConsole", operations.events || [], (item) => `
-      <article class="console-item">
-        <div class="console-item__top">
-          <strong>${escapeHtml(item.message || item.event_type || "event")}</strong>
-          <span class="${getStatusClass(item.level || "info")}">${escapeHtml(item.level || "info")}</span>
-        </div>
-        <div class="console-item__meta">
-          <span>${escapeHtml(item.stage || "-")}</span>
-          <span>${escapeHtml(item.topic_key || "global")}</span>
-          <span>${escapeHtml(formatCompactDate(item.created_at))}</span>
-        </div>
-      </article>
-    `);
+    byId("eventConsole").innerHTML = events.length
+      ? events
+          .slice(0, 12)
+          .map(
+            (item) => `
+              <article class="stack-item">
+                <div>
+                  <span>${escapeHtml(item.stage || item.event_type || "event")}</span>
+                  <strong>${escapeHtml(item.message || "-")}</strong>
+                </div>
+                <small>${escapeHtml(formatDate(item.created_at || item.ts || item.event_at))}</small>
+              </article>
+            `,
+          )
+          .join("")
+      : '<div class="empty-state small-empty">No content events yet.</div>';
 
-    renderTimelineList("artifactConsole", operations.artifacts || [], (item) => `
-      <article class="console-item">
-        <div class="console-item__top">
-          <strong>${escapeHtml(item.artifact_type || "artifact")}</strong>
-          <span class="${getStatusClass("info")}">${escapeHtml(item.label || "stored")}</span>
-        </div>
-        <div class="console-item__meta">
-          <span>${escapeHtml(item.topic_key || "-")}</span>
-          <span>${escapeHtml(item.mime_type || "-")}</span>
-          <span>${escapeHtml(item.size_bytes ? `${Math.round(item.size_bytes / 1024)} KB` : "-")}</span>
-        </div>
-      </article>
-    `);
+    const fallbacks = recentRuns
+      .flatMap((run) => {
+        const socialPosts = run?.metadata?.social_posts || {};
+        return ["youtube", "instagram", "tiktok"]
+          .map((platform) => ({ platform, payload: socialPosts[platform], title: run.title || run.topic_key || "Untitled" }))
+          .filter((item) => item.payload?.manualFallback);
+      })
+      .slice(0, 12);
 
-    renderTimelineList("auditConsole", operations.apiAudit || [], (item) => `
-      <article class="console-item">
-        <div class="console-item__top">
-          <strong>${escapeHtml(item.action || "request")}</strong>
-          <span class="${getStatusClass(item.status_code >= 400 ? "error" : "success")}">${escapeHtml(String(item.status_code || "-"))}</span>
-        </div>
-        <div class="console-item__meta">
-          <span>${escapeHtml(item.actor || "anonymous")}</span>
-          <span>${escapeHtml(item.path || "/")}</span>
-          <span>${escapeHtml(formatCompactDate(item.created_at))}</span>
-        </div>
-      </article>
-    `);
+    byId("fallbackConsole").innerHTML = fallbacks.length
+      ? fallbacks
+          .map(
+            (item) => `
+              <article class="stack-item">
+                <div>
+                  <span>${escapeHtml(item.platform)}</span>
+                  <strong>${escapeHtml(item.title)}</strong>
+                </div>
+                <div class="stack-links">
+                  ${item.payload.manualFallback.videoUrl ? `<a href="${escapeHtml(item.payload.manualFallback.videoUrl)}" target="_blank" rel="noreferrer">video</a>` : ""}
+                  ${item.payload.manualFallback.txtUrl ? `<a href="${escapeHtml(item.payload.manualFallback.txtUrl)}" target="_blank" rel="noreferrer">txt</a>` : ""}
+                  ${item.payload.manualFallback.jsonUrl ? `<a href="${escapeHtml(item.payload.manualFallback.jsonUrl)}" target="_blank" rel="noreferrer">json</a>` : ""}
+                </div>
+              </article>
+            `,
+          )
+          .join("")
+      : '<div class="empty-state small-empty">No manual fallback packages waiting.</div>';
   }
 
-  function renderPayload(data) {
-    renderGlobalView(data);
-    renderPlatformSection("youtubeView", "youtube", data.dashboard || {});
-    renderPlatformSection("instagramView", "instagram", data.dashboard || {});
-    renderPlatformSection("tiktokView", "tiktok", data.dashboard || {});
-    renderConsoleView(data);
+  async function loadDashboard() {
+    const [live, control] = await Promise.all([apiFetch("/api/platform-analytics"), apiFetch("/api/control-center")]);
+    byId("backendLabel").textContent = getApiBaseUrl();
+    renderHeaderSummary(live.global || {});
+    renderPlatformStatusStrip(live.platforms || {});
+    renderGlobalView(live);
+    renderPlatformView("youtubeView", "youtube", live.platforms.youtube);
+    renderPlatformView("instagramView", "instagram", live.platforms.instagram);
+    renderPlatformView("tiktokView", "tiktok", live.platforms.tiktok);
+    renderConsole(control);
   }
 
-  async function loadAppData() {
-    const payload = await apiFetch("/api/control-center");
-    renderPayload(payload);
-    return payload;
-  }
-
-  function startAutoRefresh() {
-    window.clearInterval(refreshTimer);
+  function scheduleRefresh() {
+    if (refreshTimer) {
+      clearInterval(refreshTimer);
+    }
     refreshTimer = window.setInterval(() => {
-      loadAppData().catch(handleFatalError);
-    }, 30000);
+      loadDashboard().catch((error) => {
+        console.error(error);
+      });
+    }, 60000);
   }
 
-  function stopAutoRefresh() {
-    window.clearInterval(refreshTimer);
-    refreshTimer = null;
-  }
-
-  function handleFatalError(error) {
-    const message = error?.message || "Unknown error";
-    loginMessage.textContent = message;
-    backendLabelNode.textContent = message;
-    qs("runnerLogs").textContent = message;
-  }
-
-  async function handleLogin(event) {
+  async function handleLoginSubmit(event) {
     event.preventDefault();
     loginMessage.textContent = "";
 
     try {
-      const apiBase = setApiBaseUrl(apiBaseUrlInput.value);
-      const response = await fetch(`${apiBase}/api/auth/login`, {
+      const baseUrl = setApiBaseUrl(apiBaseUrlInput.value.trim());
+      const response = await fetch(`${baseUrl}/api/auth/login`, {
         method: "POST",
-        headers: { "Content-Type": "application/json", accept: "application/json" },
-        body: JSON.stringify({ username: usernameInput.value.trim(), password: passwordInput.value }),
+        headers: { "content-type": "application/json", accept: "application/json" },
+        body: JSON.stringify({
+          username: usernameInput.value.trim(),
+          password: passwordInput.value,
+        }),
       });
       const payload = await response.json().catch(() => ({}));
-      if (!response.ok) throw new Error(payload.error || `Login failed with status ${response.status}`);
+      if (!response.ok) {
+        throw new Error(payload.error || "Unable to login");
+      }
+
       setToken(payload.token);
       setAuthenticated(true);
-      await loadAppData();
-      setActiveView(new URLSearchParams(window.location.search).get("view") || "global", true);
-      startAutoRefresh();
+      scheduleRefresh();
+      await loadDashboard();
+      setActiveView(new URL(window.location.href).searchParams.get("view") || "global", false);
     } catch (error) {
       loginMessage.textContent = error.message;
     }
   }
 
-  loginForm.addEventListener("submit", handleLogin);
-  refreshButton.addEventListener("click", () => loadAppData().catch(handleFatalError));
-  logoutButton.addEventListener("click", () => {
+  function handleLogout() {
     clearSession();
-    stopAutoRefresh();
     setAuthenticated(false);
-  });
-
-  document.addEventListener("click", (event) => {
-    const trigger = event.target.closest("[data-view]");
-    if (!trigger) return;
-    setActiveView(trigger.getAttribute("data-view"), true);
-  });
-
-  window.addEventListener("popstate", () => {
-    setActiveView(new URLSearchParams(window.location.search).get("view") || "global", false);
-  });
-
-  apiBaseUrlInput.value = getApiBaseUrl() || config.API_BASE_URL || "";
-  usernameInput.value = config.DEFAULT_USERNAME || "admin";
-
-  if (getToken() && getApiBaseUrl()) {
-    setAuthenticated(true);
-    loadAppData()
-      .then(() => {
-        setActiveView(new URLSearchParams(window.location.search).get("view") || "global", true);
-        startAutoRefresh();
-      })
-      .catch((error) => {
-        clearSession();
-        setAuthenticated(false);
-        loginMessage.textContent = error.message;
-      });
-  } else {
-    setAuthenticated(false);
+    if (refreshTimer) {
+      clearInterval(refreshTimer);
+      refreshTimer = null;
+    }
   }
+
+  function bindEvents() {
+    loginForm.addEventListener("submit", handleLoginSubmit);
+    refreshButton.addEventListener("click", () => {
+      loadDashboard().catch((error) => {
+        console.error(error);
+      });
+    });
+    logoutButton.addEventListener("click", handleLogout);
+    document.querySelectorAll("[data-view]").forEach((button) => {
+      button.addEventListener("click", () => {
+        setActiveView(button.getAttribute("data-view"), true);
+      });
+    });
+  }
+
+  async function bootstrap() {
+    apiBaseUrlInput.value = getApiBaseUrl();
+    bindEvents();
+
+    if (!getToken() || !getApiBaseUrl()) {
+      setAuthenticated(false);
+      return;
+    }
+
+    try {
+      setAuthenticated(true);
+      scheduleRefresh();
+      await loadDashboard();
+      setActiveView(new URL(window.location.href).searchParams.get("view") || "global", false);
+    } catch (error) {
+      console.error(error);
+      handleLogout();
+    }
+  }
+
+  bootstrap();
 })();

@@ -9,6 +9,7 @@ const { spawn } = require("child_process");
 const { Pool } = require("pg");
 const httpProxy = require("http-proxy");
 const { loadDashboardData } = require("./dashboard-data");
+const { loadPlatformAnalytics } = require("./platform-analytics");
 const {
   createPool: createContentPool,
   ensureSchema: ensureContentSchema,
@@ -1179,6 +1180,21 @@ const server = http.createServer((req, res) => {
       .then((payload) => sendApiJson(req, res, 200, payload))
       .catch((error) => {
         log("dashboard api error", { error: error.message });
+        sendApiJson(req, res, 500, { error: error.message });
+      });
+    return;
+  }
+
+  if (pathname === "/api/platform-analytics") {
+    if (authEnabled && !readSession(req)) {
+      sendApiJson(req, res, 401, { error: "Unauthorized" });
+      return;
+    }
+
+    loadPlatformAnalytics()
+      .then((payload) => sendApiJson(req, res, 200, payload))
+      .catch((error) => {
+        log("platform analytics api error", { error: error.message });
         sendApiJson(req, res, 500, { error: error.message });
       });
     return;
