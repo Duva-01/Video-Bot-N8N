@@ -36,12 +36,23 @@ function json(value) {
   return JSON.stringify(value || {});
 }
 
-function checksumFromFile(filePath) {
+async function checksumFromFile(filePath) {
   if (!filePath || !fs.existsSync(filePath)) {
     return null;
   }
 
-  return crypto.createHash("sha1").update(fs.readFileSync(filePath)).digest("hex");
+  return new Promise((resolve, reject) => {
+    const hash = crypto.createHash("sha1");
+    const stream = fs.createReadStream(filePath);
+
+    stream.on("data", (chunk) => {
+      hash.update(chunk);
+    });
+    stream.on("end", () => {
+      resolve(hash.digest("hex"));
+    });
+    stream.on("error", reject);
+  });
 }
 
 function fileSize(filePath) {
@@ -257,7 +268,7 @@ async function recordArtifact(pool, payload) {
   });
 
   const sizeBytes = payload.size_bytes ?? fileSize(payload.file_path);
-  const checksum = payload.checksum ?? checksumFromFile(payload.file_path);
+  const checksum = payload.checksum ?? (await checksumFromFile(payload.file_path));
 
   await pool.query(
     `
