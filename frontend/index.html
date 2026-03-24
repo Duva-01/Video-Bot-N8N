@@ -3,7 +3,7 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Facts Engine Studio</title>
+    <title>Facts Engine Console</title>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
@@ -16,326 +16,171 @@
     <div class="page-noise"></div>
 
     <div class="login-screen" id="loginView">
-      <header class="site-header shell-card">
-        <a class="brand-link" href="#hero">
-          <span class="brand-badge"></span>
-          <span>
-            <strong>Facts Engine Studio</strong>
-            <small>Control center for video operations</small>
-          </span>
-        </a>
-
-        <nav class="site-nav">
-          <a href="#overview">Overview</a>
-          <a href="#platforms">Platforms</a>
-          <a href="#consolePreview">Console</a>
-          <a href="./terms/">Terms</a>
-          <a href="./privacy/">Privacy</a>
-        </nav>
-      </header>
-
-      <main class="landing">
-        <section class="hero shell-card" id="hero">
-          <div class="hero-copy">
-            <p class="eyebrow">Multi-platform publishing intelligence</p>
-            <h1>Real stats from YouTube, Instagram and TikTok in one place.</h1>
-            <p class="lede">
-              A clean operations surface for channel growth, recent posts, platform health and publishing fallbacks. The
-              dashboard pulls live platform data through the backend, not from your internal database.
-            </p>
-
-            <div class="hero-metrics">
-              <article>
-                <span>Live metrics</span>
-                <strong>API-backed</strong>
-                <p>Views, followers, posts, top videos and availability per platform.</p>
-              </article>
-              <article>
-                <span>Operational console</span>
-                <strong>Runner + logs</strong>
-                <p>Recent executions, content events, failures and manual publish fallbacks.</p>
-              </article>
-              <article>
-                <span>One control layer</span>
-                <strong>Render backend</strong>
-                <p>Secrets stay server-side. The browser only sees aggregated JSON.</p>
-              </article>
-            </div>
-          </div>
-
-          <aside class="login-panel shell-card">
-            <p class="eyebrow">Sign in</p>
-            <h2>Open the dashboard</h2>
-            <p class="muted">Authenticate against your Render backend and load live platform analytics.</p>
-
-            <form id="loginForm" class="login-form">
-              <label class="field">
-                <span>Backend URL</span>
-                <input id="apiBaseUrl" type="url" required />
-              </label>
-
-              <label class="field">
-                <span>Username</span>
-                <input id="username" type="text" autocomplete="username" required />
-              </label>
-
-              <label class="field">
-                <span>Password</span>
-                <input id="password" type="password" autocomplete="current-password" required />
-              </label>
-
-              <button type="submit" class="button button--primary">Access dashboard</button>
-              <p id="loginMessage" class="message" aria-live="polite"></p>
-            </form>
-          </aside>
-        </section>
-
-        <section class="landing-section shell-card" id="overview">
-          <div class="section-heading">
-            <div>
-              <p class="eyebrow">What you get</p>
-              <h2>From platform analytics to operator-grade console</h2>
-            </div>
-          </div>
-
-          <div class="feature-grid">
-            <article class="feature-card">
-              <span>Global snapshot</span>
-              <strong>Followers, recent views and tracked posts</strong>
-              <p>Cross-platform rollups built from official APIs where your scopes allow it.</p>
+      <main class="login-layout">
+        <section class="login-hero shell-card">
+          <p class="eyebrow">Facts Engine</p>
+          <h1>Structured logs, traces and runner state in one console.</h1>
+          <p class="lede">
+            A single operator view for errors, workflow runs, social publishing failures, artifacts and manual publish
+            fallbacks.
+          </p>
+          <div class="hero-points">
+            <article>
+              <span>Traceability</span>
+              <strong>Platform, stage, severity and reference</strong>
             </article>
-            <article class="feature-card">
-              <span>Per-platform views</span>
-              <strong>Top content, recent posts and warning states</strong>
-              <p>YouTube, Instagram and TikTok each get their own dedicated analytics panel.</p>
+            <article>
+              <span>Filtering</span>
+              <strong>Search by YouTube, Instagram, TikTok or pipeline step</strong>
             </article>
-            <article class="feature-card">
-              <span>Professional console</span>
-              <strong>Recent executions, events and fallbacks</strong>
-              <p>When a publish fails, you still keep a manual publish package ready to use.</p>
+            <article>
+              <span>Operations</span>
+              <strong>Runner state, recent executions and fallback links</strong>
             </article>
           </div>
         </section>
 
-        <section class="landing-section shell-card" id="platforms">
-          <div class="section-heading">
-            <div>
-              <p class="eyebrow">Connected channels</p>
-              <h2>Designed for your three publishing surfaces</h2>
-            </div>
-          </div>
+        <section class="login-panel shell-card">
+          <p class="eyebrow">Access</p>
+          <h2>Open console</h2>
+          <form id="loginForm" class="login-form">
+            <label class="field">
+              <span>Backend URL</span>
+              <input id="apiBaseUrl" type="url" required />
+            </label>
 
-          <div class="platform-preview-grid">
-            <article class="platform-preview platform-preview--youtube">
-              <span>YouTube</span>
-              <h3>Channel stats, recent uploads and analytics trendlines</h3>
-            </article>
-            <article class="platform-preview platform-preview--instagram">
-              <span>Instagram</span>
-              <h3>Profile metrics, reach, recent reels and media-level performance</h3>
-            </article>
-            <article class="platform-preview platform-preview--tiktok">
-              <span>TikTok</span>
-              <h3>Profile data now, richer stats as soon as the right scopes are authorized</h3>
-            </article>
-          </div>
-        </section>
+            <label class="field">
+              <span>Username</span>
+              <input id="username" type="text" autocomplete="username" required />
+            </label>
 
-        <section class="landing-section shell-card" id="consolePreview">
-          <div class="section-heading">
-            <div>
-              <p class="eyebrow">Ops</p>
-              <h2>Clean console, no fluff</h2>
-            </div>
-          </div>
+            <label class="field">
+              <span>Password</span>
+              <input id="password" type="password" autocomplete="current-password" required />
+            </label>
 
-          <div class="preview-console">
-            <div>
-              <span>$ runner status</span>
-              <strong>workflow, started_at, latest logs, publish fallback</strong>
-            </div>
-            <div>
-              <span>$ platform warnings</span>
-              <strong>scope gaps, token issues, quota failures and retry state</strong>
-            </div>
-            <div>
-              <span>$ manual publish</span>
-              <strong>cloudinary video + txt/json ready when a platform fails</strong>
-            </div>
-          </div>
+            <button type="submit" class="button button--primary">Access console</button>
+            <p id="loginMessage" class="message" aria-live="polite"></p>
+          </form>
         </section>
       </main>
     </div>
 
     <div class="app-shell app-shell--hidden" id="appView">
-      <header class="dashboard-header shell-card">
-        <div class="dashboard-header__brand">
+      <header class="console-header shell-card">
+        <div class="console-header__brand">
           <span class="brand-badge"></span>
           <div>
-            <p class="eyebrow">Facts Engine Studio</p>
-            <h1>Platform dashboard</h1>
+            <p class="eyebrow">Facts Engine</p>
+            <h1>Operations Console</h1>
             <p class="muted" id="backendLabel">-</p>
           </div>
         </div>
 
-        <div class="dashboard-header__stats" id="headerSummary"></div>
-
-        <div class="dashboard-header__actions">
+        <div class="console-header__actions">
           <button class="button button--ghost" type="button" id="refreshButton">Refresh</button>
           <button class="button button--danger" type="button" id="logoutButton">Logout</button>
         </div>
       </header>
 
-      <nav class="dashboard-nav shell-card">
-        <button class="nav-tab nav-tab--active" type="button" data-view="global">Global</button>
-        <button class="nav-tab" type="button" data-view="youtube">YouTube</button>
-        <button class="nav-tab" type="button" data-view="instagram">Instagram</button>
-        <button class="nav-tab" type="button" data-view="tiktok">TikTok</button>
-        <button class="nav-tab" type="button" data-view="console">Console</button>
-      </nav>
-
-      <section class="summary-strip" id="platformStatusStrip"></section>
-
-      <main class="dashboard-main">
-        <section class="view view--active" data-view-panel="global">
-          <div class="dashboard-grid dashboard-grid--global">
-            <section class="module shell-card">
-              <div class="section-heading">
-                <div>
-                  <p class="eyebrow">Global</p>
-                  <h2>Cross-platform overview</h2>
-                </div>
-              </div>
-              <div class="kpi-grid" id="globalKpis"></div>
-            </section>
-
-            <section class="module shell-card">
-              <div class="section-heading">
-                <div>
-                  <p class="eyebrow">Highlights</p>
-                  <h2>Platform snapshot</h2>
-                </div>
-              </div>
-              <div class="platform-grid" id="globalPlatformCards"></div>
-            </section>
-
-            <section class="module shell-card module--wide">
-              <div class="section-heading">
-                <div>
-                  <p class="eyebrow">Signals</p>
-                  <h2>What needs attention</h2>
-                </div>
-              </div>
-              <div id="globalAlerts"></div>
-            </section>
+      <main class="console-main">
+        <section class="module shell-card">
+          <div class="section-heading">
+            <div>
+              <p class="eyebrow">Runner</p>
+              <h2>Live execution</h2>
+            </div>
+            <span class="status-pill status-pill--idle" id="runnerStatusBadge">idle</span>
           </div>
+          <div class="kpi-grid" id="runnerMeta"></div>
+          <pre class="terminal-output" id="runnerLogs">No logs yet.</pre>
         </section>
 
-        <section class="view" data-view-panel="youtube">
-          <div id="youtubeView"></div>
-        </section>
-
-        <section class="view" data-view-panel="instagram">
-          <div id="instagramView"></div>
-        </section>
-
-        <section class="view" data-view-panel="tiktok">
-          <div id="tiktokView"></div>
-        </section>
-
-        <section class="view" data-view-panel="console">
-          <div class="dashboard-grid">
-            <section class="module shell-card module--wide">
-              <div class="section-heading">
-                <div>
-                  <p class="eyebrow">Runner</p>
-                  <h2>Live execution state</h2>
-                </div>
-                <span class="status-pill status-pill--idle" id="runnerStatusBadge">idle</span>
-              </div>
-              <div class="runner-grid" id="runnerMeta"></div>
-              <pre class="terminal-output" id="runnerLogs">No logs yet.</pre>
-            </section>
-
-            <section class="module shell-card">
-              <div class="section-heading">
-                <div>
-                  <p class="eyebrow">Trace feed</p>
-                  <h2>Filters</h2>
-                </div>
-              </div>
-              <div class="log-filter-grid">
-                <label class="field">
-                  <span>Kind</span>
-                  <select id="logKindFilter">
-                    <option value="">All</option>
-                    <option value="event">Event</option>
-                    <option value="execution">Execution</option>
-                    <option value="artifact">Artifact</option>
-                    <option value="api">API</option>
-                  </select>
-                </label>
-                <label class="field">
-                  <span>Platform</span>
-                  <select id="logPlatformFilter">
-                    <option value="">All</option>
-                    <option value="youtube">YouTube</option>
-                    <option value="instagram">Instagram</option>
-                    <option value="tiktok">TikTok</option>
-                  </select>
-                </label>
-                <label class="field">
-                  <span>Level</span>
-                  <select id="logLevelFilter">
-                    <option value="">All</option>
-                    <option value="info">Info</option>
-                    <option value="error">Error</option>
-                    <option value="warning">Warning</option>
-                    <option value="warn">Warn</option>
-                  </select>
-                </label>
-                <label class="field">
-                  <span>Stage</span>
-                  <input id="logStageFilter" type="text" placeholder="upload_socials" />
-                </label>
-                <label class="field field--wide">
-                  <span>Search</span>
-                  <input id="logSearchFilter" type="text" placeholder="youtube, quota, frame_rate..." />
-                </label>
-              </div>
-              <div id="logCounts" class="kpi-grid"></div>
-            </section>
-
-            <section class="module shell-card">
-              <div class="section-heading">
-                <div>
-                  <p class="eyebrow">Workflow</p>
-                  <h2>Recent executions</h2>
-                </div>
-              </div>
-              <div id="executionConsole" class="stack-list"></div>
-            </section>
-
-            <section class="module shell-card">
-              <div class="section-heading">
-                <div>
-                  <p class="eyebrow">Events</p>
-                  <h2>Structured trace feed</h2>
-                </div>
-              </div>
-              <div id="eventConsole" class="stack-list"></div>
-            </section>
-
-            <section class="module shell-card module--wide">
-              <div class="section-heading">
-                <div>
-                  <p class="eyebrow">Fallbacks</p>
-                  <h2>Manual publish packages</h2>
-                </div>
-              </div>
-              <div id="fallbackConsole" class="stack-list"></div>
-            </section>
+        <section class="module shell-card">
+          <div class="section-heading">
+            <div>
+              <p class="eyebrow">Filters</p>
+              <h2>Structured trace feed</h2>
+            </div>
           </div>
+
+          <div class="log-filter-grid">
+            <label class="field">
+              <span>Kind</span>
+              <select id="logKindFilter">
+                <option value="">All</option>
+                <option value="event">Event</option>
+                <option value="execution">Execution</option>
+                <option value="artifact">Artifact</option>
+                <option value="api">API</option>
+              </select>
+            </label>
+
+            <label class="field">
+              <span>Platform</span>
+              <select id="logPlatformFilter">
+                <option value="">All</option>
+                <option value="youtube">YouTube</option>
+                <option value="instagram">Instagram</option>
+                <option value="tiktok">TikTok</option>
+              </select>
+            </label>
+
+            <label class="field">
+              <span>Level</span>
+              <select id="logLevelFilter">
+                <option value="">All</option>
+                <option value="info">Info</option>
+                <option value="error">Error</option>
+                <option value="warning">Warning</option>
+                <option value="warn">Warn</option>
+              </select>
+            </label>
+
+            <label class="field">
+              <span>Stage</span>
+              <input id="logStageFilter" type="text" placeholder="upload_socials" />
+            </label>
+
+            <label class="field field--wide">
+              <span>Search</span>
+              <input id="logSearchFilter" type="text" placeholder="youtube, quota, frame_rate, token..." />
+            </label>
+          </div>
+
+          <div class="kpi-grid" id="logCounts"></div>
+        </section>
+
+        <section class="console-grid">
+          <section class="module shell-card">
+            <div class="section-heading">
+              <div>
+                <p class="eyebrow">Workflow</p>
+                <h2>Recent executions</h2>
+              </div>
+            </div>
+            <div id="executionConsole" class="stack-list"></div>
+          </section>
+
+          <section class="module shell-card">
+            <div class="section-heading">
+              <div>
+                <p class="eyebrow">Logs</p>
+                <h2>Trace feed</h2>
+              </div>
+            </div>
+            <div id="eventConsole" class="stack-list"></div>
+          </section>
+
+          <section class="module shell-card module--wide">
+            <div class="section-heading">
+              <div>
+                <p class="eyebrow">Fallbacks</p>
+                <h2>Manual publish packages</h2>
+              </div>
+            </div>
+            <div id="fallbackConsole" class="stack-list"></div>
+          </section>
         </section>
       </main>
     </div>
