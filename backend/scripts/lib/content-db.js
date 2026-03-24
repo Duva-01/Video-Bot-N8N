@@ -758,29 +758,42 @@ function inferPlatform(value) {
 }
 
 function normalizeConsoleEntry(entry) {
+  const details = entry.context || entry.metadata || {};
   const source = entry.source || entry.action || "system";
-  const stage = entry.stage || entry.context?.stage || entry.metadata?.stage || entry.sample_type || "unknown";
+  const stage = entry.stage || details?.stage || entry.sample_type || "unknown";
   const platform =
     entry.platform ||
-    entry.context?.platform ||
-    entry.metadata?.platform ||
+    details?.platform ||
     inferPlatform(source) ||
     inferPlatform(stage) ||
     inferPlatform(entry.message);
   const status =
     entry.status ||
-    entry.context?.status ||
-    entry.metadata?.status ||
+    details?.status ||
     (entry.level === "error" ? "failed" : entry.level === "warn" || entry.level === "warning" ? "warning" : "info");
   const reference =
     entry.reference ||
-    entry.context?.reference ||
-    entry.metadata?.reference ||
-    entry.metadata?.publish_id ||
-    entry.metadata?.videoId ||
-    entry.metadata?.creationId ||
+    details?.reference ||
+    details?.publish_id ||
+    details?.videoId ||
+    details?.creationId ||
     entry.external_url ||
     null;
+  const reason =
+    details?.error ||
+    details?.reason ||
+    details?.failure_reason ||
+    details?.fail_reason ||
+    details?.raw?.data?.fail_reason ||
+    details?.raw?.error?.message ||
+    null;
+  const topic =
+    details?.title ||
+    details?.topic ||
+    details?.topic_key ||
+    entry.topic_key ||
+    null;
+  const statusCode = details?.status_code || null;
 
   return {
     id: entry.id || null,
@@ -795,8 +808,11 @@ function normalizeConsoleEntry(entry) {
     status,
     message: entry.message || entry.label || entry.metric_name || "entry",
     reference,
+    reason,
+    topic,
+    statusCode,
     timestamp: entry.created_at || null,
-    details: entry.context || entry.metadata || {},
+    details,
   };
 }
 

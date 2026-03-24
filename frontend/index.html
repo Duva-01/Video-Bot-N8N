@@ -3,185 +3,149 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Facts Engine Console</title>
+    <title>Facts Engine Logs</title>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
-      href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&family=JetBrains+Mono:wght@400;500&display=swap"
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap"
       rel="stylesheet"
     />
     <link rel="stylesheet" href="./styles.css" />
   </head>
   <body>
-    <div class="page-noise"></div>
-
     <div class="login-screen" id="loginView">
-      <main class="login-layout">
-        <section class="login-hero shell-card">
-          <p class="eyebrow">Facts Engine</p>
-          <h1>Structured logs, traces and runner state in one console.</h1>
-          <p class="lede">
-            A single operator view for errors, workflow runs, social publishing failures, artifacts and manual publish
-            fallbacks.
-          </p>
-          <div class="hero-points">
-            <article>
-              <span>Traceability</span>
-              <strong>Platform, stage, severity and reference</strong>
-            </article>
-            <article>
-              <span>Filtering</span>
-              <strong>Search by YouTube, Instagram, TikTok or pipeline step</strong>
-            </article>
-            <article>
-              <span>Operations</span>
-              <strong>Runner state, recent executions and fallback links</strong>
-            </article>
-          </div>
-        </section>
-
-        <section class="login-panel shell-card">
-          <p class="eyebrow">Access</p>
-          <h2>Open console</h2>
-          <form id="loginForm" class="login-form">
-            <label class="field">
-              <span>Backend URL</span>
-              <input id="apiBaseUrl" type="url" required />
-            </label>
-
-            <label class="field">
-              <span>Username</span>
-              <input id="username" type="text" autocomplete="username" required />
-            </label>
-
-            <label class="field">
-              <span>Password</span>
-              <input id="password" type="password" autocomplete="current-password" required />
-            </label>
-
-            <button type="submit" class="button button--primary">Access console</button>
-            <p id="loginMessage" class="message" aria-live="polite"></p>
-          </form>
-        </section>
+      <main class="login-card">
+        <p class="eyebrow">Facts Engine</p>
+        <h1>Log Console</h1>
+        <p class="lede">Structured traces, API audit logs, artifacts and failures in one searchable view.</p>
+        <form id="loginForm" class="login-form">
+          <label class="field">
+            <span>Backend URL</span>
+            <input id="apiBaseUrl" type="url" required />
+          </label>
+          <label class="field">
+            <span>Username</span>
+            <input id="username" type="text" autocomplete="username" required />
+          </label>
+          <label class="field">
+            <span>Password</span>
+            <input id="password" type="password" autocomplete="current-password" required />
+          </label>
+          <button type="submit" class="button button--primary">Open console</button>
+          <p id="loginMessage" class="message" aria-live="polite"></p>
+        </form>
       </main>
     </div>
 
     <div class="app-shell app-shell--hidden" id="appView">
-      <header class="console-header shell-card">
-        <div class="console-header__brand">
-          <span class="brand-badge"></span>
-          <div>
-            <p class="eyebrow">Facts Engine</p>
-            <h1>Operations Console</h1>
-            <p class="muted" id="backendLabel">-</p>
-          </div>
+      <header class="topbar">
+        <div>
+          <p class="eyebrow">Facts Engine</p>
+          <h1>Observability Console</h1>
+          <p class="backend-label" id="backendLabel">-</p>
         </div>
-
-        <div class="console-header__actions">
-          <button class="button button--ghost" type="button" id="refreshButton">Refresh</button>
+        <div class="topbar-actions">
+          <label class="toggle">
+            <input id="autoRefreshToggle" type="checkbox" checked />
+            <span>Auto refresh</span>
+          </label>
+          <button class="button" type="button" id="refreshButton">Refresh</button>
           <button class="button button--danger" type="button" id="logoutButton">Logout</button>
         </div>
       </header>
 
-      <main class="console-main">
-        <section class="module shell-card">
-          <div class="section-heading">
+      <section class="filters">
+        <label class="field field--wide">
+          <span>Search</span>
+          <input id="logSearchFilter" type="text" placeholder="quota, token, frame_rate, youtube, instagram..." />
+        </label>
+        <label class="field">
+          <span>Platform</span>
+          <select id="logPlatformFilter">
+            <option value="">All</option>
+            <option value="youtube">YouTube</option>
+            <option value="instagram">Instagram</option>
+            <option value="tiktok">TikTok</option>
+          </select>
+        </label>
+        <label class="field">
+          <span>Level</span>
+          <select id="logLevelFilter">
+            <option value="">All</option>
+            <option value="error">Error</option>
+            <option value="warning">Warning</option>
+            <option value="warn">Warn</option>
+            <option value="info">Info</option>
+          </select>
+        </label>
+        <label class="field">
+          <span>Kind</span>
+          <select id="logKindFilter">
+            <option value="">All</option>
+            <option value="event">Event</option>
+            <option value="execution">Execution</option>
+            <option value="artifact">Artifact</option>
+            <option value="api">API</option>
+          </select>
+        </label>
+        <label class="field">
+          <span>Status</span>
+          <select id="logStatusFilter">
+            <option value="">All</option>
+            <option value="failed">Failed</option>
+            <option value="warning">Warning</option>
+            <option value="published">Published</option>
+            <option value="started">Started</option>
+            <option value="info">Info</option>
+          </select>
+        </label>
+        <label class="field">
+          <span>Stage</span>
+          <input id="logStageFilter" type="text" placeholder="upload_socials" />
+        </label>
+        <label class="field">
+          <span>Sort</span>
+          <select id="sortOrder">
+            <option value="desc">Newest first</option>
+            <option value="asc">Oldest first</option>
+          </select>
+        </label>
+      </section>
+
+      <section class="stats-strip" id="logCounts"></section>
+
+      <main class="workspace">
+        <section class="log-panel">
+          <div class="panel-header">
             <div>
-              <p class="eyebrow">Runner</p>
-              <h2>Live execution</h2>
+              <p class="eyebrow">Trace Feed</p>
+              <h2>All requests and pipeline traces</h2>
             </div>
-            <span class="status-pill status-pill--idle" id="runnerStatusBadge">idle</span>
-          </div>
-          <div class="kpi-grid" id="runnerMeta"></div>
-          <pre class="terminal-output" id="runnerLogs">No logs yet.</pre>
-        </section>
-
-        <section class="module shell-card">
-          <div class="section-heading">
-            <div>
-              <p class="eyebrow">Filters</p>
-              <h2>Structured trace feed</h2>
-            </div>
+            <span class="result-count" id="resultCount">0 entries</span>
           </div>
 
-          <div class="log-filter-grid">
-            <label class="field">
-              <span>Kind</span>
-              <select id="logKindFilter">
-                <option value="">All</option>
-                <option value="event">Event</option>
-                <option value="execution">Execution</option>
-                <option value="artifact">Artifact</option>
-                <option value="api">API</option>
-              </select>
-            </label>
-
-            <label class="field">
-              <span>Platform</span>
-              <select id="logPlatformFilter">
-                <option value="">All</option>
-                <option value="youtube">YouTube</option>
-                <option value="instagram">Instagram</option>
-                <option value="tiktok">TikTok</option>
-              </select>
-            </label>
-
-            <label class="field">
+          <div class="log-table-shell">
+            <div class="log-table-head">
+              <span>Timestamp</span>
               <span>Level</span>
-              <select id="logLevelFilter">
-                <option value="">All</option>
-                <option value="info">Info</option>
-                <option value="error">Error</option>
-                <option value="warning">Warning</option>
-                <option value="warn">Warn</option>
-              </select>
-            </label>
-
-            <label class="field">
+              <span>Platform</span>
               <span>Stage</span>
-              <input id="logStageFilter" type="text" placeholder="upload_socials" />
-            </label>
-
-            <label class="field field--wide">
-              <span>Search</span>
-              <input id="logSearchFilter" type="text" placeholder="youtube, quota, frame_rate, token..." />
-            </label>
+              <span>Summary</span>
+            </div>
+            <div class="log-table-body" id="logTable"></div>
           </div>
-
-          <div class="kpi-grid" id="logCounts"></div>
         </section>
 
-        <section class="console-grid">
-          <section class="module shell-card">
-            <div class="section-heading">
-              <div>
-                <p class="eyebrow">Workflow</p>
-                <h2>Recent executions</h2>
-              </div>
+        <aside class="detail-panel">
+          <div class="panel-header">
+            <div>
+              <p class="eyebrow">Inspector</p>
+              <h2>Entry details</h2>
             </div>
-            <div id="executionConsole" class="stack-list"></div>
-          </section>
-
-          <section class="module shell-card">
-            <div class="section-heading">
-              <div>
-                <p class="eyebrow">Logs</p>
-                <h2>Trace feed</h2>
-              </div>
-            </div>
-            <div id="eventConsole" class="stack-list"></div>
-          </section>
-
-          <section class="module shell-card module--wide">
-            <div class="section-heading">
-              <div>
-                <p class="eyebrow">Fallbacks</p>
-                <h2>Manual publish packages</h2>
-              </div>
-            </div>
-            <div id="fallbackConsole" class="stack-list"></div>
-          </section>
-        </section>
+          </div>
+          <div id="detailSummary" class="detail-summary"></div>
+          <pre id="detailJson" class="detail-json">Select a row to inspect its full context.</pre>
+        </aside>
       </main>
     </div>
 

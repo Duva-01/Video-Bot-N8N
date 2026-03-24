@@ -1,6 +1,13 @@
 (function () {
   const TOKEN_KEY = "facts_engine_token";
   const API_BASE_KEY = "facts_engine_api_base";
+  const AUTO_REFRESH_INTERVAL_MS = 20000;
+
+  const state = {
+    entries: [],
+    selectedId: null,
+    refreshTimer: null,
+  };
 
   const loginView = document.getElementById("loginView");
   const appView = document.getElementById("appView");
@@ -9,18 +16,33 @@
   const apiBaseUrlInput = document.getElementById("apiBaseUrl");
   const usernameInput = document.getElementById("username");
   const passwordInput = document.getElementById("password");
+  const backendLabel = document.getElementById("backendLabel");
   const refreshButton = document.getElementById("refreshButton");
   const logoutButton = document.getElementById("logoutButton");
-  const logKindFilter = document.getElementById("logKindFilter");
+  const autoRefreshToggle = document.getElementById("autoRefreshToggle");
+  const logSearchFilter = document.getElementById("logSearchFilter");
   const logPlatformFilter = document.getElementById("logPlatformFilter");
   const logLevelFilter = document.getElementById("logLevelFilter");
+  const logKindFilter = document.getElementById("logKindFilter");
+  const logStatusFilter = document.getElementById("logStatusFilter");
   const logStageFilter = document.getElementById("logStageFilter");
-  const logSearchFilter = document.getElementById("logSearchFilter");
+  const sortOrder = document.getElementById("sortOrder");
+  const logCounts = document.getElementById("logCounts");
+  const logTable = document.getElementById("logTable");
+  const detailSummary = document.getElementById("detailSummary");
+  const detailJson = document.getElementById("detailJson");
+  const resultCount = document.getElementById("resultCount");
 
-  let refreshTimer = null;
+  function getToken() {
+    return window.localStorage.getItem(TOKEN_KEY) || "";
+  }
 
-  function byId(id) {
-    return document.getElementById(id);
+  function setToken(value) {
+    window.localStorage.setItem(TOKEN_KEY, value);
+  }
+
+  function clearToken() {
+    window.localStorage.removeItem(TOKEN_KEY);
   }
 
   function getApiBaseUrl() {
@@ -33,25 +55,13 @@
     return normalized;
   }
 
-  function getToken() {
-    return window.localStorage.getItem(TOKEN_KEY) || "";
-  }
-
-  function setToken(value) {
-    window.localStorage.setItem(TOKEN_KEY, value);
-  }
-
-  function clearSession() {
-    window.localStorage.removeItem(TOKEN_KEY);
-  }
-
   function setAuthenticated(authenticated) {
     loginView.style.display = authenticated ? "none" : "block";
     appView.classList.toggle("app-shell--hidden", !authenticated);
   }
 
   function escapeHtml(value) {
-    return String(value || "")
+    return String(value ?? "")
       .replace(/&/g, "&amp;")
       .replace(/</g, "&lt;")
       .replace(/>/g, "&gt;")
@@ -63,41 +73,47 @@
     if (!value) return "-";
     const date = new Date(value);
     if (Number.isNaN(date.getTime())) return "-";
-    return new Intl.DateTimeFormat("es-ES", { dateStyle: "medium", timeStyle: "short" }).format(date);
+    return new Intl.DateTimeFormat("es-ES", {
+      dateStyle: "short",
+      timeStyle: "medium",
+    }).format(date);
   }
 
-  function getStatusClass(state) {
-    const normalized = String(state || "").toLowerCase();
-    if (["ok", "active", "available", "published", "connected", "running", "info"].includes(normalized)) {
-      return "status-pill status-pill--success";
+  function formatJson(value) {
+    try {
+      return JSON.stringify(value ?? {}, null, 2);
+    } catch {
+      return String(value ?? "");
     }
-    if (["warning", "limited", "configured", "warn"].includes(normalized)) {
-      return "status-pill status-pill--warn";
-    }
-    return "status-pill status-pill--error";
   }
 
-  function makeKpiCards(items) {
-    if (!items.length) {
-      return '<div class="empty-state">No metrics yet.</div>';
+  function statusClass(status) {
+    const normalized = String(status || "").toLowerCase();
+    if (["published", "success", "ok", "completed", "running", "started", "info"].includes(normalized)) {
+      return "badge badge--info";
     }
+    if (["warning", "warn", "limited"].includes(normalized)) {
+      return "badge badge--warn";
+    }
+    return "badge badge--error";
+  }
 
-    return items
-      .map(
-        (item) => `
-          <article class="kpi-card">
-            <span>${escapeHtml(item.label)}</span>
-            <strong>${escapeHtml(item.value)}</strong>
-            ${item.note ? `<p>${escapeHtml(item.note)}</p>` : ""}
-          </article>
-        `,
-      )
-      .join("");
+  function levelClass(level) {
+    const normalized = String(level || "").toLowerCase();
+    if (normalized === "error") return "badge badge--error";
+    if (normalized === "warning" || normalized === "warn") return "badge badge--warn";
+    return "badge badge--info";
+  }
+
+  function summarize(entry) {
+    const message = entry.message || "-";
+    const reason = entry.reason ? ` | ${entry.reason}` : "";
+    return `${message}${reason}`;
   }
 
   async function apiFetch(path, options = {}) {
-    const token = getToken();
     const baseUrl = getApiBaseUrl();
+    const token = getToken();
     if (!baseUrl) {
       throw new Error("Missing API base URL");
     }
@@ -115,143 +131,179 @@
     return payload;
   }
 
-  function getLogFilters() {
+  function currentFilters() {
     return {
-      kind: logKindFilter.value,
+      limit: "300",
+      search: logSearchFilter.value.trim(),
       platform: logPlatformFilter.value,
       level: logLevelFilter.value,
+      kind: logKindFilter.value,
       stage: logStageFilter.value.trim(),
-      search: logSearchFilter.value.trim(),
     };
   }
 
-  async function loadConsoleFeed() {
-    const filters = getLogFilters();
-    const params = new URLSearchParams({ limit: "200" });
-    Object.entries(filters).forEach(([key, value]) => {
+  async function loadLogs() {
+    const params = new URLSearchParams();
+    Object.entries(currentFilters()).forEach(([key, value]) => {
       if (value) {
         params.set(key, value);
       }
     });
-    return apiFetch(`/api/logs?${params.toString()}`);
+    const payload = await apiFetch(`/api/logs?${params.toString()}`);
+    state.entries = Array.isArray(payload.entries) ? payload.entries.slice() : [];
+    renderCounts(payload.counts || {});
+    renderTable();
+    ensureSelection();
+    renderDetails();
   }
 
-  function renderRunner(control) {
-    const runner = control.runner || {};
-    const workflow = control.workflow || {};
-    byId("backendLabel").textContent = getApiBaseUrl();
-    byId("runnerStatusBadge").className = getStatusClass(runner.running ? "running" : "configured");
-    byId("runnerStatusBadge").textContent = runner.running ? "running" : "idle";
-    byId("runnerMeta").innerHTML = makeKpiCards([
-      { label: "Status", value: runner.running ? "Running" : "Idle" },
-      { label: "Workflow", value: workflow.name || "-" },
-      { label: "Started", value: runner.startedAt ? formatDate(runner.startedAt) : "-" },
-      { label: "Finished", value: runner.finishedAt ? formatDate(runner.finishedAt) : "-" },
-    ]);
-    byId("runnerLogs").textContent = [runner.stdoutTail, runner.stderrTail].filter(Boolean).join("\n\n") || "No logs yet.";
+  function renderCounts(counts) {
+    const warningCount = (counts.byLevel?.warning || 0) + (counts.byLevel?.warn || 0);
+    const cards = [
+      { label: "Entries", value: counts.total || 0 },
+      { label: "Errors", value: counts.byLevel?.error || 0 },
+      { label: "Warnings", value: warningCount },
+      { label: "YouTube", value: counts.byPlatform?.youtube || 0 },
+      { label: "Instagram", value: counts.byPlatform?.instagram || 0 },
+      { label: "TikTok", value: counts.byPlatform?.tiktok || 0 },
+    ];
+
+    logCounts.innerHTML = cards
+      .map(
+        (card) => `
+          <article class="stat-card">
+            <span>${escapeHtml(card.label)}</span>
+            <strong>${escapeHtml(card.value)}</strong>
+          </article>
+        `,
+      )
+      .join("");
   }
 
-  function renderExecutions(control) {
-    const executions = Array.isArray(control.executions) ? control.executions : [];
-    byId("executionConsole").innerHTML = executions.length
-      ? executions
-          .map(
-            (item) => `
-              <article class="stack-item">
-                <div>
-                  <span>${escapeHtml(item.name || "workflow")}</span>
-                  <strong>${escapeHtml(item.status || "-")}</strong>
-                </div>
-                <small>${escapeHtml(formatDate(item.startedAt || item.stoppedAt))}</small>
-              </article>
-            `,
-          )
-          .join("")
-      : '<div class="empty-state small-empty">No workflow executions yet.</div>';
+  function filteredAndSortedEntries() {
+    const filtered = state.entries.filter((entry) => {
+      if (logStatusFilter.value && String(entry.status || "").toLowerCase() !== logStatusFilter.value.toLowerCase()) {
+        return false;
+      }
+      return true;
+    });
+
+    const direction = sortOrder.value === "asc" ? 1 : -1;
+    return filtered.sort((left, right) => {
+      const leftTime = new Date(left.timestamp || 0).getTime();
+      const rightTime = new Date(right.timestamp || 0).getTime();
+      return (leftTime - rightTime) * direction;
+    });
   }
 
-  function renderConsoleFeed(feed) {
-    const counts = feed.counts || { total: 0, byKind: {}, byPlatform: {}, byLevel: {} };
-    byId("logCounts").innerHTML = makeKpiCards([
-      { label: "Entries", value: String(counts.total || 0) },
-      { label: "Errors", value: String(counts.byLevel?.error || 0) },
-      { label: "Warnings", value: String((counts.byLevel?.warning || 0) + (counts.byLevel?.warn || 0)) },
-      { label: "YouTube", value: String(counts.byPlatform?.youtube || 0) },
-      { label: "Instagram", value: String(counts.byPlatform?.instagram || 0) },
-      { label: "TikTok", value: String(counts.byPlatform?.tiktok || 0) },
-    ]);
+  function renderTable() {
+    const entries = filteredAndSortedEntries();
+    resultCount.textContent = `${entries.length} entries`;
 
-    byId("eventConsole").innerHTML = Array.isArray(feed.entries) && feed.entries.length
-      ? feed.entries
-          .map(
-            (entry) => `
-              <article class="stack-item">
-                <div>
-                  <span>${escapeHtml([entry.kind, entry.platform || entry.source, entry.stage].filter(Boolean).join(" / "))}</span>
-                  <strong>${escapeHtml(entry.message || "-")}</strong>
-                </div>
-                <div class="stack-links">
-                  <span class="${getStatusClass(entry.level === "error" ? "error" : entry.level === "warning" || entry.level === "warn" ? "warning" : "info")}">${escapeHtml(entry.level || "info")}</span>
-                  ${entry.reference ? `<a href="${escapeHtml(entry.reference)}" target="_blank" rel="noreferrer">ref</a>` : ""}
-                  <small>${escapeHtml(formatDate(entry.timestamp))}</small>
-                </div>
-              </article>
-            `,
-          )
-          .join("")
-      : '<div class="empty-state small-empty">No entries match the current filters.</div>';
+    if (!entries.length) {
+      logTable.innerHTML = '<div class="empty-state">No logs match the current filters.</div>';
+      return;
+    }
+
+    logTable.innerHTML = entries
+      .map(
+        (entry) => `
+          <button class="log-row ${state.selectedId === entry.id ? "log-row--active" : ""}" type="button" data-entry-id="${escapeHtml(entry.id)}">
+            <span class="log-cell log-cell--mono">${escapeHtml(formatDate(entry.timestamp))}</span>
+            <span class="log-cell"><span class="${levelClass(entry.level)}">${escapeHtml(entry.level || "info")}</span></span>
+            <span class="log-cell">${escapeHtml(entry.platform || "-")}</span>
+            <span class="log-cell">${escapeHtml(entry.stage || "-")}</span>
+            <span class="log-cell log-cell--summary">
+              <strong>${escapeHtml(entry.message || "-")}</strong>
+              <small>${escapeHtml([entry.source, entry.topic, entry.reason].filter(Boolean).join(" | "))}</small>
+            </span>
+          </button>
+        `,
+      )
+      .join("");
+
+    logTable.querySelectorAll("[data-entry-id]").forEach((node) => {
+      node.addEventListener("click", () => {
+        state.selectedId = Number(node.dataset.entryId) || node.dataset.entryId;
+        renderTable();
+        renderDetails();
+      });
+    });
   }
 
-  function renderFallbacks(control) {
-    const dashboard = control.dashboard || {};
-    const recentRuns = Array.isArray(dashboard.recentRuns) ? dashboard.recentRuns : [];
-    const fallbacks = recentRuns
-      .flatMap((run) => {
-        const socialPosts = run?.metadata?.social_posts || {};
-        return ["youtube", "instagram", "tiktok"]
-          .map((platform) => ({ platform, payload: socialPosts[platform], title: run.title || run.topic_key || "Untitled" }))
-          .filter((item) => item.payload?.manualFallback);
-      })
-      .slice(0, 20);
+  function ensureSelection() {
+    const entries = filteredAndSortedEntries();
+    if (!entries.length) {
+      state.selectedId = null;
+      return;
+    }
 
-    byId("fallbackConsole").innerHTML = fallbacks.length
-      ? fallbacks
-          .map(
-            (item) => `
-              <article class="stack-item">
-                <div>
-                  <span>${escapeHtml(item.platform)}</span>
-                  <strong>${escapeHtml(item.title)}</strong>
-                </div>
-                <div class="stack-links">
-                  ${item.payload.manualFallback.videoUrl ? `<a href="${escapeHtml(item.payload.manualFallback.videoUrl)}" target="_blank" rel="noreferrer">video</a>` : ""}
-                  ${item.payload.manualFallback.txtUrl ? `<a href="${escapeHtml(item.payload.manualFallback.txtUrl)}" target="_blank" rel="noreferrer">txt</a>` : ""}
-                  ${item.payload.manualFallback.jsonUrl ? `<a href="${escapeHtml(item.payload.manualFallback.jsonUrl)}" target="_blank" rel="noreferrer">json</a>` : ""}
-                </div>
-              </article>
-            `,
-          )
-          .join("")
-      : '<div class="empty-state small-empty">No manual fallback packages waiting.</div>';
+    const exists = entries.some((entry) => String(entry.id) === String(state.selectedId));
+    if (!exists) {
+      state.selectedId = entries[0].id;
+    }
   }
 
-  async function loadConsole() {
-    const [control, feed] = await Promise.all([apiFetch("/api/control-center"), loadConsoleFeed()]);
-    renderRunner(control);
-    renderExecutions(control);
-    renderConsoleFeed(feed);
-    renderFallbacks(control);
+  function renderDetails() {
+    const entry = filteredAndSortedEntries().find((item) => String(item.id) === String(state.selectedId));
+    if (!entry) {
+      detailSummary.innerHTML = '<div class="empty-state">Select a row to inspect its full context.</div>';
+      detailJson.textContent = "Select a row to inspect its full context.";
+      return;
+    }
+
+    detailSummary.innerHTML = `
+      <div class="summary-grid">
+        <article class="summary-card">
+          <span>Timestamp</span>
+          <strong>${escapeHtml(formatDate(entry.timestamp))}</strong>
+        </article>
+        <article class="summary-card">
+          <span>Platform</span>
+          <strong>${escapeHtml(entry.platform || "-")}</strong>
+        </article>
+        <article class="summary-card">
+          <span>Stage</span>
+          <strong>${escapeHtml(entry.stage || "-")}</strong>
+        </article>
+        <article class="summary-card">
+          <span>Status</span>
+          <strong><span class="${statusClass(entry.status)}">${escapeHtml(entry.status || "-")}</span></strong>
+        </article>
+        <article class="summary-card summary-card--wide">
+          <span>Message</span>
+          <strong>${escapeHtml(entry.message || "-")}</strong>
+        </article>
+        <article class="summary-card summary-card--wide">
+          <span>Failure reason</span>
+          <strong>${escapeHtml(entry.reason || "-")}</strong>
+        </article>
+        <article class="summary-card summary-card--wide">
+          <span>Reference</span>
+          <strong>${entry.reference ? `<a href="${escapeHtml(entry.reference)}" target="_blank" rel="noreferrer">${escapeHtml(entry.reference)}</a>` : "-"}</strong>
+        </article>
+        <article class="summary-card summary-card--wide">
+          <span>Source</span>
+          <strong>${escapeHtml([entry.kind, entry.source, entry.topic].filter(Boolean).join(" / "))}</strong>
+        </article>
+      </div>
+    `;
+    detailJson.textContent = formatJson(entry);
   }
 
   function scheduleRefresh() {
-    if (refreshTimer) {
-      clearInterval(refreshTimer);
+    if (state.refreshTimer) {
+      clearInterval(state.refreshTimer);
+      state.refreshTimer = null;
     }
-    refreshTimer = window.setInterval(() => {
-      loadConsole().catch((error) => {
-        console.error(error);
-      });
-    }, 60000);
+
+    if (!autoRefreshToggle.checked) {
+      return;
+    }
+
+    state.refreshTimer = window.setInterval(() => {
+      loadLogs().catch((error) => console.error(error));
+    }, AUTO_REFRESH_INTERVAL_MS);
   }
 
   async function handleLoginSubmit(event) {
@@ -274,47 +326,49 @@
       }
 
       setToken(payload.token);
+      backendLabel.textContent = baseUrl;
       setAuthenticated(true);
       scheduleRefresh();
-      await loadConsole();
+      await loadLogs();
     } catch (error) {
       loginMessage.textContent = error.message;
     }
   }
 
   function handleLogout() {
-    clearSession();
+    clearToken();
     setAuthenticated(false);
-    if (refreshTimer) {
-      clearInterval(refreshTimer);
-      refreshTimer = null;
+    if (state.refreshTimer) {
+      clearInterval(state.refreshTimer);
+      state.refreshTimer = null;
     }
   }
 
   function bindEvents() {
     loginForm.addEventListener("submit", handleLoginSubmit);
-    refreshButton.addEventListener("click", () => {
-      loadConsole().catch((error) => {
-        console.error(error);
-      });
-    });
+    refreshButton.addEventListener("click", () => loadLogs().catch((error) => console.error(error)));
     logoutButton.addEventListener("click", handleLogout);
+    autoRefreshToggle.addEventListener("change", scheduleRefresh);
 
-    [logKindFilter, logPlatformFilter, logLevelFilter, logStageFilter, logSearchFilter].forEach((input) => {
-      input.addEventListener("change", () => {
-        if (getToken()) {
-          loadConsole().catch((error) => console.error(error));
-        }
-      });
-      input.addEventListener("input", () => {
-        if (getToken()) {
-          clearTimeout(input._logTimer);
-          input._logTimer = setTimeout(() => {
-            loadConsole().catch((error) => console.error(error));
-          }, 250);
-        }
-      });
-    });
+    [logSearchFilter, logPlatformFilter, logLevelFilter, logKindFilter, logStatusFilter, logStageFilter, sortOrder].forEach(
+      (input) => {
+        input.addEventListener("change", () => {
+          if (getToken()) {
+            loadLogs().catch((error) => console.error(error));
+          }
+        });
+
+        input.addEventListener("input", () => {
+          if (!getToken()) {
+            return;
+          }
+          clearTimeout(input._refreshHandle);
+          input._refreshHandle = setTimeout(() => {
+            loadLogs().catch((error) => console.error(error));
+          }, 200);
+        });
+      },
+    );
   }
 
   async function bootstrap() {
@@ -327,9 +381,10 @@
     }
 
     try {
+      backendLabel.textContent = getApiBaseUrl();
       setAuthenticated(true);
       scheduleRefresh();
-      await loadConsole();
+      await loadLogs();
     } catch (error) {
       console.error(error);
       handleLogout();
