@@ -327,6 +327,16 @@ img {
   box-shadow: 0 0 0 4px rgba(255, 209, 102, 0.1);
 }
 
+.field select {
+  width: 100%;
+  padding: 15px 16px;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--line-strong);
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--text);
+  outline: none;
+}
+
 .message {
   min-height: 20px;
   margin: 0;
@@ -624,6 +634,16 @@ img {
   grid-template-columns: repeat(4, minmax(0, 1fr));
 }
 
+.log-filter-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.field--wide {
+  grid-column: 1 / -1;
+}
+
 .terminal-output {
   margin: 16px 0 0;
   padding: 18px;
@@ -707,6 +727,7 @@ img {
   .platform-grid,
   .kpi-grid,
   .runner-grid,
+  .log-filter-grid,
   .dashboard-header__stats {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
@@ -735,6 +756,7 @@ img {
   .platform-grid,
   .kpi-grid,
   .runner-grid,
+  .log-filter-grid,
   .dashboard-header__stats,
   .video-grid {
     grid-template-columns: 1fr;

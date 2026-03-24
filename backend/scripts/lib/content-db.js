@@ -738,10 +738,172 @@ async function getOperationsLog(pool, limit = 40) {
   };
 }
 
+function inferPlatform(value) {
+  const text = String(value || "").toLowerCase();
+  if (text.includes("youtube")) return "youtube";
+  if (text.includes("instagram")) return "instagram";
+  if (text.includes("tiktok")) return "tiktok";
+  return null;
+}
+
+function normalizeConsoleEntry(entry) {
+  const source = entry.source || entry.action || "system";
+  const stage = entry.stage || entry.context?.stage || entry.metadata?.stage || entry.sample_type || "unknown";
+  const platform =
+    entry.platform ||
+    entry.context?.platform ||
+    entry.metadata?.platform ||
+    inferPlatform(source) ||
+    inferPlatform(stage) ||
+    inferPlatform(entry.message);
+  const status =
+    entry.status ||
+    entry.context?.status ||
+    entry.metadata?.status ||
+    (entry.level === "error" ? "failed" : entry.level === "warn" || entry.level === "warning" ? "warning" : "info");
+  const reference =
+    entry.reference ||
+    entry.context?.reference ||
+    entry.metadata?.reference ||
+    entry.metadata?.publish_id ||
+    entry.metadata?.videoId ||
+    entry.metadata?.creationId ||
+    entry.external_url ||
+    null;
+
+  return {
+    id: entry.id || null,
+    kind: entry.kind || "event",
+    topic_key: entry.topic_key || null,
+    workflow_id: entry.workflow_id || null,
+    execution_id: entry.execution_id || null,
+    source,
+    stage,
+    platform,
+    level: entry.level || "info",
+    status,
+    message: entry.message || entry.label || entry.metric_name || "entry",
+    reference,
+    timestamp: entry.created_at || null,
+    details: entry.context || entry.metadata || {},
+  };
+}
+
+async function getConsoleFeed(pool, options = {}) {
+  const limit = Math.max(20, Math.min(Number(options.limit || 200), 500));
+  const overscan = Math.min(limit * 3, 800);
+  const platformFilter = String(options.platform || "").trim().toLowerCase();
+  const stageFilter = String(options.stage || "").trim().toLowerCase();
+  const levelFilter = String(options.level || "").trim().toLowerCase();
+  const kindFilter = String(options.kind || "").trim().toLowerCase();
+  const search = String(options.search || "").trim().toLowerCase();
+
+  const [eventsResult, executionLogsResult, artifactsResult, apiAuditResult] = await Promise.all([
+    pool.query(
+      `
+        SELECT id, topic_key, event_type, stage, level, source, message, metadata, created_at
+        FROM content_events
+        ORDER BY created_at DESC
+        LIMIT $1
+      `,
+      [overscan],
+    ),
+    pool.query(
+      `
+        SELECT id, topic_key, workflow_id, execution_id, source, level, message, context, created_at
+        FROM execution_logs
+        ORDER BY created_at DESC
+        LIMIT $1
+      `,
+      [overscan],
+    ),
+    pool.query(
+      `
+        SELECT id, topic_key, artifact_type, label, external_url, metadata, created_at
+        FROM content_artifacts
+        ORDER BY created_at DESC
+        LIMIT $1
+      `,
+      [Math.ceil(overscan / 2)],
+    ),
+    pool.query(
+      `
+        SELECT id, actor, action, path, status_code, metadata, created_at
+        FROM api_audit_logs
+        ORDER BY created_at DESC
+        LIMIT $1
+      `,
+      [Math.ceil(overscan / 2)],
+    ),
+  ]);
+
+  const rawEntries = [
+    ...eventsResult.rows.map((row) => ({ ...row, kind: "event", metadata: row.metadata || {} })),
+    ...executionLogsResult.rows.map((row) => ({ ...row, kind: "execution", context: row.context || {} })),
+    ...artifactsResult.rows.map((row) => ({
+      ...row,
+      kind: "artifact",
+      source: "artifact",
+      level: "info",
+      message: row.label || row.artifact_type,
+      metadata: { ...(row.metadata || {}), artifact_type: row.artifact_type, reference: row.external_url || null },
+    })),
+    ...apiAuditResult.rows.map((row) => ({
+      ...row,
+      kind: "api",
+      source: "api",
+      level: row.status_code >= 400 ? "error" : "info",
+      message: `${row.action} ${row.path}`,
+      stage: "http",
+      metadata: { ...(row.metadata || {}), status_code: row.status_code, actor: row.actor },
+    })),
+  ];
+
+  const entries = rawEntries
+    .map(normalizeConsoleEntry)
+    .filter((entry) => {
+      if (platformFilter && String(entry.platform || "").toLowerCase() !== platformFilter) {
+        return false;
+      }
+      if (stageFilter && !String(entry.stage || "").toLowerCase().includes(stageFilter)) {
+        return false;
+      }
+      if (levelFilter && String(entry.level || "").toLowerCase() !== levelFilter) {
+        return false;
+      }
+      if (kindFilter && String(entry.kind || "").toLowerCase() !== kindFilter) {
+        return false;
+      }
+      if (search) {
+        const blob = JSON.stringify(entry).toLowerCase();
+        return blob.includes(search);
+      }
+      return true;
+    })
+    .sort((a, b) => new Date(b.timestamp || 0).getTime() - new Date(a.timestamp || 0).getTime())
+    .slice(0, limit);
+
+  const counts = entries.reduce(
+    (acc, entry) => {
+      acc.total += 1;
+      acc.byKind[entry.kind] = (acc.byKind[entry.kind] || 0) + 1;
+      if (entry.platform) {
+        acc.byPlatform[entry.platform] = (acc.byPlatform[entry.platform] || 0) + 1;
+      }
+      acc.byLevel[entry.level] = (acc.byLevel[entry.level] || 0) + 1;
+      return acc;
+    },
+    { total: 0, byKind: {}, byPlatform: {}, byLevel: {} },
+  );
+
+  return { entries, counts };
+}
+
 module.exports = {
   createPool,
   ensureContentRun,
   ensureSchema,
+  getConsoleFeed,
   getDashboardSummary,
   getOperationsLog,
   hasDatabase,

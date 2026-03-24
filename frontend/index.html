@@ -260,6 +260,55 @@
             <section class="module shell-card">
               <div class="section-heading">
                 <div>
+                  <p class="eyebrow">Trace feed</p>
+                  <h2>Filters</h2>
+                </div>
+              </div>
+              <div class="log-filter-grid">
+                <label class="field">
+                  <span>Kind</span>
+                  <select id="logKindFilter">
+                    <option value="">All</option>
+                    <option value="event">Event</option>
+                    <option value="execution">Execution</option>
+                    <option value="artifact">Artifact</option>
+                    <option value="api">API</option>
+                  </select>
+                </label>
+                <label class="field">
+                  <span>Platform</span>
+                  <select id="logPlatformFilter">
+                    <option value="">All</option>
+                    <option value="youtube">YouTube</option>
+                    <option value="instagram">Instagram</option>
+                    <option value="tiktok">TikTok</option>
+                  </select>
+                </label>
+                <label class="field">
+                  <span>Level</span>
+                  <select id="logLevelFilter">
+                    <option value="">All</option>
+                    <option value="info">Info</option>
+                    <option value="error">Error</option>
+                    <option value="warning">Warning</option>
+                    <option value="warn">Warn</option>
+                  </select>
+                </label>
+                <label class="field">
+                  <span>Stage</span>
+                  <input id="logStageFilter" type="text" placeholder="upload_socials" />
+                </label>
+                <label class="field field--wide">
+                  <span>Search</span>
+                  <input id="logSearchFilter" type="text" placeholder="youtube, quota, frame_rate..." />
+                </label>
+              </div>
+              <div id="logCounts" class="kpi-grid"></div>
+            </section>
+
+            <section class="module shell-card">
+              <div class="section-heading">
+                <div>
                   <p class="eyebrow">Workflow</p>
                   <h2>Recent executions</h2>
                 </div>
@@ -271,7 +320,7 @@
               <div class="section-heading">
                 <div>
                   <p class="eyebrow">Events</p>
-                  <h2>Persisted content events</h2>
+                  <h2>Structured trace feed</h2>
                 </div>
               </div>
               <div id="eventConsole" class="stack-list"></div>

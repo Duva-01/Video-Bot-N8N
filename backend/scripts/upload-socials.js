@@ -18,6 +18,20 @@ function log(message, meta = {}) {
   console.log(JSON.stringify({ ts: new Date().toISOString(), message, ...meta }));
 }
 
+function withTimeout(promise, ms, label) {
+  const timeoutMs = Number(ms || 0);
+  if (!timeoutMs || timeoutMs <= 0) {
+    return promise;
+  }
+
+  return Promise.race([
+    promise,
+    new Promise((_, reject) => {
+      setTimeout(() => reject(new Error(`${label} timed out after ${timeoutMs}ms`)), timeoutMs);
+    }),
+  ]);
+}
+
 function getRequiredEnv(name) {
   const value = process.env[name];
   if (!value) {
@@ -138,14 +152,34 @@ function shouldRetryInstagramRequest(status, raw) {
 async function fetchInstagramJson(resourcePath, { method = "GET", query = {}, body, headers = {}, errorPrefix }) {
   const maxAttempts = Number(process.env.INSTAGRAM_REQUEST_MAX_ATTEMPTS || 4);
   const baseDelayMs = Number(process.env.INSTAGRAM_REQUEST_RETRY_DELAY_MS || 1500);
+  const timeoutMs = Number(process.env.INSTAGRAM_REQUEST_TIMEOUT_MS || 45000);
   let lastError = null;
 
   for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
-    const response = await fetch(buildInstagramApiUrl(resourcePath, query), {
-      method,
-      headers,
-      body,
-    });
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), timeoutMs);
+    let response;
+    try {
+      response = await fetch(buildInstagramApiUrl(resourcePath, query), {
+        method,
+        headers,
+        body,
+        signal: controller.signal,
+      });
+    } catch (error) {
+      clearTimeout(timer);
+      if (error.name === "AbortError") {
+        lastError = new Error(`${errorPrefix} timed out after ${timeoutMs}ms`);
+      } else {
+        lastError = error;
+      }
+      if (attempt === maxAttempts) {
+        throw lastError;
+      }
+      await new Promise((resolve) => setTimeout(resolve, baseDelayMs * attempt));
+      continue;
+    }
+    clearTimeout(timer);
     const raw = await response.text();
 
     if (response.ok) {
@@ -339,10 +373,14 @@ async function main() {
     results.instagram.reason = "disabled";
   } else {
     try {
-      const instagramResult = await uploadToInstagram(resolvedVideoPath, scriptData, {
-        sharedCloudinaryAsset,
-        logger: log,
-      });
+      const instagramResult = await withTimeout(
+        uploadToInstagram(resolvedVideoPath, scriptData, {
+          sharedCloudinaryAsset,
+          logger: log,
+        }),
+        Number(process.env.INSTAGRAM_PUBLISH_TIMEOUT_MS || 180000),
+        "Instagram publish",
+      );
       if (instagramResult.cloudinaryPublicId && instagramResult.cloudinaryUrl) {
         sharedCloudinaryAsset = {
           publicId: instagramResult.cloudinaryPublicId,
@@ -403,12 +441,20 @@ async function main() {
     results.tiktok.reason = "disabled";
   } else {
     try {
-      const tiktokResult = await uploadToTikTok(resolvedVideoPath, {
-        ...scriptData,
-        title: buildTikTokTitle(scriptData),
-      }, {
-        logger: log,
-      });
+      const tiktokResult = await withTimeout(
+        uploadToTikTok(
+          resolvedVideoPath,
+          {
+            ...scriptData,
+            title: buildTikTokTitle(scriptData),
+          },
+          {
+            logger: log,
+          },
+        ),
+        Number(process.env.TIKTOK_PUBLISH_TIMEOUT_MS || 180000),
+        "TikTok publish",
+      );
 
       if (tiktokResult?.skipped) {
         results.tiktok = {

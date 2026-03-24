@@ -13,6 +13,7 @@ const { loadPlatformAnalytics } = require("./platform-analytics");
 const {
   createPool: createContentPool,
   ensureSchema: ensureContentSchema,
+  getConsoleFeed,
   hasDatabase: hasContentDatabase,
   recordApiAudit,
   recordExecutionLog,
@@ -1221,7 +1222,20 @@ const server = http.createServer((req, res) => {
       return;
     }
 
-    loadShellData()
+    withObservabilityPool(async (pool) => {
+      if (!pool) {
+        return { entries: [], counts: { total: 0, byKind: {}, byPlatform: {}, byLevel: {} } };
+      }
+
+      return getConsoleFeed(pool, {
+        limit: parsedUrl.searchParams.get("limit") || 200,
+        platform: parsedUrl.searchParams.get("platform") || "",
+        stage: parsedUrl.searchParams.get("stage") || "",
+        level: parsedUrl.searchParams.get("level") || "",
+        kind: parsedUrl.searchParams.get("kind") || "",
+        search: parsedUrl.searchParams.get("search") || "",
+      });
+    })
       .then((payload) => sendApiJson(req, res, 200, payload))
       .catch((error) => {
         log("logs api error", { error: error.message });

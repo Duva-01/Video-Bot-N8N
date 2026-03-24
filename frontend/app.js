@@ -12,6 +12,11 @@
   const passwordInput = document.getElementById("password");
   const refreshButton = document.getElementById("refreshButton");
   const logoutButton = document.getElementById("logoutButton");
+  const logKindFilter = document.getElementById("logKindFilter");
+  const logPlatformFilter = document.getElementById("logPlatformFilter");
+  const logLevelFilter = document.getElementById("logLevelFilter");
+  const logStageFilter = document.getElementById("logStageFilter");
+  const logSearchFilter = document.getElementById("logSearchFilter");
 
   let refreshTimer = null;
 
@@ -520,13 +525,64 @@
     `;
   }
 
-  function renderConsole(control) {
+  function getLogFilters() {
+    return {
+      kind: logKindFilter.value,
+      platform: logPlatformFilter.value,
+      level: logLevelFilter.value,
+      stage: logStageFilter.value.trim(),
+      search: logSearchFilter.value.trim(),
+    };
+  }
+
+  async function loadConsoleFeed() {
+    const filters = getLogFilters();
+    const params = new URLSearchParams({ limit: "200" });
+    Object.entries(filters).forEach(([key, value]) => {
+      if (value) {
+        params.set(key, value);
+      }
+    });
+    return apiFetch(`/api/logs?${params.toString()}`);
+  }
+
+  function renderStructuredFeed(feed) {
+    const counts = feed.counts || { total: 0, byKind: {}, byPlatform: {}, byLevel: {} };
+    byId("logCounts").innerHTML = makeKpiCards([
+      { label: "Entries", value: String(counts.total || 0) },
+      { label: "Errors", value: String(counts.byLevel?.error || 0) },
+      { label: "Warnings", value: String((counts.byLevel?.warning || 0) + (counts.byLevel?.warn || 0)) },
+      { label: "YouTube", value: String(counts.byPlatform?.youtube || 0) },
+      { label: "Instagram", value: String(counts.byPlatform?.instagram || 0) },
+      { label: "TikTok", value: String(counts.byPlatform?.tiktok || 0) },
+    ]);
+
+    byId("eventConsole").innerHTML = Array.isArray(feed.entries) && feed.entries.length
+      ? feed.entries
+          .map(
+            (entry) => `
+              <article class="stack-item">
+                <div>
+                  <span>${escapeHtml([entry.kind, entry.platform || entry.source, entry.stage].filter(Boolean).join(" / "))}</span>
+                  <strong>${escapeHtml(entry.message || "-")}</strong>
+                </div>
+                <div class="top-row__meta">
+                  <span class="${getStatusClass(entry.level === "error" ? "error" : entry.level === "warning" || entry.level === "warn" ? "warning" : "active")}">${escapeHtml(entry.level || "info")}</span>
+                  ${entry.reference ? `<a href="${escapeHtml(entry.reference)}" target="_blank" rel="noreferrer">ref</a>` : ""}
+                  <small>${escapeHtml(formatDate(entry.timestamp))}</small>
+                </div>
+              </article>
+            `,
+          )
+          .join("")
+      : '<div class="empty-state small-empty">No entries match the current filters.</div>';
+  }
+
+  function renderConsole(control, feed) {
     const runner = control.runner || {};
     const workflow = control.workflow || {};
-    const dashboard = control.dashboard || {};
     const executions = Array.isArray(control.executions) ? control.executions : [];
-    const events = Array.isArray(dashboard.recentEvents) ? dashboard.recentEvents : [];
-    const operations = dashboard.operations || {};
+    const dashboard = control.dashboard || {};
     const recentRuns = Array.isArray(dashboard.recentRuns) ? dashboard.recentRuns : [];
 
     byId("runnerStatusBadge").className = getStatusClass(runner.running ? "active" : "configured");
@@ -554,23 +610,7 @@
           )
           .join("")
       : '<div class="empty-state small-empty">No workflow executions yet.</div>';
-
-    byId("eventConsole").innerHTML = events.length
-      ? events
-          .slice(0, 12)
-          .map(
-            (item) => `
-              <article class="stack-item">
-                <div>
-                  <span>${escapeHtml(item.stage || item.event_type || "event")}</span>
-                  <strong>${escapeHtml(item.message || "-")}</strong>
-                </div>
-                <small>${escapeHtml(formatDate(item.created_at || item.ts || item.event_at))}</small>
-              </article>
-            `,
-          )
-          .join("")
-      : '<div class="empty-state small-empty">No content events yet.</div>';
+    renderStructuredFeed(feed || { entries: [], counts: {} });
 
     const fallbacks = recentRuns
       .flatMap((run) => {
@@ -603,7 +643,11 @@
   }
 
   async function loadDashboard() {
-    const [live, control] = await Promise.all([apiFetch("/api/platform-analytics"), apiFetch("/api/control-center")]);
+    const [live, control, feed] = await Promise.all([
+      apiFetch("/api/platform-analytics"),
+      apiFetch("/api/control-center"),
+      loadConsoleFeed(),
+    ]);
     byId("backendLabel").textContent = getApiBaseUrl();
     renderHeaderSummary(live.global || {});
     renderPlatformStatusStrip(live.platforms || {});
@@ -611,7 +655,7 @@
     renderPlatformView("youtubeView", "youtube", live.platforms.youtube);
     renderPlatformView("instagramView", "instagram", live.platforms.instagram);
     renderPlatformView("tiktokView", "tiktok", live.platforms.tiktok);
-    renderConsole(control);
+    renderConsole(control, feed);
   }
 
   function scheduleRefresh() {
@@ -674,6 +718,21 @@
     document.querySelectorAll("[data-view]").forEach((button) => {
       button.addEventListener("click", () => {
         setActiveView(button.getAttribute("data-view"), true);
+      });
+    });
+    [logKindFilter, logPlatformFilter, logLevelFilter, logStageFilter, logSearchFilter].forEach((input) => {
+      input.addEventListener("change", () => {
+        if (getToken()) {
+          loadDashboard().catch((error) => console.error(error));
+        }
+      });
+      input.addEventListener("input", () => {
+        if (getToken()) {
+          clearTimeout(input._logTimer);
+          input._logTimer = setTimeout(() => {
+            loadDashboard().catch((error) => console.error(error));
+          }, 250);
+        }
       });
     });
   }

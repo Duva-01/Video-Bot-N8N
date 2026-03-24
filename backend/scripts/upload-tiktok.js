@@ -26,6 +26,25 @@ function writeResult(resultPath, payload) {
   fs.writeFileSync(resultPath, JSON.stringify(payload, null, 2));
 }
 
+async function fetchWithTimeout(url, options = {}, label = "request") {
+  const timeoutMs = Number(process.env.TIKTOK_REQUEST_TIMEOUT_MS || 45000);
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    return await fetch(url, {
+      ...options,
+      signal: controller.signal,
+    });
+  } catch (error) {
+    if (error.name === "AbortError") {
+      throw new Error(`TikTok ${label} timed out after ${timeoutMs}ms`);
+    }
+    throw error;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 function chunkRanges(totalBytes) {
   const maxChunkSize = 64 * 1024 * 1024;
   const ranges = [];
@@ -106,7 +125,7 @@ async function putChunk(uploadUrl, chunk, start, end, totalSize) {
   let lastError = null;
 
   for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
-    const response = await fetch(uploadUrl, {
+    const response = await fetchWithTimeout(uploadUrl, {
       method: "PUT",
       headers: {
         "Content-Type": "video/mp4",
@@ -114,7 +133,7 @@ async function putChunk(uploadUrl, chunk, start, end, totalSize) {
         "Content-Range": `bytes ${start}-${end - 1}/${totalSize}`,
       },
       body: chunk,
-    });
+    }, "chunk upload");
 
     if (response.ok || response.status === 201 || response.status === 206) {
       return;
@@ -137,7 +156,7 @@ async function fetchPublishStatus(token, publishId) {
   let lastError = null;
 
   for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
-    const response = await fetch("https://open.tiktokapis.com/v2/post/publish/status/fetch/", {
+    const response = await fetchWithTimeout("https://open.tiktokapis.com/v2/post/publish/status/fetch/", {
       method: "POST",
       headers: {
         Authorization: `Bearer ${token}`,
@@ -146,7 +165,7 @@ async function fetchPublishStatus(token, publishId) {
       body: JSON.stringify({
         publish_id: publishId,
       }),
-    });
+    }, "status fetch");
 
     if (response.ok) {
       return response.json();
@@ -165,14 +184,14 @@ async function fetchPublishStatus(token, publishId) {
 }
 
 async function fetchCreatorInfo(token) {
-  const response = await fetch("https://open.tiktokapis.com/v2/post/publish/creator_info/query/", {
+  const response = await fetchWithTimeout("https://open.tiktokapis.com/v2/post/publish/creator_info/query/", {
     method: "POST",
     headers: {
       Authorization: `Bearer ${token}`,
       "Content-Type": "application/json; charset=UTF-8",
     },
     body: JSON.stringify({}),
-  });
+  }, "creator info");
 
   if (!response.ok) {
     throw new Error(`TikTok creator info fetch failed with status ${response.status}: ${await response.text()}`);
@@ -251,7 +270,7 @@ async function uploadToTikTok(videoPath, scriptData = {}, options = {}) {
   let initError = null;
 
   for (let attempt = 1; attempt <= maxInitAttempts; attempt += 1) {
-    const initResponse = await fetch("https://open.tiktokapis.com/v2/post/publish/video/init/", {
+    const initResponse = await fetchWithTimeout("https://open.tiktokapis.com/v2/post/publish/video/init/", {
       method: "POST",
       headers: {
         Authorization: `Bearer ${accessToken}`,
@@ -273,7 +292,7 @@ async function uploadToTikTok(videoPath, scriptData = {}, options = {}) {
           total_chunk_count: ranges.length,
         },
       }),
-    });
+    }, "init");
 
     if (initResponse.ok) {
       initData = await initResponse.json();

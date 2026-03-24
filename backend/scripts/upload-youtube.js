@@ -117,7 +117,7 @@ async function main() {
       stage: "youtube_upload",
       source: "upload-youtube",
       message: "Uploading video to YouTube",
-      metadata: { title, privacyStatus, categoryId },
+      metadata: { platform: "youtube", status: "started", title, privacyStatus, categoryId },
     });
   });
 
@@ -166,7 +166,7 @@ async function main() {
         stage: "youtube_upload",
         source: "upload-youtube",
         message: "Video uploaded to YouTube",
-        metadata: { videoId, url: result.url, privacyStatus },
+        metadata: { platform: "youtube", status: "published", videoId, url: result.url, privacyStatus },
       });
     });
 
@@ -227,7 +227,7 @@ async function main() {
         stage: "youtube_upload",
         source: "upload-youtube",
         message: "YouTube upload failed, manual fallback prepared",
-        metadata: failedResult,
+        metadata: { platform: "youtube", ...failedResult },
       });
     });
 
