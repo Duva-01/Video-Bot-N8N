@@ -138,6 +138,49 @@ Blueprint funcional:
 
 - [youtube-longform-daily.blueprint.md](C:/Users/Usuario/Desktop/Personal/Proyectos/Automatizaciones/Bot%20de%20Videos/backend/workflows/youtube-longform-daily.blueprint.md)
 
+Stack recomendado por capa:
+
+- [professional-video-stack.md](C:/Users/Usuario/Desktop/Personal/Proyectos/Automatizaciones/Bot%20de%20Videos/docs/professional-video-stack.md)
+
+## Primer arranque en n8n
+
+Cuando abras la instancia por primera vez:
+
+1. crea el owner user
+2. entra en `Workflows`
+3. importa el JSON:
+   - `backend/workflows/youtube-longform-daily.n8n.json`
+4. ejecuta el workflow una vez con `Manual Trigger`
+5. comprueba la salida final del nodo `Finalize Production Package`
+6. luego activa integraciones reales una a una
+
+### Trigger diario por GitHub Actions
+
+Workflow de GitHub:
+
+- [.github/workflows/trigger-daily-video.yml](C:/Users/Usuario/Desktop/Personal/Proyectos/Automatizaciones/Bot%20de%20Videos/.github/workflows/trigger-daily-video.yml)
+
+Secret requerido en GitHub:
+
+- `N8N_DAILY_TRIGGER_URL`
+
+Valor esperado:
+
+- URL de produccion del webhook de n8n, por ejemplo:
+  `https://your-service.onrender.com/webhook/youtube-longform-daily-trigger`
+
+Orden recomendado para conectar el workflow:
+
+1. `Research LLM Placeholder`
+2. `Outline LLM Placeholder`
+3. `Script LLM Placeholder`
+4. `Pexels` para assets
+5. `ElevenLabs` para voz
+6. proveedor de render
+7. subida a YouTube
+
+No actives todo a la vez en la primera prueba.
+
 ## Nota importante
 
 El objetivo de `38 minutos diarios` es viable como sistema, pero no es un flujo trivial si de verdad quieres calidad. Lo correcto es tratarlo como una `content factory` por escenas, no como un simple script que junta clips al final.

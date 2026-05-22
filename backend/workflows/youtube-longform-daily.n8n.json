@@ -38,6 +38,20 @@
       }
     },
     {
+      "id": "7f0bf8b1-2c4f-4b0e-a444-90f85b83a901",
+      "name": "GitHub Daily Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [-640, 400],
+      "webhookId": "youtube-longform-daily-trigger",
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "youtube-longform-daily-trigger",
+        "responseMode": "onReceived",
+        "options": {}
+      }
+    },
+    {
       "id": "534f4ba1-cb77-49ef-8b7e-6c1a2b922064",
       "name": "Build Run Context",
       "type": "n8n-nodes-base.code",
@@ -187,6 +201,9 @@
       "main": [[{ "node": "Build Run Context", "type": "main", "index": 0 }]]
     },
     "Daily Schedule": {
+      "main": [[{ "node": "Build Run Context", "type": "main", "index": 0 }]]
+    },
+    "GitHub Daily Webhook": {
       "main": [[{ "node": "Build Run Context", "type": "main", "index": 0 }]]
     },
     "Build Run Context": {

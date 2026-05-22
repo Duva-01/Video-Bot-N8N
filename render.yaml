@@ -17,8 +17,6 @@ services:
         value: "Europe/Madrid"
       - key: DB_TYPE
         value: "postgresdb"
-      - key: N8N_RUNNERS_ENABLED
-        value: "true"
       - key: N8N_ENFORCE_SETTINGS_FILE_PERMISSIONS
         value: "true"
       - key: N8N_DIAGNOSTICS_ENABLED
@@ -31,6 +29,8 @@ services:
         sync: false
       - key: DB_POSTGRESDB_PORT
         value: "5432"
+      - key: DB_POSTGRESDB_SSL_ENABLED
+        value: "true"
       - key: DB_POSTGRESDB_DATABASE
         sync: false
       - key: DB_POSTGRESDB_USER

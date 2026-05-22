@@ -8,8 +8,8 @@ Publicar un video diario largo con una pipeline controlada, barata de iterar y f
 
 ```text
 [Manual Trigger] ----\
-                      -> [Set Run Config] -> [Create Run Record] -> [Load Topic]
-[Schedule Trigger] --/                                      |
+[Schedule Trigger] --\
+[Webhook Trigger] ----> [Set Run Config] -> [Create Run Record] -> [Load Topic]
                                                             v
                                                       [Research Pack]
                                                             |
@@ -60,12 +60,18 @@ Publicar un video diario largo con una pipeline controlada, barata de iterar y f
 
 - `Manual Trigger`
 - `Schedule Trigger`
+- `Webhook Trigger`
 
 Configuracion recomendada:
 
 - 1 ejecucion al dia
 - timezone del workflow: `Europe/Madrid`
 - hora fija de arranque: por ejemplo `06:00`
+- webhook para disparo externo desde GitHub Actions o fallback manual
+
+Path sugerido del webhook:
+
+- `youtube-longform-daily-trigger`
 
 ### Preparacion
 
