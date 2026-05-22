@@ -1,36 +1,38 @@
 # Backend
 
-Runtime principal del sistema.
+Esta carpeta arranca deliberadamente minima.
 
-## Responsabilidades
+## Que contiene
 
-- arrancar `n8n`
-- persistir `n8n` en `Neon`
-- exponer `health`
-- ejecutar el workflow manualmente
-- activar o desactivar el workflow
-- servir login mínimo para abrir `/app/`
+- configuracion base de entorno
+- esquema inicial de base de datos
+- blueprint del workflow principal
+- punto de apoyo para futuras utilidades de API, workers o scripts
 
-## Base de datos
+## Enfoque
 
-Hay dos capas persistidas en Neon:
+La primera version del backend no necesita una app Node separada si `n8n` va a hacer de:
 
-1. Base de datos de `n8n` en schema `n8n`
-2. Historial de contenido en `content_runs`
+- scheduler
+- orquestador
+- capa de webhooks
+- integrador con APIs
 
-El esquema del historial está en:
+Una API propia solo merece la pena cuando necesites:
 
-- [schema.sql](c:/Users/Usuario/Desktop/Personal/Proyectos/Automatizaciones/Bot%20de%20Videos/backend/db/schema.sql)
+- panel autenticado real
+- endpoints internos
+- colas propias
+- workers de render
+- control fino de publishing y retries
 
-## Endpoints
+## Siguiente ampliacion logica
 
-- `GET /health`
-- `POST /api/auth/login`
-- `GET /api/control-center`
-- `GET /api/logs`
-- `GET /api/run-now`
-- `POST /api/run-now`
-- `GET /api/workflow-automation`
-- `POST /api/workflow-automation`
-- `GET /login`
-- `GET /app/`
+Cuando el workflow diario este estable, la siguiente carpeta a crear aqui sera algo como:
+
+```text
+backend/api/
+backend/db/
+backend/scripts/
+backend/workers/
+```

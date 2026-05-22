@@ -1,45 +1,19 @@
 # Frontend
 
-Panel estático pensado para `Cloudflare Pages`.
+El frontend es opcional en esta fase.
 
-## Archivos
+## Funcion recomendada
 
-- `index.html`
-- `styles.css`
-- `app.js`
-- `config.js`
+Usarlo para tres cosas:
 
-## Configuración
+- ver el estado del video del dia
+- lanzar una ejecucion manual
+- revisar errores o runs bloqueados
 
-Edita `config.js` y define tu backend de Render:
+## Que no hace falta todavia
 
-```js
-window.FACTS_APP_CONFIG = {
-  API_BASE_URL: "https://video-bot-n8n.onrender.com",
-  DEFAULT_USERNAME: "admin",
-};
-```
+- dashboard complejo
+- analitica avanzada
+- auth propia
 
-## Despliegue
-
-En `Cloudflare Pages` puedes desplegar esta carpeta como sitio estático:
-
-- build command: vacío
-- output directory: `frontend`
-
-El frontend consume:
-
-- `POST /api/auth/login`
-- `GET /api/control-center`
-- `GET /api/logs`
-- `GET /health`
-- `POST /api/run-now`
-- `POST /api/workflow-automation`
-
-## Nota
-
-`n8n` ya no se embebe aquí. Se abre en una pestaña aparte apuntando al backend:
-
-```text
-https://tu-backend.onrender.com/login?next=/app/
-```
+Mientras el workflow se estabiliza, un frontend minimo es suficiente.

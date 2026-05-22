@@ -1,140 +1,115 @@
-CREATE TABLE IF NOT EXISTS content_runs (
-  id BIGSERIAL PRIMARY KEY,
-  topic_key TEXT NOT NULL UNIQUE,
-  category TEXT NOT NULL,
-  topic TEXT NOT NULL,
-  angle TEXT NOT NULL,
-  title TEXT,
-  description TEXT,
-  status TEXT NOT NULL DEFAULT 'selected',
-  current_stage TEXT NOT NULL DEFAULT 'selected',
-  source TEXT NOT NULL DEFAULT 'catalog',
-  run_origin TEXT NOT NULL DEFAULT 'n8n',
-  n8n_workflow_id TEXT,
-  n8n_workflow_name TEXT,
-  workflow_execution_id BIGINT,
-  selected_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-  published_at TIMESTAMPTZ,
-  failed_at TIMESTAMPTZ,
-  youtube_video_id TEXT,
-  youtube_url TEXT,
-  tiktok_publish_id TEXT,
-  tiktok_status TEXT,
-  metadata JSONB NOT NULL DEFAULT '{}'::jsonb
+create extension if not exists pgcrypto;
+
+create table if not exists channels (
+  id uuid primary key default gen_random_uuid(),
+  slug text not null unique,
+  name text not null,
+  language_code text not null default 'es',
+  niche text,
+  default_duration_minutes integer not null default 38,
+  is_active boolean not null default true,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
 );
 
-ALTER TABLE content_runs ADD COLUMN IF NOT EXISTS current_stage TEXT NOT NULL DEFAULT 'selected';
-ALTER TABLE content_runs ADD COLUMN IF NOT EXISTS source TEXT NOT NULL DEFAULT 'catalog';
-ALTER TABLE content_runs ADD COLUMN IF NOT EXISTS run_origin TEXT NOT NULL DEFAULT 'n8n';
-ALTER TABLE content_runs ADD COLUMN IF NOT EXISTS n8n_workflow_id TEXT;
-ALTER TABLE content_runs ADD COLUMN IF NOT EXISTS n8n_workflow_name TEXT;
-ALTER TABLE content_runs ADD COLUMN IF NOT EXISTS workflow_execution_id BIGINT;
-ALTER TABLE content_runs ADD COLUMN IF NOT EXISTS failed_at TIMESTAMPTZ;
-
-CREATE TABLE IF NOT EXISTS content_events (
-  id BIGSERIAL PRIMARY KEY,
-  topic_key TEXT REFERENCES content_runs(topic_key) ON DELETE SET NULL,
-  event_type TEXT NOT NULL,
-  stage TEXT NOT NULL,
-  level TEXT NOT NULL DEFAULT 'info',
-  source TEXT NOT NULL,
-  message TEXT NOT NULL,
-  metadata JSONB NOT NULL DEFAULT '{}'::jsonb,
-  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+create table if not exists content_runs (
+  id uuid primary key default gen_random_uuid(),
+  channel_id uuid not null references channels(id) on delete cascade,
+  run_date date not null,
+  topic text not null,
+  format text not null default 'longform',
+  status text not null default 'draft',
+  title text,
+  description text,
+  target_duration_minutes numeric(6,2) not null default 38,
+  final_duration_seconds integer,
+  youtube_video_id text,
+  youtube_url text,
+  render_provider text,
+  render_job_id text,
+  source_payload jsonb not null default '{}'::jsonb,
+  metadata jsonb not null default '{}'::jsonb,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  unique (channel_id, run_date)
 );
 
-CREATE TABLE IF NOT EXISTS content_artifacts (
-  id BIGSERIAL PRIMARY KEY,
-  topic_key TEXT REFERENCES content_runs(topic_key) ON DELETE CASCADE,
-  artifact_type TEXT NOT NULL,
-  label TEXT,
-  file_path TEXT,
-  external_url TEXT,
-  mime_type TEXT,
-  size_bytes BIGINT,
-  checksum TEXT,
-  metadata JSONB NOT NULL DEFAULT '{}'::jsonb,
-  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+create table if not exists content_chapters (
+  id uuid primary key default gen_random_uuid(),
+  run_id uuid not null references content_runs(id) on delete cascade,
+  chapter_index integer not null,
+  title text not null,
+  objective text,
+  summary text,
+  estimated_duration_seconds integer,
+  script_text text,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  unique (run_id, chapter_index)
 );
 
-CREATE TABLE IF NOT EXISTS execution_logs (
-  id BIGSERIAL PRIMARY KEY,
-  topic_key TEXT REFERENCES content_runs(topic_key) ON DELETE SET NULL,
-  workflow_id TEXT,
-  execution_id BIGINT,
-  source TEXT NOT NULL,
-  level TEXT NOT NULL DEFAULT 'info',
-  message TEXT NOT NULL,
-  context JSONB NOT NULL DEFAULT '{}'::jsonb,
-  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+create table if not exists content_scenes (
+  id uuid primary key default gen_random_uuid(),
+  run_id uuid not null references content_runs(id) on delete cascade,
+  chapter_id uuid references content_chapters(id) on delete set null,
+  scene_index integer not null,
+  visual_type text,
+  asset_query text,
+  visual_prompt text,
+  voice_text text not null,
+  estimated_duration_seconds integer,
+  status text not null default 'draft',
+  scene_payload jsonb not null default '{}'::jsonb,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  unique (run_id, scene_index)
 );
 
-CREATE TABLE IF NOT EXISTS workflow_snapshots (
-  workflow_id TEXT PRIMARY KEY,
-  workflow_name TEXT NOT NULL,
-  active BOOLEAN NOT NULL DEFAULT FALSE,
-  trigger_count INTEGER NOT NULL DEFAULT 0,
-  last_execution_id BIGINT,
-  last_status TEXT,
-  last_started_at TIMESTAMPTZ,
-  last_finished_at TIMESTAMPTZ,
-  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-  metadata JSONB NOT NULL DEFAULT '{}'::jsonb
+create table if not exists content_assets (
+  id uuid primary key default gen_random_uuid(),
+  run_id uuid not null references content_runs(id) on delete cascade,
+  scene_id uuid references content_scenes(id) on delete set null,
+  asset_type text not null,
+  provider text,
+  source_url text,
+  storage_url text,
+  mime_type text,
+  duration_seconds numeric(8,2),
+  width integer,
+  height integer,
+  status text not null default 'created',
+  asset_payload jsonb not null default '{}'::jsonb,
+  created_at timestamptz not null default now()
 );
 
-CREATE TABLE IF NOT EXISTS system_samples (
-  id BIGSERIAL PRIMARY KEY,
-  service TEXT NOT NULL,
-  sample_type TEXT NOT NULL,
-  metric_name TEXT NOT NULL,
-  metric_value NUMERIC NOT NULL,
-  unit TEXT,
-  metadata JSONB NOT NULL DEFAULT '{}'::jsonb,
-  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+create table if not exists publish_jobs (
+  id uuid primary key default gen_random_uuid(),
+  run_id uuid not null references content_runs(id) on delete cascade,
+  platform text not null default 'youtube',
+  status text not null default 'queued',
+  scheduled_for timestamptz,
+  published_at timestamptz,
+  remote_id text,
+  remote_url text,
+  payload jsonb not null default '{}'::jsonb,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
 );
 
-CREATE TABLE IF NOT EXISTS api_audit_logs (
-  id BIGSERIAL PRIMARY KEY,
-  actor TEXT,
-  action TEXT NOT NULL,
-  path TEXT NOT NULL,
-  status_code INTEGER,
-  ip_address TEXT,
-  metadata JSONB NOT NULL DEFAULT '{}'::jsonb,
-  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+create table if not exists workflow_events (
+  id uuid primary key default gen_random_uuid(),
+  run_id uuid references content_runs(id) on delete cascade,
+  event_type text not null,
+  stage text,
+  level text not null default 'info',
+  message text not null,
+  payload jsonb not null default '{}'::jsonb,
+  created_at timestamptz not null default now()
 );
 
-CREATE INDEX IF NOT EXISTS idx_content_runs_status ON content_runs (status);
-CREATE INDEX IF NOT EXISTS idx_content_runs_stage ON content_runs (current_stage);
-CREATE INDEX IF NOT EXISTS idx_content_runs_category ON content_runs (category);
-CREATE INDEX IF NOT EXISTS idx_content_runs_source ON content_runs (source);
-CREATE INDEX IF NOT EXISTS idx_content_runs_selected_at_desc ON content_runs (selected_at DESC);
-CREATE INDEX IF NOT EXISTS idx_content_runs_published_at_desc ON content_runs (published_at DESC);
-CREATE INDEX IF NOT EXISTS idx_content_runs_updated_at_desc ON content_runs (updated_at DESC);
-CREATE INDEX IF NOT EXISTS idx_content_runs_failed_at_desc ON content_runs (failed_at DESC);
-CREATE INDEX IF NOT EXISTS idx_content_runs_metadata_gin ON content_runs USING GIN (metadata);
-
-CREATE INDEX IF NOT EXISTS idx_content_events_topic_key ON content_events (topic_key);
-CREATE INDEX IF NOT EXISTS idx_content_events_stage ON content_events (stage);
-CREATE INDEX IF NOT EXISTS idx_content_events_level ON content_events (level);
-CREATE INDEX IF NOT EXISTS idx_content_events_created_at_desc ON content_events (created_at DESC);
-CREATE INDEX IF NOT EXISTS idx_content_events_metadata_gin ON content_events USING GIN (metadata);
-
-CREATE INDEX IF NOT EXISTS idx_content_artifacts_topic_key ON content_artifacts (topic_key);
-CREATE INDEX IF NOT EXISTS idx_content_artifacts_type ON content_artifacts (artifact_type);
-CREATE INDEX IF NOT EXISTS idx_content_artifacts_created_at_desc ON content_artifacts (created_at DESC);
-CREATE INDEX IF NOT EXISTS idx_content_artifacts_metadata_gin ON content_artifacts USING GIN (metadata);
-
-CREATE INDEX IF NOT EXISTS idx_execution_logs_topic_key ON execution_logs (topic_key);
-CREATE INDEX IF NOT EXISTS idx_execution_logs_workflow_id ON execution_logs (workflow_id);
-CREATE INDEX IF NOT EXISTS idx_execution_logs_execution_id ON execution_logs (execution_id);
-CREATE INDEX IF NOT EXISTS idx_execution_logs_created_at_desc ON execution_logs (created_at DESC);
-CREATE INDEX IF NOT EXISTS idx_execution_logs_context_gin ON execution_logs USING GIN (context);
-
-CREATE INDEX IF NOT EXISTS idx_system_samples_service_created_at_desc ON system_samples (service, created_at DESC);
-CREATE INDEX IF NOT EXISTS idx_system_samples_metric_created_at_desc ON system_samples (metric_name, created_at DESC);
-
-CREATE INDEX IF NOT EXISTS idx_api_audit_logs_created_at_desc ON api_audit_logs (created_at DESC);
-CREATE INDEX IF NOT EXISTS idx_api_audit_logs_action ON api_audit_logs (action);
+create index if not exists idx_content_runs_status on content_runs(status);
+create index if not exists idx_content_runs_run_date on content_runs(run_date desc);
+create index if not exists idx_content_scenes_run_id on content_scenes(run_id);
+create index if not exists idx_content_assets_run_id on content_assets(run_id);
+create index if not exists idx_publish_jobs_run_id on publish_jobs(run_id);
+create index if not exists idx_workflow_events_run_id on workflow_events(run_id);

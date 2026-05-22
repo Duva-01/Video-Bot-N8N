@@ -1,13 +1,14 @@
 .git
-.gitignore
+.github
 node_modules
-npm-debug.log
 .env
 .env.local
+frontend
+docs
 tmp
 tmp-output
 downloads
 clips
 exports
-.n8n
 n8n_data
+*.log

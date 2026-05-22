@@ -2,16 +2,19 @@ name: Keep Render Awake
 
 on:
   schedule:
-    - cron: "*/5 * * * *"
+    - cron: "*/10 * * * *"
   workflow_dispatch:
 
 jobs:
-  ping-health:
+  ping:
     runs-on: ubuntu-latest
     steps:
-      - name: Ping Render health endpoint
+      - name: Ping n8n health endpoint
         env:
-          KEEPALIVE_URL: https://video-bot-n8n.onrender.com/health
+          HEALTHCHECK_URL: ${{ secrets.RENDER_HEALTHCHECK_URL }}
         run: |
-          echo "Pinging $KEEPALIVE_URL"
-          curl --fail --show-error --silent --location --max-time 30 "$KEEPALIVE_URL"
+          if [ -z "$HEALTHCHECK_URL" ]; then
+            echo "RENDER_HEALTHCHECK_URL is not configured"
+            exit 0
+          fi
+          curl --fail --silent --show-error "$HEALTHCHECK_URL"

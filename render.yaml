@@ -1,274 +1,43 @@
 services:
   - type: web
-    name: bot-de-videos-n8n
-    env: docker
-    plan: free
+    name: youtube-longform-n8n
+    runtime: docker
     dockerfilePath: ./Dockerfile
-    dockerContext: .
-    autoDeploy: true
-    healthCheckPath: /health
+    plan: free
+    autoDeployTrigger: commit
+    healthCheckPath: /healthz
     envVars:
-      - key: N8N_BASIC_AUTH_ACTIVE
-        value: "true"
-      - key: N8N_BASIC_AUTH_USER
-        value: admin
-      - key: N8N_BASIC_AUTH_PASSWORD
-        sync: false
-      - key: APP_AUTH_ENABLED
-        value: "true"
-      - key: APP_FRONTEND_ORIGIN
-        sync: false
-      - key: APP_SESSION_SECRET
-        sync: false
-      - key: N8N_ENCRYPTION_KEY
-        sync: false
-      - key: N8N_HOST
-        value: 0.0.0.0
       - key: N8N_PORT
-        value: "10000"
-      - key: N8N_INTERNAL_HOST
-        value: 127.0.0.1
-      - key: N8N_INTERNAL_PORT
         value: "5678"
-      - key: N8N_PATH
-        value: /
+      - key: N8N_HOST
+        value: "0.0.0.0"
+      - key: N8N_PROTOCOL
+        value: "https"
+      - key: GENERIC_TIMEZONE
+        value: "Europe/Madrid"
+      - key: DB_TYPE
+        value: "postgresdb"
+      - key: N8N_RUNNERS_ENABLED
+        value: "true"
+      - key: N8N_DIAGNOSTICS_ENABLED
+        value: "false"
+      - key: N8N_VERSION_NOTIFICATIONS_ENABLED
+        value: "false"
+      - key: N8N_ENCRYPTION_KEY
+        generateValue: true
+      - key: DB_POSTGRESDB_HOST
+        sync: false
+      - key: DB_POSTGRESDB_PORT
+        value: "5432"
+      - key: DB_POSTGRESDB_DATABASE
+        sync: false
+      - key: DB_POSTGRESDB_USER
+        sync: false
+      - key: DB_POSTGRESDB_PASSWORD
+        sync: false
+      - key: DB_POSTGRESDB_SSL_REJECT_UNAUTHORIZED
+        value: "false"
       - key: N8N_EDITOR_BASE_URL
         sync: false
-      - key: N8N_PROXY_HOPS
-        value: "1"
-      - key: N8N_SHELL_WORKFLOW_ID
-        value: "1"
-      - key: N8N_AUTO_ACTIVATE_WORKFLOW_ID
-        value: "1"
-      - key: N8N_DB_SCHEMA
-        value: n8n
-      - key: KEEP_ALIVE_ENABLED
-        value: "true"
-      - key: KEEP_ALIVE_INTERVAL_MS
-        value: "300000"
-      - key: EXECUTIONS_DATA_SAVE_MANUAL_EXECUTIONS
-        value: "true"
-      - key: EXECUTIONS_DATA_SAVE_ON_PROGRESS
-        value: "true"
-      - key: EXECUTIONS_DATA_SAVE_ON_ERROR
-        value: all
-      - key: EXECUTIONS_DATA_SAVE_ON_SUCCESS
-        value: all
       - key: WEBHOOK_URL
         sync: false
-      - key: TEXT_PROVIDER
-        value: groq
-      - key: TTS_PROVIDER
-        value: gemini
-      - key: TTS_PROVIDER_CHAIN
-        value: gemini,cloudflare,elevenlabs,deepgram,espeak
-      - key: TTS_FALLBACK_ENABLED
-        value: "true"
-      - key: TTS_FALLBACK_PROVIDER
-        value: espeak
-      - key: PIPER_VOICE
-        value: es_ES-carlfm-x_low
-      - key: PIPER_DATA_DIR
-        value: /app/voices
-      - key: ESPEAK_VOICE
-        value: es
-      - key: ESPEAK_RATE
-        value: "165"
-      - key: ESPEAK_PITCH
-        value: "55"
-      - key: GROQ_API_KEY
-        sync: false
-      - key: GROQ_TEXT_MODEL
-        value: llama-3.1-8b-instant
-      - key: CLOUDFLARE_AI_API_TOKEN
-        sync: false
-      - key: CLOUDFLARE_ACCOUNT_ID
-        sync: false
-      - key: CLOUDFLARE_TTS_MODEL
-        value: "@cf/deepgram/aura-2-es"
-      - key: CLOUDFLARE_TTS_LANG
-        value: es
-      - key: CLOUDFLARE_TTS_SPEAKER
-        value: aquila
-      - key: AZURE_SPEECH_KEY
-        sync: false
-      - key: AZURE_SPEECH_REGION
-        sync: false
-      - key: AZURE_SPEECH_VOICE
-        value: es-ES-ElviraNeural
-      - key: AZURE_SPEECH_OUTPUT_FORMAT
-        value: riff-24khz-16bit-mono-pcm
-      - key: GEMINI_API_KEY
-        sync: false
-      - key: GEMINI_TEXT_MODEL
-        value: gemini-2.5-flash-lite
-      - key: GEMINI_TTS_MODEL
-        value: gemini-2.5-flash-preview-tts
-      - key: GEMINI_TTS_VOICE
-        value: Kore
-      - key: OPENAI_API_KEY
-        sync: false
-      - key: OPENAI_MODEL
-        value: gpt-4.1-mini
-      - key: VIDEO_DEFAULT_TOPIC
-        value: hechos curiosos
-      - key: VIDEO_DEFAULT_DURATION_SECONDS
-        value: "12"
-      - key: VIDEO_DEFAULT_CTA
-        value: Sigue la cuenta para mas hechos curiosos
-      - key: VIDEO_DEFAULT_STYLE
-        value: curioso, rapido, directo
-      - key: VIDEO_DEFAULT_LANGUAGE
-        value: es
-      - key: FACT_ALLOWED_CATEGORIES
-        value: space,science,history,technology,animals,psychology,geography,food,sports,culture,internet
-      - key: FACT_TOPIC_MODE
-        value: dynamic-first
-      - key: FACT_DYNAMIC_TOPIC_ATTEMPTS
-        value: "4"
-      - key: NEON_DATABASE_URL
-        sync: false
-      - key: ELEVENLABS_API_KEY
-        sync: false
-      - key: ELEVENLABS_VOICE_ID
-        sync: false
-      - key: ELEVENLABS_MODEL_ID
-        value: eleven_multilingual_v2
-      - key: DEEPGRAM_API_KEY
-        sync: false
-      - key: DEEPGRAM_TTS_MODEL
-        value: aura-2-alvaro-es
-      - key: DEEPGRAM_TTS_ENCODING
-        value: linear16
-      - key: DEEPGRAM_TTS_CONTAINER
-        value: wav
-      - key: DEEPGRAM_TTS_SAMPLE_RATE
-        value: "24000"
-      - key: PEXELS_API_KEY
-        sync: false
-      - key: PEXELS_CLIPS_COUNT
-        value: "1"
-      - key: PEXELS_QUERY_LIMIT
-        value: "3"
-      - key: PEXELS_PER_PAGE
-        value: "3"
-      - key: PEXELS_TARGET_WIDTH
-        value: "540"
-      - key: PEXELS_SEARCH_TIMEOUT_MS
-        value: "15000"
-      - key: PEXELS_DOWNLOAD_TIMEOUT_MS
-        value: "45000"
-      - key: RENDER_LOW_MEMORY_MODE
-        value: "true"
-      - key: SHORTS_WIDTH
-        value: "432"
-      - key: SHORTS_HEIGHT
-        value: "768"
-      - key: SHORTS_FPS
-        value: "18"
-      - key: FFMPEG_THREADS
-        value: "1"
-      - key: FFMPEG_PRESET
-        value: ultrafast
-      - key: FFMPEG_CRF
-        value: "32"
-      - key: FFMPEG_VIDEO_BITRATE
-        value: 900k
-      - key: FFMPEG_AUDIO_BITRATE
-        value: 48k
-      - key: FFMPEG_AUDIO_RATE
-        value: "22050"
-      - key: FFMPEG_X264_TUNE
-        value: zerolatency
-      - key: SFX_ENABLED
-        value: "false"
-      - key: CLIP_TRANSITIONS_ENABLED
-        value: "false"
-      - key: YOUTUBE_CLIENT_ID
-        sync: false
-      - key: YOUTUBE_CLIENT_SECRET
-        sync: false
-      - key: YOUTUBE_REFRESH_TOKEN
-        sync: false
-      - key: YOUTUBE_PRIVACY_STATUS
-        value: private
-      - key: YOUTUBE_CATEGORY_ID
-        value: "28"
-      - key: YOUTUBE_DEFAULT_TITLE
-        value: Dato curioso del dia
-      - key: YOUTUBE_DEFAULT_DESCRIPTION
-        value: Video generado automaticamente con n8n.
-      - key: YOUTUBE_DEFAULT_TAGS
-        value: facts,curiosidades,shorts
-      - key: SOCIAL_CHANNEL_URL
-        sync: false
-      - key: INSTAGRAM_PUBLISH_ENABLED
-        value: "false"
-      - key: INSTAGRAM_AUTO_REFRESH_TOKEN
-        value: "true"
-      - key: INSTAGRAM_GRAPH_API_VERSION
-        value: v25.0
-      - key: INSTAGRAM_APP_ID
-        sync: false
-      - key: INSTAGRAM_APP_SECRET
-        sync: false
-      - key: INSTAGRAM_REDIRECT_URI
-        value: https://localhost/
-      - key: INSTAGRAM_TOKEN_STATE_PATH
-        value: tmp/instagram-token-state.json
-      - key: INSTAGRAM_TOKEN_MIN_VALIDITY_SECONDS
-        value: "86400"
-      - key: INSTAGRAM_IG_USER_ID
-        sync: false
-      - key: INSTAGRAM_ACCESS_TOKEN
-        sync: false
-      - key: INSTAGRAM_VIDEO_URL
-        sync: false
-      - key: INSTAGRAM_HASHTAGS
-        value: curiosidades,datoscuriosos,shorts
-      - key: INSTAGRAM_FIXED_CTA
-        value: "Visita mi canal de YouTube: https://www.youtube.com/channel/UC9ynAJNdEpRGI6K2-Fqv4Ow"
-      - key: INSTAGRAM_CONTAINER_POLL_INTERVAL_MS
-        value: "5000"
-      - key: INSTAGRAM_CONTAINER_POLL_MAX_ATTEMPTS
-        value: "24"
-      - key: TIKTOK_PUBLISH_ENABLED
-        value: "false"
-      - key: TIKTOK_ACCESS_TOKEN
-        sync: false
-      - key: TIKTOK_REFRESH_TOKEN
-        sync: false
-      - key: TIKTOK_ACCESS_TOKEN_EXPIRES_AT
-        sync: false
-      - key: TIKTOK_REFRESH_TOKEN_EXPIRES_AT
-        sync: false
-      - key: TIKTOK_CLIENT_KEY
-        sync: false
-      - key: TIKTOK_CLIENT_SECRET
-        sync: false
-      - key: TIKTOK_OPEN_ID
-        sync: false
-      - key: TIKTOK_REDIRECT_URI
-        sync: false
-      - key: TIKTOK_STATE_PATH
-        value: /tmp/tiktok-auth-state.json
-      - key: TIKTOK_TOKEN_MIN_VALIDITY_SECONDS
-        value: "3600"
-      - key: TIKTOK_PRIVACY_LEVEL
-        value: SELF_ONLY
-      - key: TIKTOK_DEFAULT_TITLE
-        value: Dato curioso rapido
-      - key: TIKTOK_HASHTAGS
-        value: curiosidades,datoscuriosos,shorts
-      - key: CLOUDINARY_CLOUD_NAME
-        sync: false
-      - key: CLOUDINARY_API_KEY
-        sync: false
-      - key: CLOUDINARY_API_SECRET
-        sync: false
-      - key: CLOUDINARY_FOLDER
-        value: bot-videos
-      - key: CLOUDINARY_DELETE_AFTER_INSTAGRAM
-        value: "true"
-      - key: MANUAL_PUBLISH_DIR
-        value: /tmp/bot-videos/manual-publish-fallback
