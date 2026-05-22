@@ -6,6 +6,7 @@ create table if not exists channels (
   name text not null,
   language_code text not null default 'es',
   niche text,
+  niche_strategy jsonb not null default '{}'::jsonb,
   default_duration_minutes integer not null default 38,
   is_active boolean not null default true,
   created_at timestamptz not null default now(),
@@ -16,17 +17,24 @@ create table if not exists content_runs (
   id uuid primary key default gen_random_uuid(),
   channel_id uuid not null references channels(id) on delete cascade,
   run_date date not null,
+  niche text,
+  canonical_topic text,
   topic text not null,
   format text not null default 'longform',
   status text not null default 'draft',
   title text,
   description text,
+  hook text,
   target_duration_minutes numeric(6,2) not null default 38,
   final_duration_seconds integer,
   youtube_video_id text,
   youtube_url text,
   render_provider text,
   render_job_id text,
+  thumbnail_prompt text,
+  originality_score numeric(5,2),
+  monetization_status text,
+  uniqueness_hash text,
   source_payload jsonb not null default '{}'::jsonb,
   metadata jsonb not null default '{}'::jsonb,
   created_at timestamptz not null default now(),
@@ -107,9 +115,47 @@ create table if not exists workflow_events (
   created_at timestamptz not null default now()
 );
 
+create table if not exists editorial_topics (
+  id uuid primary key default gen_random_uuid(),
+  channel_id uuid not null references channels(id) on delete cascade,
+  niche text not null,
+  canonical_topic text not null,
+  working_title text,
+  angle text,
+  status text not null default 'candidate',
+  priority integer not null default 0,
+  source_type text,
+  source_url text,
+  notes text,
+  last_considered_at timestamptz,
+  last_used_at timestamptz,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  unique (channel_id, canonical_topic)
+);
+
+create table if not exists subtitle_segments (
+  id uuid primary key default gen_random_uuid(),
+  run_id uuid not null references content_runs(id) on delete cascade,
+  scene_id uuid references content_scenes(id) on delete set null,
+  segment_index integer not null,
+  start_ms integer not null,
+  end_ms integer not null,
+  text text not null,
+  emphasis_words jsonb not null default '[]'::jsonb,
+  style_payload jsonb not null default '{}'::jsonb,
+  created_at timestamptz not null default now(),
+  unique (run_id, segment_index)
+);
+
 create index if not exists idx_content_runs_status on content_runs(status);
 create index if not exists idx_content_runs_run_date on content_runs(run_date desc);
+create index if not exists idx_content_runs_canonical_topic on content_runs(canonical_topic);
+create index if not exists idx_content_runs_uniqueness_hash on content_runs(uniqueness_hash);
 create index if not exists idx_content_scenes_run_id on content_scenes(run_id);
 create index if not exists idx_content_assets_run_id on content_assets(run_id);
 create index if not exists idx_publish_jobs_run_id on publish_jobs(run_id);
 create index if not exists idx_workflow_events_run_id on workflow_events(run_id);
+create index if not exists idx_editorial_topics_channel_niche on editorial_topics(channel_id, niche);
+create index if not exists idx_editorial_topics_status on editorial_topics(status);
+create index if not exists idx_subtitle_segments_run_id on subtitle_segments(run_id);

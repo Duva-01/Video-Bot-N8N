@@ -1,5 +1,5 @@
 {
-  "name": "YouTube Longform Daily - Dry Run Base",
+  "name": "YouTube Longform Daily - Professional Base",
   "active": false,
   "isArchived": false,
   "settings": {
@@ -10,22 +10,28 @@
     "templateCredsSetupCompleted": false
   },
   "pinData": {},
-  "versionId": "c4a4841d-5c8e-4a36-9b53-63e1a0ad5b70",
+  "versionId": "bcf07380-8068-4878-b761-bf7f1f6dc401",
   "nodes": [
     {
-      "id": "9ebca1fe-8fd1-4f7e-8c29-3f2b8d9f1f01",
+      "id": "manual-trigger-001",
       "name": "Manual Trigger",
       "type": "n8n-nodes-base.manualTrigger",
       "typeVersion": 1,
-      "position": [-640, 80],
+      "position": [
+        -980,
+        120
+      ],
       "parameters": {}
     },
     {
-      "id": "58563fb2-4464-417f-82df-5672dabf8e8b",
+      "id": "schedule-trigger-001",
       "name": "Daily Schedule",
       "type": "n8n-nodes-base.scheduleTrigger",
       "typeVersion": 1.1,
-      "position": [-640, 240],
+      "position": [
+        -980,
+        280
+      ],
       "parameters": {
         "rule": {
           "interval": [
@@ -38,11 +44,14 @@
       }
     },
     {
-      "id": "7f0bf8b1-2c4f-4b0e-a444-90f85b83a901",
+      "id": "webhook-trigger-001",
       "name": "GitHub Daily Webhook",
       "type": "n8n-nodes-base.webhook",
       "typeVersion": 2.1,
-      "position": [-640, 400],
+      "position": [
+        -980,
+        440
+      ],
       "webhookId": "youtube-longform-daily-trigger",
       "parameters": {
         "httpMethod": "POST",
@@ -52,192 +61,416 @@
       }
     },
     {
-      "id": "534f4ba1-cb77-49ef-8b7e-6c1a2b922064",
-      "name": "Build Run Context",
+      "id": "build-strategy-001",
+      "name": "Build Channel Strategy",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [-380, 160],
+      "position": [
+        -720,
+        280
+      ],
       "parameters": {
-        "jsCode": "const now = new Date();\nconst isoDate = now.toISOString().slice(0, 10);\nconst seedTopics = [\n  'La historia completa de la inteligencia artificial',\n  'Como cambiaron internet los primeros algoritmos de recomendacion',\n  'La carrera espacial contada como una historia de decisiones imposibles',\n  'Las tecnologias que parecen modernas pero nacieron hace decadas',\n  'Por que los grandes inventos ocurren en momentos concretos de la historia',\n  'Errores cientificos famosos que terminaron cambiando el mundo'\n];\nconst topicIndex = Math.floor(now.getTime() / 86400000) % seedTopics.length;\nconst topic = seedTopics[Math.abs(topicIndex)];\nreturn [{\n  json: {\n    run: {\n      id: `run-${isoDate}`,\n      date: isoDate,\n      topic,\n      status: 'draft'\n    },\n    config: {\n      channelSlug: 'youtube-longform-ai',\n      channelName: 'YouTube Longform AI',\n      language: 'es',\n      timezone: 'Europe/Madrid',\n      niche: 'historia, ciencia, tecnologia y curiosidades',\n      targetMinutes: 38,\n      publishHourLocal: '18:00',\n      llm: {\n        provider: 'groq',\n        model: 'llama-3.3-70b-versatile'\n      },\n      tts: {\n        provider: 'elevenlabs',\n        voiceId: 'EXAVITQu4vr4xnSDxMaL'\n      },\n      visuals: {\n        stockProvider: 'pexels',\n        scenesPerChapter: 9,\n        preferredMix: {\n          stockVideo: 0.6,\n          aiImage: 0.25,\n          textSlide: 0.15\n        }\n      },\n      youtube: {\n        privacyStatus: 'private',\n        categoryId: '27',\n        defaultTags: ['youtube', 'longform', 'documental', 'curiosidades', 'historia', 'ciencia']\n      }\n    },\n    prompts: {\n      researchSystem: 'Eres un researcher senior para YouTube longform. Devuelve solo JSON valido.',\n      researchUser: `Prepara un research pack para un video de 38 minutos sobre: ${topic}. Devuelve angulo, promesa, audiencia, keywords, hechos, posibles capitulos y puntos de retencion.`,\n      outlineSystem: 'Eres un guionista senior de retencion para YouTube. Devuelve solo JSON valido.',\n      scriptSystem: 'Eres un guionista de documentales faceless. Devuelve solo JSON valido.'\n    },\n    integrations: {\n      researchLlmEnabled: false,\n      outlineLlmEnabled: false,\n      scriptLlmEnabled: false,\n      ttsEnabled: false,\n      renderEnabled: false,\n      youtubeUploadEnabled: false\n    }\n  }\n}];"
+        "jsCode": "const now = new Date();\nconst isoDate = now.toISOString().slice(0, 10);\nconst nicheCatalog = [\n  {\n    key: 'history-power',\n    label: 'Historia y decisiones de poder',\n    audience: 'Publico adulto interesado en historia explicada con ritmo',\n    topicSeeds: [\n      'La historia real del Proyecto Manhattan',\n      'Como una crisis de suministros cambia el curso de una guerra',\n      'La decision politica que cambio la exploracion espacial',\n      'El error estrategico que transformo un imperio en decadencia'\n    ]\n  },\n  {\n    key: 'science-breakthroughs',\n    label: 'Ciencia, descubrimientos y errores famosos',\n    audience: 'Audiencia de divulgacion, tecnologia y curiosidad',\n    topicSeeds: [\n      'El descubrimiento accidental que cambio la medicina moderna',\n      'Como se construyo la primera inteligencia artificial util',\n      'La carrera por resolver un problema cientifico imposible',\n      'Experimentos fallidos que acabaron revolucionando la tecnologia'\n    ]\n  },\n  {\n    key: 'internet-systems',\n    label: 'Internet, plataformas y sistemas que moldean la vida diaria',\n    audience: 'Personas interesadas en tecnologia e historia digital',\n    topicSeeds: [\n      'Como nacieron los algoritmos de recomendacion modernos',\n      'La historia de los sistemas que sostienen internet',\n      'Por que algunas decisiones tecnicas marcan decadas enteras',\n      'Errores de producto que redefinieron una industria digital'\n    ]\n  },\n  {\n    key: 'future-industries',\n    label: 'Industrias del futuro y tecnologias emergentes',\n    audience: 'Audiencia interesada en innovacion, negocio y tecnologia',\n    topicSeeds: [\n      'La guerra silenciosa por dominar la fabricacion de chips',\n      'Como se construyen las empresas que controlan la IA moderna',\n      'Las tecnologias que parecen hype pero pueden cambiar una industria',\n      'La cadena oculta detras de la computacion global'\n    ]\n  }\n];\nconst dayNumber = Math.floor(now.getTime() / 86400000);\nconst chosenNiche = nicheCatalog[Math.abs(dayNumber) % nicheCatalog.length];\nconst topic = chosenNiche.topicSeeds[Math.abs(dayNumber) % chosenNiche.topicSeeds.length];\nreturn [{\n  json: {\n    run: {\n      id: `run-${isoDate}`,\n      date: isoDate,\n      status: 'draft'\n    },\n    channel: {\n      slug: 'youtube-longform-ai',\n      name: 'YouTube Longform AI',\n      language: 'es',\n      timezone: 'Europe/Madrid'\n    },\n    niche: chosenNiche,\n    config: {\n      targetMinutes: 38,\n      publishHourLocal: '18:00',\n      llm: {\n        provider: 'openai',\n        model: 'gpt-4.1'\n      },\n      tts: {\n        provider: 'elevenlabs',\n        voiceId: 'set-in-n8n-credential-or-node'\n      },\n      subtitles: {\n        provider: 'openai-stt',\n        mode: 'word-level',\n        style: 'kinetic-documentary'\n      },\n      visuals: {\n        stockProvider: 'storyblocks-or-artgrid',\n        heroProvider: 'runway-or-kling',\n        scenesPerChapter: 9,\n        preferredMix: {\n          stockPremium: 0.55,\n          motionGraphics: 0.15,\n          aiImage: 0.10,\n          heroAiVideo: 0.10,\n          archiveStill: 0.10\n        }\n      },\n      render: {\n        provider: 'creatomate',\n        subtitleBurnIn: true,\n        chapterCards: true\n      },\n      youtube: {\n        privacyStatus: 'private',\n        categoryId: '27',\n        defaultTags: ['documental', 'historia', 'ciencia', 'tecnologia', 'analisis', 'longform']\n      },\n      editorialPolicy: {\n        forbiddenRepeatWindowDays: 180,\n        minimumOriginalityScore: 85,\n        targetVideosPerWeekPerNiche: 2,\n        requireFreshAngle: true,\n        requireMonetizationSafeScript: true\n      }\n    },\n    workingTopic: {\n      canonicalTopic: topic,\n      userFacingTopic: topic,\n      uniquenessHash: topic.toLowerCase().replace(/[^a-z0-9]+/g, '-'),\n      chosenBy: 'rotation-seed-mock'\n    },\n    prompts: {\n      researchSystem: 'Eres un lead researcher de YouTube longform. Devuelve solo JSON valido, con enfoque editorial, fuentes y angulo no repetido.',\n      researchUser: `Prepara un research pack para un video de 38 minutos sobre: ${topic}. Debes proponer un angulo original, evitar topicos repetidos, identificar hooks de retencion y devolver una lista de fuentes o categorias de fuentes a consultar.`,\n      outlineSystem: 'Eres un guionista senior de documentales faceless para YouTube. Devuelve solo JSON valido, con estructura de retencion y sin relleno.',\n      scriptSystem: 'Eres un head writer de YouTube longform. Devuelve solo JSON valido. El guion debe ser monetizable, limpio, claro, con ritmo y sin repetirse.'\n    },\n    integrations: {\n      researchLlmEnabled: false,\n      outlineLlmEnabled: false,\n      scriptLlmEnabled: false,\n      ttsEnabled: false,\n      subtitleAlignmentEnabled: false,\n      renderEnabled: false,\n      youtubeUploadEnabled: false\n    }\n  }\n}];"
       }
     },
     {
-      "id": "d5b2344b-69b8-458f-89a6-8a174c436639",
+      "id": "editorial-guard-001",
+      "name": "Editorial Guard And Uniqueness",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -470,
+        280
+      ],
+      "parameters": {
+        "jsCode": "const data = $input.first().json;\nconst bannedPatterns = ['top 10 curiosidades', 'resumen generico', 'video sin angle'];\nconst editorialChecks = {\n  nicheLocked: true,\n  duplicateCheckImplementedInDb: false,\n  requiresDbQuery: ['editorial_topics', 'content_runs'],\n  forbiddenRepeatWindowDays: data.config.editorialPolicy.forbiddenRepeatWindowDays,\n  originalityScoreTarget: data.config.editorialPolicy.minimumOriginalityScore,\n  blockedPatterns: bannedPatterns\n};\nconst monetizationChecklist = {\n  avoidHarmfulClaims: true,\n  avoidGraphicContent: true,\n  avoidMedicalOrLegalClaimsWithoutContext: true,\n  avoidCopyrightedFootageWithoutLicense: true,\n  requireTransformativeNarrative: true\n};\nreturn [{ json: { ...data, editorialChecks, monetizationChecklist } }];"
+      }
+    },
+    {
+      "id": "research-http-001",
       "name": "Research LLM Placeholder",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [-120, 160],
+      "position": [
+        -220,
+        280
+      ],
       "disabled": true,
       "notesInFlow": true,
-      "notes": "Activa este nodo cuando quieras llamar al proveedor real de research. La idea es usar GROQ_API_KEY y pedir JSON estricto.",
+      "notes": "Conecta aqui OpenAI Responses API para research real. Debe devolver canonicalTopic, angle, sourcePlan, hooks y originalityNotes.",
       "parameters": {
-        "url": "https://api.groq.com/openai/v1/chat/completions",
+        "url": "https://api.openai.com/v1/responses",
         "options": {}
       }
     },
     {
-      "id": "d6d74a3d-0810-44cb-a057-e8595cfacfb0",
+      "id": "research-parse-001",
       "name": "Parse Or Mock Research",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [120, 160],
+      "position": [
+        20,
+        280
+      ],
       "parameters": {
-        "jsCode": "const data = $input.first().json;\nconst raw = data.body?.choices?.[0]?.message?.content;\nlet research = null;\nif (raw) {\n  try {\n    research = JSON.parse(raw);\n  } catch (error) {\n    research = null;\n  }\n}\nif (!research) {\n  research = {\n    angle: `Explicar ${data.run.topic} como una historia conectada y facil de consumir`,\n    promise: 'El espectador entendera el contexto, los momentos clave y por que este tema importa hoy.',\n    audience: 'Publico general interesado en videos largos de aprendizaje y curiosidad.',\n    keywords: ['contexto', 'historia', 'impacto', 'curiosidades', 'personajes clave'],\n    retentionHooks: ['abrir con una promesa fuerte', 'cerrar cada capitulo con una pregunta', 'alternar contexto y consecuencias'],\n    facts: [\n      'Hay un origen historico claro que sirve de hook.',\n      'Existen varios hitos intermedios que permiten dividir el video en capitulos.',\n      'El tema conecta con decisiones humanas, errores y cambios culturales.',\n      'Se puede explicar con ejemplos concretos y visuales faciles de producir.'\n    ],\n    chapterIdeas: [\n      'Contexto inicial',\n      'Primer gran punto de inflexion',\n      'Expansion y adopcion',\n      'Errores, riesgos o mitos',\n      'Consecuencias actuales',\n      'Que puede pasar despues'\n    ]\n  };\n}\nreturn [{ json: { ...data, research } }];"
+        "jsCode": "const data = $input.first().json;\nconst raw = data.output?.[0]?.content?.[0]?.text || data.body?.output_text || data.body?.choices?.[0]?.message?.content;\nlet research = null;\nif (raw) {\n  try { research = JSON.parse(raw); } catch (error) { research = null; }\n}\nif (!research) {\n  research = {\n    canonicalTopic: data.workingTopic.canonicalTopic,\n    angle: `Explicar ${data.workingTopic.userFacingTopic} como una historia de decisiones, incentivos y consecuencias reales`,\n    audience: data.niche.audience,\n    sourcePlan: ['libros y papers base', 'fuentes periodisticas serias', 'cronologia historica', 'datos y contexto industrial'],\n    retentionHooks: [\n      'abrir con una consecuencia moderna del tema',\n      'cerrar cada capitulo con una tension abierta',\n      'alternar contexto humano con implicaciones actuales'\n    ],\n    originalityNotes: 'El angulo evita listas genericas y plantea una narrativa causal.',\n    bannedRepetitions: ['no repetir ejemplos del canal en los ultimos 6 meses']\n  };\n}\nreturn [{ json: { ...data, research } }];"
       }
     },
     {
-      "id": "4c17d6fd-bbca-4456-a7f0-7fded2ceb58a",
+      "id": "outline-http-001",
       "name": "Outline LLM Placeholder",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [360, 160],
+      "position": [
+        260,
+        280
+      ],
       "disabled": true,
       "notesInFlow": true,
-      "notes": "Activa este nodo para generar el outline real. Debe devolver titulo provisional, hook, CTA y capitulos con duracion.",
+      "notes": "Conecta aqui OpenAI para generar un outline largo con hook, promesa, CTA y capitulos con funcion de retencion.",
       "parameters": {
-        "url": "https://api.groq.com/openai/v1/chat/completions",
+        "url": "https://api.openai.com/v1/responses",
         "options": {}
       }
     },
     {
-      "id": "98d65161-d6ca-4d4c-9195-bdf8c31f10d6",
+      "id": "outline-parse-001",
       "name": "Parse Or Mock Outline",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [600, 160],
+      "position": [
+        500,
+        280
+      ],
       "parameters": {
-        "jsCode": "const data = $input.first().json;\nconst raw = data.body?.choices?.[0]?.message?.content;\nlet outline = null;\nif (raw) {\n  try {\n    outline = JSON.parse(raw);\n  } catch (error) {\n    outline = null;\n  }\n}\nif (!outline) {\n  const chapterTitles = [\n    'El origen del problema o de la idea',\n    'Los primeros intentos que casi nadie recuerda',\n    'El momento que cambio todo',\n    'La fase de crecimiento y adopcion',\n    'Los errores que generaron nuevas decisiones',\n    'Los protagonistas que empujaron el cambio',\n    'El impacto en la vida actual',\n    'Lo que viene despues y por que importa'\n  ];\n  outline = {\n    workingTitle: data.run.topic,\n    hook: `Hoy vas a entender ${data.run.topic} desde el principio hasta sus consecuencias actuales.`,\n    cta: 'Si te gustan este tipo de historias largas y bien explicadas, suscribete para el siguiente episodio.',\n    chapters: chapterTitles.map((title, index) => ({\n      chapterIndex: index + 1,\n      title,\n      objective: `Mantener retencion mientras se desarrolla ${title.toLowerCase()}`,\n      targetMinutes: index === 0 ? 4 : 4.25\n    }))\n  };\n}\nreturn [{ json: { ...data, outline } }];"
+        "jsCode": "const data = $input.first().json;\nconst raw = data.output?.[0]?.content?.[0]?.text || data.body?.output_text || data.body?.choices?.[0]?.message?.content;\nlet outline = null;\nif (raw) {\n  try { outline = JSON.parse(raw); } catch (error) { outline = null; }\n}\nif (!outline) {\n  const chapterTitles = [\n    'La promesa y el problema de origen',\n    'El contexto que casi siempre se omite',\n    'El primer punto de inflexion',\n    'Las decisiones que aceleraron el cambio',\n    'Los errores, mitos y conflictos',\n    'Los actores clave y sus incentivos',\n    'El impacto sobre el presente',\n    'Lo que viene despues y por que deberia importarte'\n  ];\n  outline = {\n    workingTitle: `${data.workingTopic.userFacingTopic}: la historia completa`,\n    hook: `Lo que hoy parece inevitable en realidad nacio de una cadena de decisiones muy concretas.`,\n    promise: `Al terminar entenderas ${data.workingTopic.userFacingTopic} desde el origen hasta su impacto actual.`,\n    cta: 'Si quieres documentales largos con contexto y claridad, suscribete para el siguiente episodio.',\n    chapters: chapterTitles.map((title, index) => ({\n      chapterIndex: index + 1,\n      title,\n      objective: `Crear retencion y avanzar la historia con una pieza nueva de contexto en ${title.toLowerCase()}`,\n      targetMinutes: index === 0 ? 4 : 4.25,\n      retentionDevice: index % 2 === 0 ? 'open-loop' : 'reveal'\n    }))\n  };\n}\nreturn [{ json: { ...data, outline } }];"
       }
     },
     {
-      "id": "46458d72-bf53-425b-aabf-0ec7ee6f4080",
+      "id": "script-http-001",
       "name": "Script LLM Placeholder",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [840, 160],
+      "position": [
+        740,
+        280
+      ],
       "disabled": true,
       "notesInFlow": true,
-      "notes": "Activa este nodo para generar el guion largo real por capitulos.",
+      "notes": "Conecta aqui OpenAI para generar un guion largo limpio, narrativo y monetizable.",
       "parameters": {
-        "url": "https://api.groq.com/openai/v1/chat/completions",
+        "url": "https://api.openai.com/v1/responses",
         "options": {}
       }
     },
     {
-      "id": "3b310d3f-13f0-47c0-8944-ccac13208a92",
+      "id": "script-parse-001",
       "name": "Parse Or Mock Script",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [1080, 160],
+      "position": [
+        980,
+        280
+      ],
       "parameters": {
-        "jsCode": "const data = $input.first().json;\nconst raw = data.body?.choices?.[0]?.message?.content;\nlet script = null;\nif (raw) {\n  try {\n    script = JSON.parse(raw);\n  } catch (error) {\n    script = null;\n  }\n}\nif (!script) {\n  const intro = `${data.outline.hook} En este video vamos a recorrer el contexto, los puntos de inflexion y las consecuencias de una forma clara, sin relleno y manteniendo el hilo de la historia.`;\n  const chapterScripts = data.outline.chapters.map((chapter) => ({\n    chapterIndex: chapter.chapterIndex,\n    title: chapter.title,\n    narration: `${chapter.title}. En esta parte explicamos el contexto, introducimos a los actores principales, desarrollamos el conflicto o la idea central y cerramos con una transicion que obligue al espectador a quedarse para el siguiente bloque.`\n  }));\n  const outro = data.outline.cta;\n  script = {\n    title: `${data.run.topic}: historia completa en 38 minutos`,\n    description: `Video largo automatizado sobre ${data.run.topic}. Formato documental, narrado y estructurado por capitulos.`,\n    intro,\n    chapters: chapterScripts,\n    outro\n  };\n}\nreturn [{ json: { ...data, script } }];"
+        "jsCode": "const data = $input.first().json;\nconst raw = data.output?.[0]?.content?.[0]?.text || data.body?.output_text || data.body?.choices?.[0]?.message?.content;\nlet script = null;\nif (raw) {\n  try { script = JSON.parse(raw); } catch (error) { script = null; }\n}\nif (!script) {\n  script = {\n    title: `${data.workingTopic.userFacingTopic}: historia completa en 38 minutos`,\n    description: `Documental faceless de larga duracion sobre ${data.workingTopic.userFacingTopic}, con contexto, narrativa y analisis.`,\n    hook: data.outline.hook,\n    intro: `${data.outline.hook} En este video vamos a seguir el origen, el conflicto, los puntos de giro y las consecuencias modernas del tema.`,\n    chapters: data.outline.chapters.map((chapter) => ({\n      chapterIndex: chapter.chapterIndex,\n      title: chapter.title,\n      narration: `${chapter.title}. Aqui desarrollamos el contexto, explicamos por que esta etapa importa y cerramos conectando con la siguiente decision o consecuencia.`\n    })),\n    outro: data.outline.cta,\n    monetizationSafety: {\n      advertiserFriendly: true,\n      sensitiveClaimsReviewed: true,\n      copyrightedQuotesMinimized: true\n    }\n  };\n}\nreturn [{ json: { ...data, script } }];"
       }
     },
     {
-      "id": "6254cf8d-7f50-4e6b-b0d7-9aee2bd1304a",
-      "name": "Build Scenes And Asset Plan",
+      "id": "visual-storyboard-001",
+      "name": "Build Visual Storyboard",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [1340, 160],
+      "position": [
+        1220,
+        280
+      ],
       "parameters": {
-        "jsCode": "const data = $input.first().json;\nconst scenes = [];\nlet sceneIndex = 1;\nfor (const chapter of data.outline.chapters) {\n  for (let i = 0; i < data.config.visuals.scenesPerChapter; i++) {\n    const visualType = i % 5 === 0 ? 'text_slide' : (i % 3 === 0 ? 'ai_image' : 'stock_video');\n    scenes.push({\n      sceneIndex,\n      chapterIndex: chapter.chapterIndex,\n      chapterTitle: chapter.title,\n      visualType,\n      query: `${data.run.topic} ${chapter.title}`,\n      narrationBeat: `Escena ${i + 1} del capitulo ${chapter.chapterIndex}: desarrollo visual de ${chapter.title.toLowerCase()}.`,\n      targetDurationSeconds: Math.round((chapter.targetMinutes * 60) / data.config.visuals.scenesPerChapter)\n    });\n    sceneIndex += 1;\n  }\n}\nconst assetPlan = scenes.map((scene) => ({\n  sceneIndex: scene.sceneIndex,\n  provider: scene.visualType === 'stock_video' ? 'pexels' : 'image-generator',\n  requestedType: scene.visualType,\n  searchText: scene.query\n}));\nconst productionPlan = {\n  chapterCount: data.outline.chapters.length,\n  sceneCount: scenes.length,\n  estimatedDurationMinutes: data.config.targetMinutes,\n  renderStrategy: 'external-render-provider-recommended',\n  uploadStrategy: 'youtube-api-after-render'\n};\nreturn [{ json: { ...data, scenes, assetPlan, productionPlan } }];"
+        "jsCode": "const data = $input.first().json;\nconst scenes = [];\nlet sceneIndex = 1;\nfor (const chapter of data.outline.chapters) {\n  for (let i = 0; i < data.config.visuals.scenesPerChapter; i++) {\n    const visualType = i % 7 === 0\n      ? 'hero_ai_video'\n      : i % 5 === 0\n        ? 'motion_graphic'\n        : i % 3 === 0\n          ? 'ai_image'\n          : i % 2 === 0\n            ? 'archive_still'\n            : 'stock_premium';\n    scenes.push({\n      sceneIndex,\n      chapterIndex: chapter.chapterIndex,\n      chapterTitle: chapter.title,\n      visualType,\n      searchText: `${data.workingTopic.userFacingTopic} ${chapter.title}`,\n      subtitleStyle: 'kinetic-documentary',\n      narrationBeat: `Escena ${i + 1} del capitulo ${chapter.chapterIndex}.`,\n      targetDurationSeconds: Math.round((chapter.targetMinutes * 60) / data.config.visuals.scenesPerChapter)\n    });\n    sceneIndex += 1;\n  }\n}\nconst assetPlan = scenes.map((scene) => ({\n  sceneIndex: scene.sceneIndex,\n  provider: scene.visualType === 'hero_ai_video' ? 'runway-or-kling' : (scene.visualType === 'stock_premium' ? 'storyblocks-or-artgrid' : 'internal-graphics-or-image-gen'),\n  requestedType: scene.visualType,\n  searchText: scene.searchText\n}));\nreturn [{ json: { ...data, scenes, assetPlan } }];"
       }
     },
     {
-      "id": "b07abef9-14e2-44e7-9e2b-487688fe2b5a",
+      "id": "tts-http-001",
       "name": "TTS Placeholder",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [1600, 80],
+      "position": [
+        1460,
+        200
+      ],
       "disabled": true,
       "notesInFlow": true,
-      "notes": "Conecta aqui ElevenLabs o tu TTS elegido. Idealmente genera audio por capitulo, no un archivo unico gigante.",
+      "notes": "Conecta aqui ElevenLabs. Genera audio por capitulo para controlar reintentos y expresividad.",
       "parameters": {
         "url": "https://api.elevenlabs.io/v1/text-to-speech",
         "options": {}
       }
     },
     {
-      "id": "f8f372b0-b33f-40b7-a5c7-129056f35ca8",
-      "name": "Render Placeholder",
+      "id": "subtitle-http-001",
+      "name": "Subtitle Timing Placeholder",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [1600, 240],
+      "position": [
+        1700,
+        200
+      ],
       "disabled": true,
       "notesInFlow": true,
-      "notes": "Conecta aqui el proveedor de render. Para 38 minutos diarios no recomiendo render pesado dentro de Render free.",
+      "notes": "Conecta aqui OpenAI Speech-to-Text para obtener timestamps por palabra a partir del audio final.",
       "parameters": {
-        "url": "https://example.com/render-provider",
+        "url": "https://api.openai.com/v1/audio/transcriptions",
         "options": {}
       }
     },
     {
-      "id": "76d2237c-7d52-4a83-a00c-a00a55065520",
+      "id": "subtitle-parse-001",
+      "name": "Parse Or Mock Subtitles",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1940,
+        200
+      ],
+      "parameters": {
+        "jsCode": "const data = $input.first().json;\nconst subtitleSegments = [];\nlet segmentIndex = 1;\nfor (const chapter of data.outline.chapters) {\n  subtitleSegments.push({\n    segmentIndex,\n    startMs: (segmentIndex - 1) * 4000,\n    endMs: (segmentIndex - 1) * 4000 + 3200,\n    text: `${chapter.title}.`,\n    emphasisWords: [chapter.title.split(' ')[0] || chapter.title],\n    style: 'kinetic-documentary'\n  });\n  segmentIndex += 1;\n}\nreturn [{ json: { ...data, subtitleSegments } }];"
+      }
+    },
+    {
+      "id": "render-http-001",
+      "name": "Render Placeholder",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        2180,
+        280
+      ],
+      "disabled": true,
+      "notesInFlow": true,
+      "notes": "Conecta aqui Creatomate o Shotstack para el render final con timeline, captions, chapter cards y lower thirds.",
+      "parameters": {
+        "url": "https://api.creatomate.com/v2/renders",
+        "options": {}
+      }
+    },
+    {
+      "id": "youtube-http-001",
       "name": "YouTube Upload Placeholder",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [1600, 400],
+      "position": [
+        2420,
+        280
+      ],
       "disabled": true,
       "notesInFlow": true,
-      "notes": "Conecta aqui la subida final a YouTube cuando ya tengas render real y binario listo.",
+      "notes": "Conecta aqui la subida final a YouTube cuando ya tengas render y thumbnail.",
       "parameters": {
         "url": "https://www.googleapis.com/upload/youtube/v3/videos",
         "options": {}
       }
     },
     {
-      "id": "6db4b3cb-118c-4553-ac6e-9b5b2903d78e",
-      "name": "Finalize Production Package",
+      "id": "final-qa-001",
+      "name": "Finalize QA And Publication Package",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [1860, 240],
+      "position": [
+        2660,
+        280
+      ],
       "parameters": {
-        "jsCode": "const data = $input.first().json;\nconst title = data.script?.title || `${data.run.topic}: historia completa en ${data.config.targetMinutes} minutos`;\nconst description = [\n  data.script?.description || `Video largo sobre ${data.run.topic}.`,\n  '',\n  'Estructura prevista:',\n  ...data.outline.chapters.map((chapter, index) => `${index + 1}. ${chapter.title}`),\n  '',\n  'Generado con un workflow de n8n y preparado para integrar research, guion, voz, assets, render y publicacion.'\n].join('\\n');\nconst youtubePackage = {\n  title,\n  description,\n  tags: data.config.youtube.defaultTags,\n  privacyStatus: data.config.youtube.privacyStatus,\n  categoryId: data.config.youtube.categoryId,\n  scheduledForLocal: `${data.run.date} ${data.config.publishHourLocal}`\n};\nconst issues = [];\nif (!data.outline?.chapters?.length) issues.push('No hay outline');\nif (!data.script?.chapters?.length) issues.push('No hay guion por capitulos');\nif ((data.scenes || []).length < 40) issues.push('El numero de escenas es demasiado bajo para un longform de 38 minutos');\nif (!data.productionPlan) issues.push('Falta el production plan');\nconst status = issues.length ? 'needs_review' : 'ready_for_integrations';\nconst nextActions = [\n  'Activar nodo de research LLM',\n  'Activar nodo de outline LLM',\n  'Activar nodo de script LLM',\n  'Conectar TTS real por capitulo',\n  'Conectar proveedor de render externo',\n  'Conectar subida final a YouTube'\n];\nreturn [{ json: { ...data, youtubePackage, quality: { issues, status }, nextActions } }];"
+        "jsCode": "const data = $input.first().json;\nconst issues = [];\nif (!data.niche?.key) issues.push('No hay nicho seleccionado');\nif (!data.research?.angle) issues.push('Falta angulo editorial');\nif (!data.outline?.chapters?.length) issues.push('No hay outline');\nif (!data.script?.chapters?.length) issues.push('No hay guion por capitulos');\nif ((data.scenes || []).length < 50) issues.push('Demasiadas pocas escenas para un longform de 38 minutos');\nif (!(data.subtitleSegments || []).length) issues.push('No hay subtitulos alineados');\nif (data.integrations.researchLlmEnabled === false) issues.push('Research real no conectado');\nif (data.integrations.scriptLlmEnabled === false) issues.push('Script real no conectado');\nif (data.integrations.ttsEnabled === false) issues.push('TTS real no conectado');\nif (data.integrations.subtitleAlignmentEnabled === false) issues.push('Subtitulos reales no conectados');\nif (data.integrations.renderEnabled === false) issues.push('Render real no conectado');\nif (data.integrations.youtubeUploadEnabled === false) issues.push('Upload real no conectado');\nconst youtubePackage = {\n  title: data.script?.title || `${data.workingTopic.userFacingTopic}: historia completa`,\n  description: [\n    data.script?.description || `Documental sobre ${data.workingTopic.userFacingTopic}.`,\n    '',\n    'Capitulos previstos:',\n    ...data.outline.chapters.map((chapter, index) => `${index + 1}. ${chapter.title}`)\n  ].join('\\n'),\n  tags: data.config.youtube.defaultTags,\n  privacyStatus: data.config.youtube.privacyStatus,\n  categoryId: data.config.youtube.categoryId,\n  scheduledForLocal: `${data.run.date} ${data.config.publishHourLocal}`\n};\nconst assessment = {\n  currentWorkflowWillGenerateProfessionalVideo: false,\n  currentWorkflowIsMonetizableAsIs: false,\n  reasons: [\n    'El flujo base aun es una plantilla de orquestacion, no una pipeline conectada.',\n    'No hay control real contra repeticion hasta consultar base de datos y backlog editorial.',\n    'No hay stock premium ni render final conectados.',\n    'No hay subtitulado real con timestamps por palabra.',\n    'No hay QA de copyright, claims y narrativa final antes de publicar.'\n  ]\n};\nconst status = issues.length ? 'needs_review' : 'ready_for_production';\nreturn [{ json: { ...data, youtubePackage, quality: { issues, status }, assessment } }];"
       }
     }
   ],
   "connections": {
     "Manual Trigger": {
-      "main": [[{ "node": "Build Run Context", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "Build Channel Strategy",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "Daily Schedule": {
-      "main": [[{ "node": "Build Run Context", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "Build Channel Strategy",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "GitHub Daily Webhook": {
-      "main": [[{ "node": "Build Run Context", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "Build Channel Strategy",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
-    "Build Run Context": {
-      "main": [[{ "node": "Research LLM Placeholder", "type": "main", "index": 0 }]]
+    "Build Channel Strategy": {
+      "main": [
+        [
+          {
+            "node": "Editorial Guard And Uniqueness",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Editorial Guard And Uniqueness": {
+      "main": [
+        [
+          {
+            "node": "Research LLM Placeholder",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "Research LLM Placeholder": {
-      "main": [[{ "node": "Parse Or Mock Research", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "Parse Or Mock Research",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "Parse Or Mock Research": {
-      "main": [[{ "node": "Outline LLM Placeholder", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "Outline LLM Placeholder",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "Outline LLM Placeholder": {
-      "main": [[{ "node": "Parse Or Mock Outline", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "Parse Or Mock Outline",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "Parse Or Mock Outline": {
-      "main": [[{ "node": "Script LLM Placeholder", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "Script LLM Placeholder",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "Script LLM Placeholder": {
-      "main": [[{ "node": "Parse Or Mock Script", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "Parse Or Mock Script",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "Parse Or Mock Script": {
-      "main": [[{ "node": "Build Scenes And Asset Plan", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "Build Visual Storyboard",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
-    "Build Scenes And Asset Plan": {
-      "main": [[{ "node": "TTS Placeholder", "type": "main", "index": 0 }]]
+    "Build Visual Storyboard": {
+      "main": [
+        [
+          {
+            "node": "TTS Placeholder",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "TTS Placeholder": {
-      "main": [[{ "node": "Render Placeholder", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "Subtitle Timing Placeholder",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Subtitle Timing Placeholder": {
+      "main": [
+        [
+          {
+            "node": "Parse Or Mock Subtitles",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse Or Mock Subtitles": {
+      "main": [
+        [
+          {
+            "node": "Render Placeholder",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "Render Placeholder": {
-      "main": [[{ "node": "YouTube Upload Placeholder", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "YouTube Upload Placeholder",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "YouTube Upload Placeholder": {
-      "main": [[{ "node": "Finalize Production Package", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "Finalize QA And Publication Package",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     }
   }
 }

@@ -141,6 +141,7 @@ Blueprint funcional:
 Stack recomendado por capa:
 
 - [professional-video-stack.md](C:/Users/Usuario/Desktop/Personal/Proyectos/Automatizaciones/Bot%20de%20Videos/docs/professional-video-stack.md)
+- [channel-strategy-and-monetization.md](C:/Users/Usuario/Desktop/Personal/Proyectos/Automatizaciones/Bot%20de%20Videos/docs/channel-strategy-and-monetization.md)
 
 ## Primer arranque en n8n
 
