@@ -4,9 +4,10 @@ create table if not exists channels (
   id uuid primary key default gen_random_uuid(),
   slug text not null unique,
   name text not null,
-  language_code text not null default 'es',
+  language_code text not null default 'en',
   niche text,
   niche_strategy jsonb not null default '{}'::jsonb,
+  brand_payload jsonb not null default '{}'::jsonb,
   default_duration_minutes integer not null default 38,
   is_active boolean not null default true,
   created_at timestamptz not null default now(),
@@ -19,18 +20,28 @@ create table if not exists content_runs (
   run_date date not null,
   niche text,
   canonical_topic text,
+  angle text,
   topic text not null,
   format text not null default 'longform',
   status text not null default 'draft',
+  review_status text not null default 'needs_review',
+  delivery_mode text not null default 'b2_manual_publish',
+  delivery_status text not null default 'queued',
   title text,
   description text,
   hook text,
   target_duration_minutes numeric(6,2) not null default 38,
   final_duration_seconds integer,
-  youtube_video_id text,
-  youtube_url text,
   render_provider text,
   render_job_id text,
+  voice_provider text,
+  music_provider text,
+  storage_bucket text,
+  storage_prefix text,
+  storage_url text,
+  thumbnail_url text,
+  youtube_video_id text,
+  youtube_url text,
   thumbnail_prompt text,
   originality_score numeric(5,2),
   monetization_status text,
@@ -93,7 +104,7 @@ create table if not exists content_assets (
 create table if not exists publish_jobs (
   id uuid primary key default gen_random_uuid(),
   run_id uuid not null references content_runs(id) on delete cascade,
-  platform text not null default 'youtube',
+  platform text not null default 'backblaze_b2',
   status text not null default 'queued',
   scheduled_for timestamptz,
   published_at timestamptz,
@@ -149,6 +160,8 @@ create table if not exists subtitle_segments (
 );
 
 create index if not exists idx_content_runs_status on content_runs(status);
+create index if not exists idx_content_runs_review_status on content_runs(review_status);
+create index if not exists idx_content_runs_delivery_status on content_runs(delivery_status);
 create index if not exists idx_content_runs_run_date on content_runs(run_date desc);
 create index if not exists idx_content_runs_canonical_topic on content_runs(canonical_topic);
 create index if not exists idx_content_runs_uniqueness_hash on content_runs(uniqueness_hash);

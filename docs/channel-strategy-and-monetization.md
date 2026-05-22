@@ -2,110 +2,106 @@
 
 ## Respuesta corta
 
-No, el workflow anterior no iba a generar por si solo un video profesional y monetizable para YouTube.
+Si quieres monetizar mejor, este proyecto debe ir en `ingles` y con un solo nicho fuerte.
 
-Servia como base de orquestacion.
+No debe parecer un canal AI genérico.
 
-No servia todavia como sistema de produccion real.
+Debe parecer una marca editorial real.
 
-## Lo que faltaba
+## Nombre recomendado
 
-- nicho fijo
-- backlog editorial
-- historial de temas usados
-- control anti-repeticion por tema y por angulo
-- subtitulos alineados por palabra
-- render cinematografico consistente
-- control de copyright/licencias
-- QA de monetizacion antes de publicar
+- `The Hidden Thread`
 
-## Nicho recomendado
+## Posicionamiento
 
-Para un primer canal automatizado con longform, evita nichos demasiado abiertos.
+Canal de documentales faceless sobre:
 
-Recomendacion:
+- historia
+- ciencia
+- tecnologia
 
-- historia, poder, ciencia y tecnologia explicadas con enfoque documental
+Siempre con el mismo enfoque:
 
-Subnichos:
-
-- historia de decisiones politicas y militares
-- descubrimientos y errores cientificos
-- historia de internet y sistemas modernos
-- industrias del futuro
+- decisiones
+- sistemas
+- consecuencias
 
 ## Lo que no debes hacer
 
-- mezclar diez nichos distintos
-- publicar temas aleatorios por moda
-- hacer videos demasiado parecidos entre si
-- usar titulos y miniaturas intercambiables
+- mezclar demasiados nichos
+- sacar temas al azar
+- repetir el mismo video con otro titulo
+- usar miniaturas de collage cutre
+- usar voz o musica que suenen falsas
 
-## Como evitar repeticiones
+## Politica editorial
 
-Debes guardar y consultar como minimo:
+Cada episodio debe tener:
 
 - `canonical_topic`
-- `niche`
 - `angle`
+- `subNiche`
 - `uniqueness_hash`
-- fecha de publicacion
+- score de originalidad
+- checklist de monetizacion
 
-Y aplicar estas reglas:
+Reglas:
 
-- no repetir el mismo `canonical_topic` en 180 dias
-- no repetir el mismo `angle` aunque cambie el titulo
-- no publicar dos videos seguidos del mismo subnicho si el canal aun es pequeno
-- marcar topics candidatos, usados y descartados
+- no repetir `canonical_topic` en 180 dias
+- no repetir el mismo `angle`
+- no sacar dos videos seguidos demasiado parecidos
+- priorizar temas evergreen con potencial de retencion
 
-## Que significa “profesional” en este proyecto
+## Que significa profesional aqui
 
-Para este canal, profesional significa:
+- ingles convincente
+- voz consistente
+- musica de fondo bien mezclada
+- captions limpios
+- identidad visual fija
+- guion con estructura de retencion
+- miniatura pensada desde el tema
 
-- guion largo con estructura de retencion
-- voz expresiva y consistente
-- visuales con coherencia de marca
-- subtitulos bonitos y legibles
-- pacing estable
-- chapter cards
-- thumbnail pensada desde el guion
-- descripcion y metadata limpias
+## Que significa monetizable aqui
 
-## Que significa “monetizable”
+- contenido transformativo
+- narrativa propia
+- sin material dudoso
+- sin musica insegura
+- sin hooks baratos sensibles
+- revision manual antes de publicar
 
-No basta con que YouTube acepte el upload.
+## Publicacion recomendada
 
-Monetizable aqui significa:
+No hace falta automatizar el upload a YouTube.
 
-- sin claims delicados gratuitos
-- sin metraje dudoso
-- sin reuso obvio de material sin transformar
-- sin narracion mecanica o spammy
-- con suficiente transformacion editorial
+La opcion sensata para este proyecto es:
 
-## Workflow profesional recomendado
+1. generar el episodio
+2. renderizarlo
+3. subirlo a `Backblaze B2`
+4. revisar
+5. subir manualmente a `YouTube`
 
-1. seleccionar nicho del dia
-2. elegir topic desde backlog editorial
-3. comprobar historial y anti-repeticion
-4. research con fuentes
-5. outline con hooks y capitulos
-6. guion largo final
-7. storyboard visual
-8. voz por capitulos
-9. subtitulos con word timestamps
-10. render final
-11. QA editorial, visual y monetizacion
-12. upload
+## Por que esta opcion es mejor
 
-## Decision importante
+- controlas el resultado final
+- mantienes la calidad del archivo
+- evitas pelearte con OAuth de YouTube
+- reduces el riesgo de publicar algo flojo o con errores
 
-El workflow profesional no puede decidir “cualquier tema” cada dia sin memoria.
+## Identidad del canal
 
-Necesita memoria editorial.
+El canal debe sentirse:
 
-Por eso en la base de datos ahora conviene guardar:
+- editorial
+- sobrio
+- claro
+- premium
 
-- `editorial_topics`
-- `content_runs`
-- `subtitle_segments`
+No debe sentirse:
+
+- AI flashy
+- genérico
+- clickbait barato
+- collage de stock

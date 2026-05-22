@@ -1,227 +1,217 @@
-# Blueprint: YouTube Longform Daily
+# Blueprint: The Hidden Thread Daily Delivery
 
 ## Objetivo del workflow
 
-Publicar un video diario largo con una pipeline controlada, profesional y monetizable, donde:
+Generar un episodio diario largo en ingles para `The Hidden Thread`, con tono documental premium y entrega final a `Backblaze B2` para revision manual antes de subir a `YouTube`.
 
-- haya un nicho definido
-- no se repitan temas o angulos
-- el guion tenga retencion real
-- la voz suene humana
-- los subtitulos tengan timing por palabra
-- el render final tenga calidad visual suficiente para YouTube longform
+## Principios del sistema
+
+- un solo nicho fuerte
+- un solo tono de canal
+- nada de contenido random
+- nada de visuales de stock cutres como base
+- nada de subida automatica a YouTube sin revision
 
 ## Workflow canvas
 
 ```text
 [Manual Trigger] ----\
 [Schedule Trigger] --\
-[Webhook Trigger] ----> [Build Channel Strategy]
+[Webhook Trigger] ----> [Build Channel Brand And Run Context]
                               |
                               v
                  [Editorial Guard And Uniqueness]
                               |
                               v
-                        [Research Pack]
+                      [Research LLM Placeholder]
                               |
                               v
-                        [Generate Outline]
+                     [Parse Or Mock Research]
                               |
                               v
-                        [Generate Script]
+                       [Outline LLM Placeholder]
                               |
                               v
-                     [Build Visual Storyboard]
+                      [Parse Or Mock Outline]
                               |
                               v
-                     [Generate Voiceover Pack]
+                        [Script LLM Placeholder]
                               |
                               v
-                    [Subtitle Timing Alignment]
+                      [Parse Or Mock Script]
                               |
                               v
-                         [Render Request]
+                      [Build Visual Storyboard]
                               |
                               v
-                    [Final QA And Monetization]
-                          /               \
-                         /                 \
-                        v                   v
-             [Upload To YouTube]      [Needs Review]
+                        [Voiceover Placeholder]
+                              |
+                              v
+                   [Background Music Placeholder]
+                              |
+                              v
+                    [Subtitle Timing Placeholder]
+                              |
+                              v
+                     [Parse Or Mock Subtitles]
+                              |
+                              v
+                      [Build Thumbnail Brief]
+                              |
+                              v
+                         [Render Placeholder]
+                              |
+                              v
+                  [Build Drive Delivery Package]
+                              |
+                              v
+                 [Backblaze B2 Delivery Placeholder]
+                              |
+                              v
+                    [Finalize Delivery Package]
 ```
 
-## Nodos que debes crear en n8n
+## Salida esperada
 
-### Triggers
+Cada run debe producir un paquete entregable:
 
-- `Manual Trigger`
-- `Schedule Trigger`
-- `Webhook Trigger`
+- `video.mp4`
+- `thumbnail.png`
+- `title.txt`
+- `description.txt`
+- `tags.json`
+- `chapters.txt`
+- `subtitles.srt`
+- `publication-checklist.md`
 
-Configuracion recomendada:
+## Capa editorial
 
-- 1 ejecucion al dia
-- timezone del workflow: `Europe/Madrid`
-- hora fija de arranque: por ejemplo `06:00`
-- webhook para disparo externo desde GitHub Actions o fallback manual
+### Build Channel Brand And Run Context
 
-Path sugerido del webhook:
+Debe fijar:
 
-- `youtube-longform-daily-trigger`
+- canal: `The Hidden Thread`
+- idioma: `en`
+- duracion objetivo: `38 minutos`
+- nicho: `history, science and technology documentary essays`
+- tono: `calm premium documentary`
 
-### Estrategia de canal
+### Editorial Guard And Uniqueness
 
-- `Build Channel Strategy`
-- `Editorial Guard And Uniqueness`
+Debe impedir:
 
-Datos base:
+- repetir `canonical_topic` en 180 dias
+- repetir el mismo `angle`
+- usar hooks sensacionalistas baratos
+- sacar un video fuera del nicho
 
-- fecha
-- idioma
-- duracion
-- nicho activo del dia
-- politica editorial
-- ventana de repeticion prohibida
-- score minimo de originalidad
+## Capa de contenido
 
-La regla correcta no es “sacar cualquier tema”.
+### Research
 
-La regla correcta es:
+Provider:
 
-- elegir un nicho estrecho
-- rotar subtemas dentro del nicho
-- impedir repetir tema o angulo durante meses
-- registrar cada idea y cada video generado
+- `OpenAI`
 
-### Research y guion
+Debe devolver:
 
-- `Load Topic`
-- `Research Pack`
-- `Generate Outline`
-- `Generate Script`
+- angulo fresco
+- plan de fuentes
+- checkpoints factuales
+- riesgos de monetizacion
+- hooks de retencion
 
-Entradas:
+### Outline
 
-- backlog editorial
-- historial de videos anteriores
-- nicho del canal
-- prompt maestro del canal
-- reglas anti-repeticion
+Debe devolver:
 
-Salidas:
+- `workingTitle`
+- `hook`
+- `promise`
+- `cta`
+- `8 chapters`
 
-- dossier
-- canonical topic
-- angle
-- originality notes
-- outline
-- guion largo
+### Script
 
-### Visuales
+Debe devolver:
 
-- `Build Visual Storyboard`
+- titulo final
+- descripcion
+- tags
+- guion por capitulos
+- notas de seguridad para monetizacion
 
-Estrategia:
+## Capa audiovisual
 
-- `stock premium` para el cuerpo del video
-- `motion graphics` para contexto, cifras y mapas
-- `hero AI video` solo en escenas clave
-- `ai image` para apoyar conceptos complejos
-- `archive still` cuando sea historicamente relevante
+### Voiceover
 
-No se considera profesional:
+Provider:
 
-- montar 38 minutos enteros con clips AI genericos
-- depender de stock gratuito como base principal
-- usar escenas visualmente intercambiables sin relacion con el guion
+- `ElevenLabs`
 
-### Audio
+Regla:
 
-- `Generate Voiceover Pack`
+- generar por capitulo
+- no generar el episodio entero en una sola llamada
 
-Recomendacion:
+### Background music
 
-- generar audio por capitulo
-- expresividad por bloque
-- marcar pausas y enfasis
+Provider:
 
-### Subtitulos
+- `Eleven Music`
 
-- `Subtitle Timing Alignment`
+Regla:
 
-Recomendacion:
+- solo instrumental
+- mezcla suave
+- sin vocals
+- sin estilo trailer exagerado
 
-- retranscribir el audio final
-- obtener `word-level timestamps`
-- renderizar captions cortos y cinematicos
-- enfatizar palabras clave
+### Subtitles
+
+Provider:
+
+- `OpenAI Speech-to-Text`
+
+Regla:
+
+- `word-level timestamps`
+- captions legibles
+- enfasis en palabras clave
 
 ### Render
 
-- `Render Request`
+Provider:
 
-MVP:
+- `Creatomate`
 
-- usar `Creatomate` o `Shotstack`
-- quemar subtitulos, lower thirds y chapter cards en el render final
-- usar templates coherentes con el nicho
+Debe incluir:
 
-### QA
+- chapter cards
+- lower thirds
+- captions animados
+- musica con ducking
+- zooms y paneos suaves
+- transiciones discretas
 
-- `Final QA And Monetization`
+No hace falta llenar el video de transiciones llamativas.
 
-Validaciones:
+Si hace falta movimiento visual controlado.
 
-- duracion final
-- audio disponible
-- subtitulos presentes
-- render final disponible
-- titulo y descripcion generados
-- score de originalidad
-- historial del canal consultado
-- revision de copyright/licencias
-- seguridad para monetizacion
+## Delivery
 
-### Publicacion
+Provider:
 
-- `Upload To YouTube`
-- `Persist Results`
-- `Notify`
+- `Backblaze B2`
 
-## Fallos que debes contemplar
+Regla:
 
-- no hay tema disponible sin repetir
-- el research devuelve poco material
-- el tema ya existe en backlog o historico
-- el LLM genera outline flojo
-- el guion se parece demasiado a uno previo
-- faltan visuales premium suficientes
-- el render tarda demasiado
-- YouTube devuelve error de subida
-- el QA considera el contenido no monetizable
+- el sistema entrega
+- tu revisas
+- tu subes manualmente a YouTube
 
-## Politica de retries
+## Regla de calidad
 
-- `research/script`: 2 retries
-- `assets`: 3 retries con fallback
-- `render`: polling + timeout
-- `upload`: 2 retries
+Si el flujo no puede producir un episodio con nivel minimo, debe terminar en `needs_review`.
 
-## Regla importante
-
-Si el sistema no puede completar un video con una calidad minima, debe terminar en `needs_review`, no inventarse un video mediocre solo por cumplir la frecuencia.
-
-## Evaluacion honesta del flujo anterior
-
-El flujo anterior no bastaba para un canal monetizable serio porque:
-
-- elegia topics por lista fija
-- no consultaba historial real
-- no tenia control anti-repeticion
-- no tenia subtitulos profesionales
-- no tenia stock premium ni estrategia visual de nivel canal
-- no hacia QA de monetizacion antes de publicar
-
-Como demo de orquestacion, servia.
-
-Como sistema de produccion para YouTube, no era suficiente.
+No debe inventarse una salida mediocre solo para cumplir la frecuencia.

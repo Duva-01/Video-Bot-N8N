@@ -2,170 +2,164 @@
 
 ## Objetivo
 
-Definir el stack recomendado para que este workflow pase de `dry-run` a una pipeline capaz de producir un video diario con acabado profesional.
+Definir el stack real para que el workflow produzca un documental faceless que se vea serio, consistente y monetizable.
 
 ## Recomendacion corta
 
-Si quieres el mejor equilibrio entre calidad, control y tiempo de implementacion:
-
-- `Research + guion`: `OpenAI` + buscador web
-- `Voz expresiva`: `ElevenLabs`
-- `Subtitulos word-level`: `OpenAI Speech to Text` o `Deepgram`
-- `Stock`: `Pexels` para MVP, `Storyblocks` o `Artgrid` para calidad real
-- `Hero shots AI`: `Runway` o `Kling`
-- `Montaje/render`: `Creatomate` o `Shotstack`
-- `Publicacion`: `YouTube Data API`
+- `Research + outline + script`: `OpenAI`
+- `Voiceover`: `ElevenLabs`
+- `Background music`: `Eleven Music`
+- `Word-level subtitles`: `OpenAI Speech to Text`
+- `Hero shots`: `Runway` solo en escenas clave
+- `Render`: `Creatomate`
+- `Delivery`: `Backblaze B2`
+- `Upload`: manual a `YouTube`
 
 ## Capa por capa
 
 ### 1. Research y guion
 
-Necesitas dos cosas distintas:
+Provider recomendado:
 
-- un `LLM` bueno para escribir
-- una capa de `research` con fuentes
+- `OpenAI`
 
-Stack recomendado:
+Uso:
 
-- `OpenAI Responses API` para research estructurado, outline y script final
-- un buscador/API de research como `Tavily`, `Exa` o `SerpAPI`
+- research pack
+- outline
+- script largo
+- revision de tono y claridad
 
 Por que:
 
-- el guion de 38 minutos necesita coherencia larga
-- no basta con un modelo rapido; necesitas estructura, continuidad y revision
+- necesitas coherencia larga
+- necesitas ingles limpio
+- necesitas control de estilo
 
-### 2. Voz con expresividad
+### 2. Voz
 
-Recomendacion principal:
+Provider recomendado:
 
 - `ElevenLabs`
 
-Por que:
+Uso:
 
-- su TTS oficial destaca por entonacion, pausas y carga emocional
-- para narracion documental es claramente mejor que un TTS plano
+- una sola voz principal al principio
+- generacion por capitulo
+- pausas y enfasis controlados
 
-Uso recomendado:
+No conviene:
 
-- generar voz por capitulo
-- no por video completo
-- introducir indicaciones de emocion y pausas en el texto
+- cambiar de voz todo el rato
+- usar una voz demasiado teatral
 
-### 3. Subtitulos profesionales
+### 3. Musica
 
-Para subtitulos bonitos no basta con un `.srt`.
+Provider recomendado:
 
-Necesitas:
+- `Eleven Music`
 
-- `word-level timestamps`
-- bloques cortos
-- estilo cinetico
-- enfasis por palabras
+Uso:
 
-Recomendacion:
+- instrumental solamente
+- textura documental
+- mezcla suave
 
-- generar la voz
-- retranscribir el audio final con `OpenAI Speech to Text` o `Deepgram`
-- usar ese resultado para renderizar subtitulos palabra por palabra
+No conviene:
 
-Esto es mejor que alinear solo desde el guion, porque la voz real siempre introduce pequeñas variaciones.
+- usar temas con vocales
+- usar musica hiper epica todo el tiempo
+- usar un track que pelee con la narracion
 
-### 4. Visuales
+### 4. Subtitulos
 
-No intentes hacer `38 minutos` enteros con video generativo puro. Es carisimo y poco estable.
+Provider recomendado:
 
-Mezcla recomendada:
+- `OpenAI Speech to Text`
 
-- `60%` stock video
-- `20%` imagen AI
-- `10%` motion graphics / slides
-- `10%` hero shots AI
+Uso:
 
-Para stock:
+- retranscribir el audio real
+- obtener timestamps por palabra
+- renderizar captions dinamicos
 
-- `Pexels` vale para MVP
-- `Storyblocks`, `Artgrid` o `Envato` son mas profesionales
+Esto es mejor que alinear subtitulos solo desde el guion.
 
-Para hero shots AI:
+### 5. Render
 
-- `Runway`
-- `Kling`
-
-Usalos solo en escenas clave.
-
-### 5. Render y montaje
-
-Si quieres subtitulos potentes, overlays, lower thirds y timeline serio:
+Provider recomendado:
 
 - `Creatomate`
-- `Shotstack`
 
-Ambos te dejan definir un timeline en JSON y lanzar renders por API.
+Uso:
 
-Recomendacion:
+- timeline por JSON
+- chapter cards
+- lower thirds
+- captions
+- mezcla final de voz y musica
+- transiciones discretas
 
-- `Creatomate` si quieres velocidad y facilidad con plantillas
-- `Shotstack` si quieres una capa de edicion API-first muy clara
+La calidad final no depende solo de tener `Creatomate`.
 
-### 6. Publicacion
+Depende de:
 
-Para YouTube:
+- la plantilla
+- el ritmo visual
+- la jerarquia tipografica
+- la mezcla de audio
 
-- `YouTube Data API`
+### 6. Hero shots
 
-Sube:
+Provider recomendado:
 
-- video
-- titulo
-- descripcion
-- tags
-- thumbnail
+- `Runway`
 
-## Stack recomendado final
+Uso:
 
-### Opcion A: maxima calidad pragmatica
+- escenas clave
+- momentos de apertura
+- transiciones de cambio de bloque
 
-- `OpenAI` para research + outline + script
-- `ElevenLabs` para narracion
-- `OpenAI Speech to Text` para timestamps
-- `Storyblocks/Artgrid` para stock
-- `Runway/Kling` para hero shots
-- `Creatomate` para render
-- `YouTube Data API` para publicar
+No conviene:
 
-### Opcion B: calidad alta con implementacion mas simple
+- intentar hacer 38 minutos enteros con video generativo
 
-- `OpenAI` para guion
-- `ElevenLabs` para narracion
-- `OpenAI Speech to Text` para subtitulos
-- `Pexels` para stock
-- `Creatomate` para render
-- `YouTube Data API`
+### 7. Delivery
 
-## Que necesito de tu lado para conectarlo bien
+Provider recomendado:
 
-### Imprescindible
+- `Backblaze B2`
 
-- `OPENAI_API_KEY`
-- `ELEVENLABS_API_KEY`
-- `PEXELS_API_KEY` o proveedor premium alternativo
-- `YOUTUBE_CLIENT_ID`
-- `YOUTUBE_CLIENT_SECRET`
-- `YOUTUBE_REFRESH_TOKEN`
+Uso:
 
-### Si quieres acabado profesional de verdad
+- carpeta por episodio
+- entrega del `.mp4` final
+- entrega de miniatura y metadata
+- revision manual antes de YouTube
 
-- cuenta en `Creatomate` o `Shotstack`
-- cuenta en `Storyblocks`, `Artgrid` o libreria equivalente
-- cuenta en `Runway` o `Kling`
+## Stack final recomendado
 
-## Implementacion recomendada por orden
+- `OpenAI`
+- `ElevenLabs`
+- `Eleven Music`
+- `OpenAI Speech to Text`
+- `Creatomate`
+- `Backblaze B2`
+- `Runway` como opcional
 
-1. conectar `OpenAI` para research, outline y script
-2. conectar `ElevenLabs` para voz
-3. conectar `OpenAI Speech to Text` para subtitulos con timestamps
-4. conectar stock
-5. conectar render
-6. conectar upload a YouTube
-7. despues mejorar hero shots AI
+## Lo que hace falta para que se vea premium
+
+- nombre y tono de canal fijos
+- tipografias editoriales
+- captions consistentes
+- miniaturas sobrias
+- musica que no moleste
+- movement visual sutil
+
+## Lo que no hace falta
+
+- festival de transiciones
+- clips random gratuitos
+- estetica AI exagerada
+- subida automatica a YouTube si no te aporta nada
