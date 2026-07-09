@@ -1,0 +1,16 @@
+# Nucleo (siempre)
+pyyaml>=6.0
+python-dotenv>=1.0
+pillow>=10.0
+
+# YouTube (subida + analytics)
+google-api-python-client>=2.100
+google-auth>=2.23
+google-auth-oauthlib>=1.1
+
+# GPU (instalar tras PyTorch con CUDA, ver SETUP.md)
+# torch y torchaudio: instalar con el index de cu128 (RTX 5060 Ti = Blackwell)
+faster-whisper>=1.0
+chatterbox-tts
+kokoro>=0.9
+soundfile>=0.12

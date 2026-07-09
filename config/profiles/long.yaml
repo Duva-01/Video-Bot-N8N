@@ -1,0 +1,32 @@
+format: long
+video:
+  width: 1920
+  height: 1080
+  fps: 30
+  max_shot_seconds: 6.0
+script:
+  target_seconds: 600          # ~10 min
+  sections: 6                  # outline -> secciones generadas una a una
+  words_per_section: 220
+  hook_candidates: 5
+  loop: false
+render:
+  encoder: "auto"
+  crf: 18
+  bitrate: "16M"
+  preset: "p5"
+metadata:
+  title_max_chars: 70
+  hashtags: ["#history", "#documentary", "#science"]
+  chapters: true               # capitulos automaticos en la descripcion
+  description_template: |
+    {summary}
+
+    Chapters:
+    {chapters}
+
+    The Hidden Thread — how hidden decisions, systems and consequences shaped our world.
+    {hashtags}
+thumbnail:
+  variants: 3                  # variantes para test A/B
+  text_max_words: 5

@@ -1,0 +1,26 @@
+format: short
+video:
+  width: 1080
+  height: 1920
+  fps: 30
+  max_shot_seconds: 3.0        # pattern interrupt: ningun plano dura mas
+script:
+  target_seconds: 45
+  min_words: 95
+  max_words: 145
+  structure: "hook -> setup -> escalation -> payoff -> loop_line"
+  hook_candidates: 5
+  loop: true                   # la ultima frase conecta con la primera
+render:
+  encoder: "auto"              # auto = h264_nvenc si existe, si no libx264
+  crf: 18
+  bitrate: "10M"
+  preset: "p5"                 # preset NVENC (p1-p7); libx264 usa 'slow'
+metadata:
+  title_max_chars: 60
+  hashtags: ["#shorts", "#history", "#documentary"]
+  description_template: |
+    {summary}
+
+    Part of The Hidden Thread — history, science and technology explained.
+    {hashtags}

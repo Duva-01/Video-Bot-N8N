@@ -1,0 +1,72 @@
+# Identidad y estrategia del canal. Todo lo funcional vive aqui, no en .env.
+channel:
+  name: "The Hidden Thread"
+  tagline: "History, Science, and Technology Explained"
+  language: "en"
+  niche: >
+    Documentary essays about how hidden decisions, systems and consequences
+    shaped history, science and technology.
+
+editorial:
+  # Formatos de serie reconocibles. El selector de temas rota entre ellos.
+  series:
+    - id: decision
+      label: "The Decision That Changed Everything"
+      angle: "One specific decision and its cascade of consequences"
+    - id: hidden-system
+      label: "The Hidden System"
+      angle: "An invisible system or mechanism that quietly runs the world"
+    - id: almost-happened
+      label: "It Almost Happened"
+      angle: "A near-miss moment in history, science or technology"
+  # Anti-repeticion
+  topic_cooldown_days: 180
+  angle_cooldown_days: 45
+  banned_topics: []
+
+voice:
+  provider: "chatterbox"        # chatterbox | kokoro
+  # Voz de catalogo. Para clonar: pon la ruta a un wav de ~30s en reference_audio.
+  reference_audio: null
+  kokoro_voice: "am_michael"    # fallback rapido
+  exaggeration: 0.45            # chatterbox: expresividad (0-1)
+  cfg_weight: 0.5               # chatterbox: fidelidad al texto
+
+visual_style:
+  # Sufijo de estilo fijo que se anade a todos los prompts de imagen (identidad visual)
+  image_style: >
+    cinematic documentary still, muted editorial color palette, deep teal and
+    ivory tones, film grain, dramatic natural light, 35mm photography,
+    no text, no watermark
+  negative: "cartoon, anime, oversaturated, neon, text, watermark, logo, low quality"
+  # Mezcla de fuentes visuales por escena
+  broll_ratio: 0.35             # fraccion de escenas con clip real de Pexels
+  hero_video_scenes: 1          # escenas con video IA (LTX) por short (0 = desactivado)
+
+captions:
+  font: "Montserrat ExtraBold"
+  fallback_font: "Arial Black"
+  words_per_group: 3
+  active_color: "&H0051D9F0&"   # BGR: ambar calido
+  base_color: "&H00FFFFFF&"
+  outline_color: "&H00101010&"
+
+music:
+  enabled: true
+  directory: "assets/music"     # deja aqui mp3 de YouTube Audio Library
+  ducking_db: -13               # atenuacion bajo la voz
+
+publish:
+  # private hasta pasar la auditoria de la API; despues: public o scheduled
+  privacy: "private"
+  schedule_hours_utc: [15, 20]  # horas de publicacion para el modo scheduled
+  category_id: "27"             # Education
+  made_for_kids: false
+
+services:
+  ollama_url: "http://127.0.0.1:11434"
+  ollama_model: "qwen3:14b"
+  ollama_fast_model: "llama3.1:8b"
+  comfyui_url: "http://127.0.0.1:8188"
+  whisper_model: "large-v3"
+  whisper_compute: "float16"
