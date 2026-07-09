@@ -59,14 +59,14 @@ def main() -> None:
 
 def _check() -> None:
     import json
-    import shutil
     import urllib.request
 
-    from .utils import pick_encoder
+    from .utils import find_tool, pick_encoder
 
     settings = load_settings("short")
     print("== factory check ==")
-    print(f"ffmpeg:   {'OK' if shutil.which('ffmpeg') else 'FALTA (winget install ffmpeg)'}")
+    ffmpeg = find_tool("ffmpeg")
+    print(f"ffmpeg:   {'OK' if ffmpeg else 'FALTA (winget install ffmpeg)'}")
     print(f"encoder:  {pick_encoder('auto')}")
 
     for name, url, probe in (

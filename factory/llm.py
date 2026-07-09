@@ -95,7 +95,7 @@ def _simulated(prompt: str) -> dict | list:
                  "visual": "aurora borealis blazing over a victorian city at night",
                  "source": "image", "transition": "cut", "overlay": "1859",
                  "emphasis": ["fire", "1859"], "energy": 2, "pause_before": False},
-                {"text": "Telegraph lines sparked on their own.",
+                {"text": "Across Europe and North America, telegraph lines sparked on their own.",
                  "visual": "vintage telegraph office, sparks on wires, dramatic light",
                  "source": "archival", "query": "telegraph office 1859",
                  "transition": "punch", "overlay": "",
@@ -104,7 +104,35 @@ def _simulated(prompt: str) -> dict | list:
                  "visual": "close up of telegraph key tapping, period drama style",
                  "source": "broll", "query": "telegraph vintage", "transition": "cut",
                  "overlay": "", "emphasis": ["unplugged"], "energy": 1, "pause_before": False},
-                {"text": "If it happened today, the grid would collapse in minutes.",
+                {"text": "Richard Carrington had watched a white flash rip across the sun the day before.",
+                 "visual": "astronomer sketching sunspots beside a brass telescope in 1859",
+                 "source": "archival", "query": "Richard Carrington sunspots",
+                 "transition": "cut", "overlay": "", "emphasis": ["white flash"],
+                 "energy": 1, "pause_before": False},
+                {"text": "Nobody had a word yet for a solar storm big enough to turn wires into antennas.",
+                 "visual": "old scientific diagram of sunspots and magnetic lines",
+                 "source": "archival", "query": "solar storm diagram",
+                 "transition": "cut", "overlay": "", "emphasis": ["antennas"],
+                 "energy": 1, "pause_before": False},
+                {"text": "The warning was not mystical. It was infrastructure reporting its own failure.",
+                 "visual": "telegraph poles stretching across a dark rural road",
+                 "source": "broll", "query": "telegraph poles", "transition": "punch",
+                 "overlay": "", "emphasis": ["infrastructure"], "energy": 2,
+                 "pause_before": False},
+                {"text": "A repeat today would hit satellites, navigation, transformers, markets and emergency systems at once.",
+                 "visual": "modern power grid, satellite, and stock exchange screens in a documentary montage",
+                 "source": "image", "transition": "cut", "overlay": "TODAY",
+                 "emphasis": ["at once"], "energy": 2, "pause_before": False},
+                {"text": "The strange part is that the clue has been public for more than a century.",
+                 "visual": "old logbook pages and newspaper clipping on a desk",
+                 "source": "archival", "query": "Carrington event newspaper",
+                 "transition": "cut", "overlay": "", "emphasis": ["public"],
+                 "energy": 1, "pause_before": False},
+                {"text": "We built a wired world after seeing exactly what space weather could do to wires.",
+                 "visual": "city power lines fading into a glowing aurora sky",
+                 "source": "image", "transition": "flash", "overlay": "",
+                 "emphasis": ["wired world"], "energy": 2, "pause_before": True},
+                {"text": "If it happened today, the grid would not get a myth. It would get minutes.",
                  "visual": "modern power grid at night from above, city blackout spreading",
                  "source": "image", "transition": "flash", "overlay": "MINUTES",
                  "emphasis": ["collapse", "minutes"], "energy": 3, "pause_before": True},
@@ -119,9 +147,25 @@ def _simulated(prompt: str) -> dict | list:
         return [{"image_prompt": "aurora over a dark city, one telegraph pole silhouette",
                  "text": "THE SKY CAUGHT FIRE"}]
     return {
-        "narration": "In 1859, the sky caught fire. Telegraph lines sparked on their own. "
-                     "Operators kept sending messages with the batteries unplugged. "
-                     "If it happened today, the grid would collapse in minutes.",
+        "narration": (
+            "In 1859, the sky caught fire. Across Europe and North America, "
+            "telegraph lines sparked on their own, paper burned inside offices, "
+            "and operators kept sending messages with the batteries unplugged. "
+            "The clue had arrived one day earlier, when Richard Carrington saw "
+            "a white flash tear across a group of sunspots. Nobody had a word "
+            "yet for a solar storm strong enough to turn the planet's wiring "
+            "into an antenna. So the warning was filed away as a strange "
+            "Victorian incident, not as a map of the future. That is the part "
+            "we forget. The first global electrical network was already telling "
+            "us its weakness: long wires, connected systems, and no clean way "
+            "to isolate failure. A repeat today would not just make pretty "
+            "auroras. It could hit satellites, GPS, aviation routes, transformers, "
+            "markets, hospital backups, and emergency communications at the "
+            "same time. The strangest detail is that the evidence has been "
+            "public for more than a century. We built a wired world after "
+            "watching space weather use wires against us. If it happened today, "
+            "the grid would not get a myth. It would get minutes."
+        ),
         "hook": "In 1859, the sky caught fire.",
         "title": "The Day the Sky Caught Fire",
         "summary": "The 1859 Carrington event nearly broke the modern world before it existed.",
