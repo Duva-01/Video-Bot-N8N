@@ -49,9 +49,11 @@ Si no estan, la pipeline usa parallax/Ken Burns automaticamente.
 
 La musica se genera en tu GPU con ACE-Step (Apache 2.0, sin copyright):
 
-1. Descarga `ace_step_v1_3.5b.safetensors` (repo Comfy-Org en HuggingFace)
-   a `ComfyUI/models/checkpoints/`.
-2. Con ComfyUI abierto, genera la biblioteca (10 estilos, ~2-4 min por pista):
+1. Descarga `ace_step_v1_3.5b.safetensors` a
+   `ComfyUI/models/checkpoints/`.
+2. Si tu ComfyUI no trae los nodos ACE-Step, instala el custom node
+   `billwuhao/ComfyUI_ACE-Step` desde ComfyUI Manager y reinicia ComfyUI.
+3. Con ComfyUI abierto, genera la biblioteca (10 estilos, ~2-4 min por pista):
 
 ```powershell
 python -m factory music                 # 1 pista por estilo (10 pistas)

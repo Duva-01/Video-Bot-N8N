@@ -123,4 +123,59 @@ def _simulated(prompt: str) -> dict | list:
                  "visual": "modern power grid, satellite, and stock exchange screens in a documentary montage",
                  "source": "image", "transition": "cut", "overlay": "TODAY",
                  "emphasis": ["at once"], "energy": 2, "pause_before": False},
-          
+                {"text": "The strange part is that the clue has been public for more than a century.",
+                 "visual": "old logbook pages and newspaper clipping on a desk",
+                 "source": "archival", "query": "Carrington event newspaper",
+                 "transition": "cut", "overlay": "", "emphasis": ["public"],
+                 "energy": 1, "pause_before": False},
+                {"text": "We built a wired world after seeing exactly what space weather could do to wires.",
+                 "visual": "city power lines fading into a glowing aurora sky",
+                 "source": "image", "transition": "flash", "overlay": "",
+                 "emphasis": ["wired world"], "energy": 2, "pause_before": True},
+                {"text": "If it happened today, the grid would not get a myth. It would get minutes.",
+                 "visual": "modern power grid at night from above, city blackout spreading",
+                 "source": "image", "transition": "flash", "overlay": "MINUTES",
+                 "emphasis": ["collapse", "minutes"], "energy": 3, "pause_before": True},
+            ],
+        }
+    if "outline" in p:
+        return {"title": "The Day the Sky Caught Fire", "summary": "The 1859 Carrington event.",
+                "tags": ["history"], "sections": [
+                    {"title": "The warning", "summary": "The event"},
+                    {"title": "The cascade", "summary": "Consequences"}]}
+    if "thumbnail concepts" in p:
+        return [{"image_prompt": "aurora over a dark city, one telegraph pole silhouette",
+                 "text": "THE SKY CAUGHT FIRE"}]
+    return {
+        "narration": (
+            "In 1859, the sky caught fire. Across Europe and North America, "
+            "telegraph lines sparked on their own, paper burned inside offices, "
+            "and operators kept sending messages with the batteries unplugged. "
+            "The clue had arrived one day earlier, when Richard Carrington saw "
+            "a white flash tear across a group of sunspots. Nobody had a word "
+            "yet for a solar storm strong enough to turn the planet's wiring "
+            "into an antenna. So the warning was filed away as a strange "
+            "Victorian incident, not as a map of the future. That is the part "
+            "we forget. The first global electrical network was already telling "
+            "us its weakness: long wires, connected systems, and no clean way "
+            "to isolate failure. A repeat today would not just make pretty "
+            "auroras. It could hit satellites, GPS, aviation routes, transformers, "
+            "markets, hospital backups, and emergency communications at the "
+            "same time. The strangest detail is that the evidence has been "
+            "public for more than a century. We built a wired world after "
+            "watching space weather use wires against us. If it happened today, "
+            "the grid would not get a myth. It would get minutes."
+        ),
+        "hook": "In 1859, the sky caught fire.",
+        "title": "The Day the Sky Caught Fire",
+        "summary": "The 1859 Carrington event nearly broke the modern world before it existed.",
+        "tags": ["carrington event", "solar storm", "history"],
+    }
+
+
+def _extract_quoted_narration(prompt: str) -> str:
+    start = prompt.find('"""')
+    end = prompt.find('"""', start + 3)
+    if start != -1 and end != -1:
+        return prompt[start + 3:end].strip()
+    return "In 1859, the sky caught fire."

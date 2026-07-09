@@ -33,6 +33,9 @@ python -m factory review    # -> http://127.0.0.1:8099
 
 # analytics -> insights que mejoran los hooks automaticamente
 python -m factory stats
+
+# generar musica documental local por mood (ACE-Step via ComfyUI)
+python -m factory music --per-style 3
 ```
 
 ## Estructura
@@ -43,7 +46,7 @@ config/
   profiles/short.yaml 1080x1920, 45s, captions karaoke, loop
   profiles/long.yaml  1920x1080, ~10min, capitulos, miniaturas A/B
 factory/              pipeline Python (ver factory/cli.py)
-assets/music/         pon aqui mp3 de YouTube Audio Library
+assets/music/         musica generada localmente por mood
 output/<slug>/        artefactos de cada video (guion, voz, escenas, final.mp4)
 factory.db            SQLite: runs, anti-repeticion, cola, analytics
 legacy/               proyecto anterior (Node + n8n + Render), solo referencia

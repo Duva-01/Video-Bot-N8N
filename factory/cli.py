@@ -74,6 +74,7 @@ def _check() -> None:
     import json
     import urllib.request
 
+    from .config import ROOT
     from .utils import find_tool, pick_encoder
 
     settings = load_settings("short")
@@ -109,3 +110,10 @@ def _check() -> None:
                  ("YOUTUBE_CLIENT_ID", "YOUTUBE_CLIENT_SECRET", "YOUTUBE_REFRESH_TOKEN"))
     print(f"youtube creds: {'OK' if env_ok else 'FALTAN en .env'}")
     print(f"pexels key:    {'OK' if settings.env.get('PEXELS_API_KEY') else 'FALTA (opcional)'}")
+    ace = str(settings.ch("music", "ace", "checkpoint",
+                          default="ace_step_v1_3.5b.safetensors"))
+    ace_paths = [
+        ROOT / ".tools" / "ComfyUI" / "models" / "checkpoints" / ace,
+        ROOT / "ComfyUI" / "models" / "checkpoints" / ace,
+    ]
+    print(f"ace-step:      {'OK' if any(p.exists() for p in ace_paths) else 'FALTA (solo para factory music)'}")

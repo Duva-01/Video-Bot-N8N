@@ -45,8 +45,10 @@ def ffprobe_duration(path: str | Path) -> float:
     proc = run_cmd(
         ["ffprobe", "-v", "error", "-show_entries", "format=duration",
          "-of", "csv=p=0", str(path)],
-        desc="ffprobe",
+        desc="ffprobe", check=False,
     )
+    if proc.returncode != 0:
+        return 0.0
     try:
         return float(proc.stdout.strip())
     except ValueError:
@@ -99,4 +101,30 @@ def _resolve_cmd(args: list[str]) -> list[str]:
     if first.lower() in {"ffmpeg", "ffmpeg.exe", "ffprobe", "ffprobe.exe"}:
         resolved = find_tool(first)
         if resolved:
-            return [resolve
+            return [resolved, *args[1:]]
+    return args
+
+
+def extract_json(text: str) -> dict | list:
+    """Extrae el primer objeto/array JSON de una respuesta de LLM."""
+    text = text.strip()
+    text = re.sub(r"<think>[\s\S]*?</think>", "", text).strip()  # qwen3 thinking
+    fenced = re.search(r"```(?:json)?\s*([\s\S]+?)```", text)
+    if fenced:
+        text = fenced.group(1).strip()
+    for opener, closer in (("{", "}"), ("[", "]")):
+        start = text.find(opener)
+        if start == -1:
+            continue
+        depth = 0
+        for i in range(start, len(text)):
+            if text[i] == opener:
+                depth += 1
+            elif text[i] == closer:
+                depth -= 1
+                if depth == 0:
+                    try:
+                        return json.loads(text[start:i + 1])
+                    except json.JSONDecodeError:
+                        break
+    raise ValueError(f"La respuesta del modelo no contiene JSON valido:\n{text[:400]}")
