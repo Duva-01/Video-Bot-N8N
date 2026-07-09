@@ -1,0 +1,552 @@
+{
+  "name": "The Hidden Thread - Daily Longform Delivery",
+  "active": false,
+  "isArchived": false,
+  "settings": {
+    "executionOrder": "v1",
+    "timezone": "Europe/Madrid"
+  },
+  "meta": {
+    "templateCredsSetupCompleted": false
+  },
+  "pinData": {},
+  "versionId": "91ff8bb8-0208-4d63-bb1a-9576a65d70b4",
+  "nodes": [
+    {
+      "id": "manual-trigger-001",
+      "name": "Manual Trigger",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        -1200,
+        120
+      ],
+      "parameters": {}
+    },
+    {
+      "id": "schedule-trigger-001",
+      "name": "Daily Schedule",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.1,
+      "position": [
+        -1200,
+        280
+      ],
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "0 0 6 * * *"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "webhook-trigger-001",
+      "name": "GitHub Daily Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        -1200,
+        440
+      ],
+      "webhookId": "youtube-longform-daily-trigger",
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "youtube-longform-daily-trigger",
+        "responseMode": "onReceived",
+        "options": {}
+      }
+    },
+    {
+      "id": "build-context-001",
+      "name": "Build Channel Brand And Run Context",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -930,
+        280
+      ],
+      "parameters": {
+        "jsCode": "const now = new Date();\nconst isoDate = now.toISOString().slice(0, 10);\nconst seed = Math.floor(now.getTime() / 86400000);\nconst topicCatalog = [\n  {\n    canonicalTopic: 'how semiconductor supply chains became geopolitical leverage',\n    audienceAngle: 'systems and power',\n    subNiche: 'technology-history'\n  },\n  {\n    canonicalTopic: 'the hidden decisions behind the manhattan project',\n    audienceAngle: 'science and state power',\n    subNiche: 'history-science'\n  },\n  {\n    canonicalTopic: 'why recommendation algorithms shape modern culture',\n    audienceAngle: 'internet systems',\n    subNiche: 'technology-society'\n  },\n  {\n    canonicalTopic: 'the error chains that changed modern medicine',\n    audienceAngle: 'scientific breakthroughs',\n    subNiche: 'science-history'\n  },\n  {\n    canonicalTopic: 'how undersea cables quietly hold up the internet',\n    audienceAngle: 'infrastructure and hidden systems',\n    subNiche: 'internet-history'\n  },\n  {\n    canonicalTopic: 'the industrial race that made chips the new oil',\n    audienceAngle: 'industry and strategy',\n    subNiche: 'future-industries'\n  }\n];\nconst chosenTopic = topicCatalog[Math.abs(seed) % topicCatalog.length];\nreturn [{\n  json: {\n    run: {\n      id: `run-${isoDate}`,\n      date: isoDate,\n      status: 'draft',\n      triggerSource: $execution.mode || 'manual'\n    },\n    channel: {\n      slug: 'the-hidden-thread',\n      name: 'The Hidden Thread',\n      language: 'en',\n      timezone: 'Europe/Madrid',\n      tone: 'calm-premium-documentary',\n      identity: {\n        avatarConcept: 'Editorial monogram HT in ivory serif on deep petrol background',\n        bannerConcept: 'Minimal timeline line, The Hidden Thread wordmark, subtitle History, Science, and Technology Explained',\n        thumbnailStyle: 'High-contrast editorial, one dominant idea, 3-5 words max, no AI-glow, no clutter',\n        palette: ['#0F1720', '#D9D2C3', '#8C6A43'],\n        typeSystem: ['Cormorant Garamond', 'Libre Baskerville', 'Manrope']\n      }\n    },\n    niche: {\n      key: 'history-science-technology-documentaries',\n      label: 'History, science and technology documentary essays',\n      audience: 'Adults who like documentary storytelling, systems thinking and clear explanations',\n      premise: 'Explain how decisions, systems and unintended consequences shape the modern world.'\n    },\n    config: {\n      targetMinutes: 38,\n      publishHourLocal: '18:00',\n      llm: {\n        provider: 'openai',\n        model: 'gpt-4.1'\n      },\n      voiceover: {\n        provider: 'elevenlabs',\n        model: 'eleven_v3',\n        voiceStyle: 'authoritative, warm, controlled, cinematic'\n      },\n      music: {\n        provider: 'elevenlabs-music',\n        model: 'music_v1',\n        targetStyle: 'instrumental documentary underscore with subtle tension and no vocals',\n        mix: {\n          targetVolumePercent: 18,\n          duckingPercentUnderVoice: 70,\n          fadeInSeconds: 2,\n          fadeOutSeconds: 3\n        }\n      },\n      subtitles: {\n        provider: 'openai-stt',\n        mode: 'word-level',\n        style: 'kinetic-documentary',\n        alwaysVisible: true\n      },\n      visuals: {\n        renderProvider: 'creatomate',\n        scenesPerChapter: 8,\n        chapterCards: true,\n        lowerThirds: true,\n        motionProfile: 'subtle pans, slow zooms, elegant fades, restrained transitions',\n        visualMix: {\n          motionGraphics: 0.35,\n          archiveStill: 0.20,\n          aiImage: 0.20,\n          heroAiVideo: 0.15,\n          mapsAndCharts: 0.10\n        }\n      },\n      delivery: {\n        mode: 'b2_manual_publish',\n        objectPrefixNaming: 'YYYY-MM-DD/episode-slug/',\n        requiredFiles: ['video.mp4', 'thumbnail.png', 'title.txt', 'description.txt', 'tags.json', 'chapters.txt', 'subtitles.srt', 'publication-checklist.md'],\n        manualUploadRequired: true\n      },\n      editorialPolicy: {\n        forbiddenRepeatWindowDays: 180,\n        minimumOriginalityScore: 85,\n        requireFreshAngle: true,\n        requireTransformativeNarrative: true,\n        requireMonetizationSafeScript: true\n      }\n    },\n    workingTopic: {\n      canonicalTopic: chosenTopic.canonicalTopic,\n      angle: chosenTopic.audienceAngle,\n      subNiche: chosenTopic.subNiche,\n      uniquenessHash: chosenTopic.canonicalTopic.replace(/[^a-z0-9]+/g, '-'),\n      chosenBy: 'rotation-seed-mock'\n    },\n    prompts: {\n      researchSystem: 'You are a senior documentary researcher for a premium YouTube longform channel. Return valid JSON only. Focus on causality, originality and strong retention hooks.',\n      researchUser: `Prepare a research pack for a 38 minute documentary about ${chosenTopic.canonicalTopic}. Avoid generic listicle angles. Return fresh angle, source plan, factual checkpoints, retention hooks and monetization risks.`,\n      outlineSystem: 'You are a head of story for premium faceless documentaries. Return valid JSON only. Build a retention-aware structure with chapters and open loops.',\n      scriptSystem: 'You are a lead writer for premium English YouTube documentaries. Return valid JSON only. The script must sound native, calm, clear, analytical and monetization-safe.'\n    },\n    integrations: {\n      researchLlmEnabled: false,\n      outlineLlmEnabled: false,\n      scriptLlmEnabled: false,\n      voiceoverEnabled: false,\n      musicEnabled: false,\n      subtitleAlignmentEnabled: false,\n      renderEnabled: false,\n      b2DeliveryEnabled: false\n    }\n  }\n}];"
+      }
+    },
+    {
+      "id": "editorial-guard-001",
+      "name": "Editorial Guard And Uniqueness",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -660,
+        280
+      ],
+      "parameters": {
+        "jsCode": "const data = $input.first().json;\nconst editorialChecks = {\n  nicheLocked: true,\n  languageLocked: data.channel.language === 'en',\n  duplicateCheckImplementedInDb: false,\n  requiresDbQuery: ['editorial_topics', 'content_runs'],\n  forbiddenRepeatWindowDays: data.config.editorialPolicy.forbiddenRepeatWindowDays,\n  originalityScoreTarget: data.config.editorialPolicy.minimumOriginalityScore,\n  bannedPatterns: [\n    'top 10 facts',\n    'generic timeline recap',\n    'video without angle',\n    'obvious AI filler'\n  ]\n};\nconst monetizationChecklist = {\n  noCopyrightUnsafeMusic: true,\n  noUnlicensedThirdPartyFootage: true,\n  noMedicalOrLegalAdviceFraming: true,\n  noGraphicShockHooks: true,\n  requireTransformativeCommentary: true,\n  requireManualFinalReviewBeforeUpload: true\n};\nreturn [{ json: { ...data, editorialChecks, monetizationChecklist } }];"
+      }
+    },
+    {
+      "id": "research-http-001",
+      "name": "Research LLM Placeholder",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -390,
+        280
+      ],
+      "disabled": true,
+      "notesInFlow": true,
+      "notes": "Connect OpenAI Responses API here for real research. Return canonical topic, fresh angle, source plan, factual checkpoints, hook ideas and originality notes.",
+      "parameters": {
+        "url": "https://api.openai.com/v1/responses",
+        "options": {}
+      }
+    },
+    {
+      "id": "research-parse-001",
+      "name": "Parse Or Mock Research",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -120,
+        280
+      ],
+      "parameters": {
+        "jsCode": "const data = $input.first().json;\nconst raw = data.output?.[0]?.content?.[0]?.text || data.body?.output_text || data.body?.choices?.[0]?.message?.content;\nlet research = null;\nif (raw) {\n  try { research = JSON.parse(raw); } catch (error) { research = null; }\n}\nif (!research) {\n  research = {\n    canonicalTopic: data.workingTopic.canonicalTopic,\n    freshAngle: `Treat ${data.workingTopic.canonicalTopic} as a chain of hidden decisions, incentives and consequences rather than a simple chronology.`,\n    sourcePlan: ['books and academic history', 'serious journalism', 'industry reports', 'primary-source timelines'],\n    factualCheckpoints: [\n      'verify key dates and names',\n      'verify what is disputed versus established',\n      'verify modern relevance with current sources'\n    ],\n    retentionHooks: [\n      'open with a modern consequence',\n      'end each chapter with an unresolved pressure point',\n      'alternate human motives and system-level effects'\n    ],\n    monetizationRisks: ['graphic wartime imagery', 'speculative claims without sourcing'],\n    originalityNotes: 'Angle is causal and systems-focused, not listicle-based.'\n  };\n}\nreturn [{ json: { ...data, research } }];"
+      }
+    },
+    {
+      "id": "outline-http-001",
+      "name": "Outline LLM Placeholder",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        150,
+        280
+      ],
+      "disabled": true,
+      "notesInFlow": true,
+      "notes": "Connect OpenAI here for the full documentary structure. Return title candidates, hook, promise, CTA and 8 chapters with retention purpose.",
+      "parameters": {
+        "url": "https://api.openai.com/v1/responses",
+        "options": {}
+      }
+    },
+    {
+      "id": "outline-parse-001",
+      "name": "Parse Or Mock Outline",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        420,
+        280
+      ],
+      "parameters": {
+        "jsCode": "const data = $input.first().json;\nconst raw = data.output?.[0]?.content?.[0]?.text || data.body?.output_text || data.body?.choices?.[0]?.message?.content;\nlet outline = null;\nif (raw) {\n  try { outline = JSON.parse(raw); } catch (error) { outline = null; }\n}\nif (!outline) {\n  const chapterTitles = [\n    'The promise of the system',\n    'The hidden context everyone skips',\n    'The first decisive break',\n    'Why the key actors chose this path',\n    'The errors that changed everything',\n    'How the system spread into everyday life',\n    'The modern consequence most people miss',\n    'What this means next'\n  ];\n  outline = {\n    workingTitle: `The hidden story of ${data.workingTopic.canonicalTopic}`,\n    hook: 'What looks inevitable today usually began with a few decisions nobody expected to matter this much.',\n    promise: `By the end, you will understand ${data.workingTopic.canonicalTopic} as a connected story of choices, pressure and consequences.`,\n    cta: 'Subscribe for more longform documentary essays on history, science and technology.',\n    chapters: chapterTitles.map((title, index) => ({\n      chapterIndex: index + 1,\n      title,\n      objective: `Advance the narrative with a new causal layer in ${title.toLowerCase()}.`,\n      targetMinutes: index === 0 ? 4 : 4.8,\n      retentionDevice: index % 2 === 0 ? 'open-loop' : 'reveal'\n    }))\n  };\n}\nreturn [{ json: { ...data, outline } }];"
+      }
+    },
+    {
+      "id": "script-http-001",
+      "name": "Script LLM Placeholder",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        690,
+        280
+      ],
+      "disabled": true,
+      "notesInFlow": true,
+      "notes": "Connect OpenAI here for the long-form English script. Return title, description, tags, intro, chapter narration, outro and monetization notes.",
+      "parameters": {
+        "url": "https://api.openai.com/v1/responses",
+        "options": {}
+      }
+    },
+    {
+      "id": "script-parse-001",
+      "name": "Parse Or Mock Script",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        960,
+        280
+      ],
+      "parameters": {
+        "jsCode": "const data = $input.first().json;\nconst raw = data.output?.[0]?.content?.[0]?.text || data.body?.output_text || data.body?.choices?.[0]?.message?.content;\nlet script = null;\nif (raw) {\n  try { script = JSON.parse(raw); } catch (error) { script = null; }\n}\nif (!script) {\n  script = {\n    title: `The Hidden Story of ${data.workingTopic.canonicalTopic}`,\n    description: `A premium longform documentary essay explaining ${data.workingTopic.canonicalTopic} through the decisions, systems and consequences that shaped it.`,\n    tags: ['history documentary', 'science documentary', 'technology documentary', 'documentary essay', 'systems history', 'the hidden thread'],\n    thumbnailHypothesis: 'One powerful concept, one strong phrase, one symbolic object',\n    intro: `${data.outline.hook} In this documentary, we are following the hidden chain from origin to modern impact.`,\n    chapters: data.outline.chapters.map((chapter) => ({\n      chapterIndex: chapter.chapterIndex,\n      title: chapter.title,\n      narration: `${chapter.title}. This section explains the context, the pressure on the actors involved, the decision they made, and why it still matters now.`\n    })),\n    outro: data.outline.cta,\n    monetizationSafety: {\n      advertiserFriendly: true,\n      factualClaimsRequireReview: true,\n      avoidShockLanguage: true,\n      avoidUnlicensedQuotesOrFootage: true\n    }\n  };\n}\nreturn [{ json: { ...data, script } }];"
+      }
+    },
+    {
+      "id": "visual-storyboard-001",
+      "name": "Build Visual Storyboard",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1230,
+        280
+      ],
+      "parameters": {
+        "jsCode": "const data = $input.first().json;\nconst scenes = [];\nlet sceneIndex = 1;\nfor (const chapter of data.outline.chapters) {\n  for (let i = 0; i < data.config.visuals.scenesPerChapter; i++) {\n    const visualType = i % 6 === 0\n      ? 'hero_ai_video'\n      : i % 5 === 0\n        ? 'maps_and_charts'\n        : i % 3 === 0\n          ? 'motion_graphic'\n          : i % 2 === 0\n            ? 'archive_still'\n            : 'ai_image';\n    scenes.push({\n      sceneIndex,\n      chapterIndex: chapter.chapterIndex,\n      chapterTitle: chapter.title,\n      visualType,\n      searchText: `${data.workingTopic.canonicalTopic} ${chapter.title}`,\n      motionPreset: 'slow-pan-or-push',\n      transitionStyle: 'elegant-fade',\n      subtitleStyle: data.config.subtitles.style,\n      targetDurationSeconds: Math.round((chapter.targetMinutes * 60) / data.config.visuals.scenesPerChapter)\n    });\n    sceneIndex += 1;\n  }\n}\nconst assetPlan = scenes.map((scene) => ({\n  sceneIndex: scene.sceneIndex,\n  provider: scene.visualType === 'hero_ai_video' ? 'runway' : (scene.visualType === 'maps_and_charts' ? 'internal-graphics' : 'image-or-archive-layer'),\n  requestedType: scene.visualType,\n  query: scene.searchText\n}));\nreturn [{ json: { ...data, scenes, assetPlan } }];"
+      }
+    },
+    {
+      "id": "voiceover-http-001",
+      "name": "Voiceover Placeholder",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1500,
+        180
+      ],
+      "disabled": true,
+      "notesInFlow": true,
+      "notes": "Connect ElevenLabs TTS here. Generate audio chapter by chapter to control retries, pacing and expressive emphasis.",
+      "parameters": {
+        "url": "https://api.elevenlabs.io/v1/text-to-speech",
+        "options": {}
+      }
+    },
+    {
+      "id": "music-http-001",
+      "name": "Background Music Placeholder",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1500,
+        380
+      ],
+      "disabled": true,
+      "notesInFlow": true,
+      "notes": "Connect Eleven Music here. Generate instrumental underscore only, no vocals, and keep it editorial rather than trailer-heavy.",
+      "parameters": {
+        "url": "https://api.elevenlabs.io/v1/music/compose",
+        "options": {}
+      }
+    },
+    {
+      "id": "subtitle-http-001",
+      "name": "Subtitle Timing Placeholder",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1770,
+        280
+      ],
+      "disabled": true,
+      "notesInFlow": true,
+      "notes": "Connect OpenAI speech-to-text here to transcribe the final voiceover and get word-level timestamps for animated captions.",
+      "parameters": {
+        "url": "https://api.openai.com/v1/audio/transcriptions",
+        "options": {}
+      }
+    },
+    {
+      "id": "subtitle-parse-001",
+      "name": "Parse Or Mock Subtitles",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2040,
+        280
+      ],
+      "parameters": {
+        "jsCode": "const data = $input.first().json;\nconst subtitleSegments = [];\nlet segmentIndex = 1;\nfor (const chapter of data.outline.chapters) {\n  subtitleSegments.push({\n    segmentIndex,\n    startMs: (segmentIndex - 1) * 4500,\n    endMs: (segmentIndex - 1) * 4500 + 3400,\n    text: chapter.title,\n    emphasisWords: [chapter.title.split(' ')[0] || chapter.title],\n    style: data.config.subtitles.style\n  });\n  segmentIndex += 1;\n}\nreturn [{ json: { ...data, subtitleSegments } }];"
+      }
+    },
+    {
+      "id": "thumbnail-brief-001",
+      "name": "Build Thumbnail Brief",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2310,
+        280
+      ],
+      "parameters": {
+        "jsCode": "const data = $input.first().json;\nconst thumbnailPackage = {\n  channelName: data.channel.name,\n  style: data.channel.identity.thumbnailStyle,\n  visualConcept: `A single symbolic image representing ${data.workingTopic.canonicalTopic}, with strong negative space and premium editorial contrast.`,\n  shortTextOptions: [\n    'THE HIDDEN COST',\n    'WHY IT CHANGED',\n    'THE SYSTEM BENEATH'\n  ],\n  avoid: ['busy collages', 'AI glow', 'tiny text', 'fake faces', 'generic cyberpunk colors']\n};\nreturn [{ json: { ...data, thumbnailPackage } }];"
+      }
+    },
+    {
+      "id": "render-http-001",
+      "name": "Render Placeholder",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        2580,
+        280
+      ],
+      "disabled": true,
+      "notesInFlow": true,
+      "notes": "Connect Creatomate here. The template should combine voiceover, background music, word-level captions, chapter cards, lower thirds and restrained transitions.",
+      "parameters": {
+        "url": "https://api.creatomate.com/v2/renders",
+        "options": {}
+      }
+    },
+    {
+      "id": "r2-package-001",
+      "name": "Build B2 Delivery Package",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2850,
+        280
+      ],
+      "parameters": {
+        "jsCode": "const data = $input.first().json;\nconst slug = (data.script?.title || data.workingTopic.canonicalTopic).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');\nconst chaptersText = data.outline.chapters.map((chapter, index) => `${index + 1}. ${chapter.title}`).join('\\n');\nconst objectPrefix = `${data.run.date}/${slug}/`;\nconst delivery = {\n  bucketName: 'set-in-b2-credentials-or-config',\n  objectPrefix,\n  reviewMode: 'manual-before-youtube',\n  files: [\n    { key: `${objectPrefix}video.mp4`, name: 'video.mp4', role: 'final-video' },\n    { key: `${objectPrefix}thumbnail.png`, name: 'thumbnail.png', role: 'thumbnail' },\n    { key: `${objectPrefix}title.txt`, name: 'title.txt', role: 'metadata', content: data.script.title },\n    { key: `${objectPrefix}description.txt`, name: 'description.txt', role: 'metadata', content: data.script.description },\n    { key: `${objectPrefix}tags.json`, name: 'tags.json', role: 'metadata', content: JSON.stringify(data.script.tags, null, 2) },\n    { key: `${objectPrefix}chapters.txt`, name: 'chapters.txt', role: 'metadata', content: chaptersText },\n    { key: `${objectPrefix}subtitles.srt`, name: 'subtitles.srt', role: 'captions' },\n    { key: `${objectPrefix}publication-checklist.md`, name: 'publication-checklist.md', role: 'qa', content: '- Review title\\n- Review thumbnail\\n- Review music mix\\n- Review factual claims\\n- Upload manually to YouTube' }\n  ]\n};\nreturn [{ json: { ...data, delivery } }];"
+      }
+    },
+    {
+      "id": "r2-http-001",
+      "name": "Backblaze B2 Delivery Placeholder",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        3120,
+        280
+      ],
+      "disabled": true,
+      "notesInFlow": true,
+      "notes": "Replace this with the native S3 node or S3-compatible upload flow. Use the Backblaze B2 S3 endpoint for your bucket region and upload all files to the chosen bucket prefix.",
+      "parameters": {
+        "url": "https://s3.eu-central-003.backblazeb2.com/example-bucket",
+        "options": {}
+      }
+    },
+    {
+      "id": "final-qa-001",
+      "name": "Finalize Delivery Package",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        3390,
+        280
+      ],
+      "parameters": {
+        "jsCode": "const data = $input.first().json;\nconst issues = [];\nif (!data.niche?.key) issues.push('No niche selected');\nif (!data.research?.freshAngle) issues.push('Missing documentary angle');\nif (!data.outline?.chapters?.length) issues.push('Missing outline');\nif (!data.script?.chapters?.length) issues.push('Missing chapter script');\nif ((data.scenes || []).length < 50) issues.push('Too few scenes for a 38 minute documentary');\nif (!(data.subtitleSegments || []).length) issues.push('Missing subtitles');\nif (data.integrations.researchLlmEnabled === false) issues.push('Research integration not connected');\nif (data.integrations.scriptLlmEnabled === false) issues.push('Script integration not connected');\nif (data.integrations.voiceoverEnabled === false) issues.push('Voiceover integration not connected');\nif (data.integrations.musicEnabled === false) issues.push('Background music integration not connected');\nif (data.integrations.subtitleAlignmentEnabled === false) issues.push('Subtitle alignment not connected');\nif (data.integrations.renderEnabled === false) issues.push('Render integration not connected');\nif (data.integrations.b2DeliveryEnabled === false) issues.push('Backblaze B2 delivery not connected');\nconst deliveryManifest = {\n  channelName: data.channel.name,\n  channelIdentity: data.channel.identity,\n  title: data.script?.title || `The Hidden Story of ${data.workingTopic.canonicalTopic}`,\n  description: data.script?.description || `Documentary essay about ${data.workingTopic.canonicalTopic}.`,\n  tags: data.script?.tags || [],\n  bucketName: data.delivery.bucketName,\n  objectPrefix: data.delivery.objectPrefix,\n  deliveryMode: data.config.delivery.mode,\n  manualUpload: true\n};\nconst fullyIntegrated = Object.values(data.integrations).every(Boolean);\nconst assessment = {\n  currentWorkflowWillGenerateProfessionalVideo: fullyIntegrated,\n  currentWorkflowIsMonetizableAsIs: fullyIntegrated,\n  reasonsIfNotReady: fullyIntegrated ? [] : [\n    'The current base is structurally correct but still uses placeholders for key providers.',\n    'A premium result depends on real OpenAI writing, ElevenLabs voice, Eleven Music background score, Creatomate rendering and Backblaze B2 delivery.',\n    'Manual editorial review remains required before YouTube upload.'\n  ]\n};\nconst status = issues.length ? 'needs_review' : 'ready_for_delivery';\nreturn [{ json: { ...data, deliveryManifest, quality: { issues, status }, assessment } }];"
+      }
+    }
+  ],
+  "connections": {
+    "Manual Trigger": {
+      "main": [
+        [
+          {
+            "node": "Build Channel Brand And Run Context",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Daily Schedule": {
+      "main": [
+        [
+          {
+            "node": "Build Channel Brand And Run Context",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "GitHub Daily Webhook": {
+      "main": [
+        [
+          {
+            "node": "Build Channel Brand And Run Context",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Channel Brand And Run Context": {
+      "main": [
+        [
+          {
+            "node": "Editorial Guard And Uniqueness",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Editorial Guard And Uniqueness": {
+      "main": [
+        [
+          {
+            "node": "Research LLM Placeholder",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Research LLM Placeholder": {
+      "main": [
+        [
+          {
+            "node": "Parse Or Mock Research",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse Or Mock Research": {
+      "main": [
+        [
+          {
+            "node": "Outline LLM Placeholder",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Outline LLM Placeholder": {
+      "main": [
+        [
+          {
+            "node": "Parse Or Mock Outline",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse Or Mock Outline": {
+      "main": [
+        [
+          {
+            "node": "Script LLM Placeholder",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Script LLM Placeholder": {
+      "main": [
+        [
+          {
+            "node": "Parse Or Mock Script",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse Or Mock Script": {
+      "main": [
+        [
+          {
+            "node": "Build Visual Storyboard",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Visual Storyboard": {
+      "main": [
+        [
+          {
+            "node": "Voiceover Placeholder",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Voiceover Placeholder": {
+      "main": [
+        [
+          {
+            "node": "Background Music Placeholder",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Background Music Placeholder": {
+      "main": [
+        [
+          {
+            "node": "Subtitle Timing Placeholder",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Subtitle Timing Placeholder": {
+      "main": [
+        [
+          {
+            "node": "Parse Or Mock Subtitles",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse Or Mock Subtitles": {
+      "main": [
+        [
+          {
+            "node": "Build Thumbnail Brief",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Thumbnail Brief": {
+      "main": [
+        [
+          {
+            "node": "Render Placeholder",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Render Placeholder": {
+      "main": [
+        [
+          {
+            "node": "Build B2 Delivery Package",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build B2 Delivery Package": {
+      "main": [
+        [
+          {
+            "node": "Backblaze B2 Delivery Placeholder",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Backblaze B2 Delivery Placeholder": {
+      "main": [
+        [
+          {
+            "node": "Finalize Delivery Package",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  }
+}
