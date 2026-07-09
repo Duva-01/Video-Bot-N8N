@@ -3,6 +3,7 @@
   run      genera un video completo (y lo sube salvo --no-upload)
   review   servidor local para publicar videos private con un clic
   stats    descarga analytics y actualiza los insights de hooks
+  auth     autoriza YouTube y guarda el refresh token
   check    comprueba dependencias y servicios (Ollama, ComfyUI, ffmpeg, NVENC)
 """
 from __future__ import annotations
@@ -39,6 +40,10 @@ def main() -> None:
     p_music.add_argument("--force", action="store_true", help="regenerar aunque existan")
     p_music.add_argument("--simulate", action="store_true", help="pistas sinteticas de prueba")
 
+    p_auth = sub.add_parser("auth", help="autoriza servicios externos")
+    p_auth.add_argument("service", choices=["youtube"])
+    p_auth.add_argument("--port", type=int, default=8098)
+
     sub.add_parser("check", help="diagnostico del entorno")
 
     args = parser.parse_args()
@@ -66,6 +71,10 @@ def main() -> None:
         styles = [s.strip() for s in args.styles.split(",") if s.strip()] or None
         generate_library(settings, styles=styles, per_style=args.per_style,
                          seconds=args.seconds, force=args.force)
+    elif args.cmd == "auth":
+        if args.service == "youtube":
+            from .auth import youtube_auth
+            youtube_auth(port=args.port)
     elif args.cmd == "check":
         _check()
 
