@@ -84,7 +84,8 @@ def _simulated(prompt: str) -> dict | list:
     if "verified facts" in p and "wikipedia" in p:
         return {"facts": ["On September 1-2, 1859 a massive solar storm hit Earth",
                           "Telegraph operators reported sparks from their equipment",
-                          "Richard Carrington observed the flare on September 1, 1859"]}
+                          "Richard Carrington observed the flare on September 1, 1859"],
+                "archive_queries": ["Carrington event", "telegraph 1859"]}
     if "scene plan" in p or ("scene" in p and "plan" in p):
         return {
             "mood": "tense",
@@ -96,7 +97,8 @@ def _simulated(prompt: str) -> dict | list:
                  "emphasis": ["fire", "1859"], "energy": 2, "pause_before": False},
                 {"text": "Telegraph lines sparked on their own.",
                  "visual": "vintage telegraph office, sparks on wires, dramatic light",
-                 "source": "image", "transition": "punch", "overlay": "",
+                 "source": "archival", "query": "telegraph office 1859",
+                 "transition": "punch", "overlay": "",
                  "emphasis": ["sparked"], "energy": 2, "pause_before": False},
                 {"text": "Operators kept sending messages with the batteries unplugged.",
                  "visual": "close up of telegraph key tapping, period drama style",

@@ -72,8 +72,9 @@ WrapStyle: 2
 [V4+ Styles]
 Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding
 Style: Caption,{font},{size},{base},{base},{outline},&H78000000,-1,0,0,0,100,100,1,0,1,{border},2,2,60,60,{margin_v},1
-Style: Overlay,{font},{overlay_size},{emphasis},{emphasis},{outline},&H96000000,-1,0,0,0,100,100,2,0,1,{overlay_border},3,8,60,60,{overlay_margin},1
-Style: Cover,{font},{cover_size},{base},{base},{outline},&H96000000,-1,0,0,0,100,100,1,0,1,{border},3,5,80,80,0,1
+Style: Overlay,{overlay_font},{overlay_size},{emphasis},{emphasis},{outline},&H96000000,-1,0,0,0,100,100,2,0,1,{overlay_border},3,8,60,60,{overlay_margin},1
+Style: Cover,{cover_font},{cover_size},{base},{base},{outline},&H96000000,-1,0,0,0,100,100,1,0,1,{border},3,5,80,80,0,1
+Style: Brand,{font},{brand_size},{base},{base},{outline},&H00000000,-1,0,0,0,100,100,3,0,1,2,0,8,60,60,{brand_margin},1
 
 [Events]
 Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
@@ -84,25 +85,31 @@ def build_ass(settings: Settings, words: list[Word], out_ass: Path,
               scenes: list[dict] | None = None, hook: str | None = None) -> Path:
     w, h = settings.size
     group_size = int(settings.ch("captions", "words_per_group", default=3))
+    if settings.fmt == "short":
+        group_size = min(group_size, 2)
     active = _c(settings.ch("captions", "active_color", default="&H0051D9F0&"))
     base = _c(settings.ch("captions", "base_color", default="&H00FFFFFF&"))
     emphasis_c = _c(settings.ch("captions", "emphasis_color", default="&H002E86FF&"))
     outline = _c(settings.ch("captions", "outline_color", default="&H00101010&"))
     font = settings.ch("captions", "font", default="Arial Black")
+    overlay_font = settings.ch("captions", "overlay_font", default=None) or font
+    cover_font = settings.ch("captions", "cover_font", default=None) or font
     upper = bool(settings.ch("captions", "uppercase", default=True))
     pop = bool(settings.ch("captions", "pop", default=True))
 
-    size = int(h * 0.048) if settings.fmt == "short" else int(h * 0.055)
+    size = int(h * 0.042) if settings.fmt == "short" else int(h * 0.055)
     margin_v = int(h * 0.30) if settings.fmt == "short" else int(h * 0.08)
     overlay_size = int(h * 0.10)
     cover_size = int(h * 0.052)
 
     lines = [ASS_HEADER.format(
-        w=w, h=h, font=font, size=size, base=base, outline=outline,
+        w=w, h=h, font=font, overlay_font=overlay_font, cover_font=cover_font,
+        size=size, base=base, outline=outline,
         emphasis=emphasis_c, border=max(3, size // 12),
         margin_v=margin_v, overlay_size=overlay_size,
         overlay_border=max(4, overlay_size // 14),
-        overlay_margin=int(h * 0.16), cover_size=cover_size)]
+        overlay_margin=int(h * 0.16), cover_size=cover_size,
+        brand_size=int(h * 0.016), brand_margin=int(h * 0.032))]
 
     emphasis_words = _emphasis_set(scenes)
 
@@ -152,6 +159,15 @@ def build_ass(settings: Settings, words: list[Word], out_ass: Path,
         text = ("{\\fad(50,260)\\fscx90\\fscy90\\t(0,120,\\fscx100\\fscy100)}"
                 f"{_ass_escape(wrapped)}")
         lines.append(f"Dialogue: 3,{_ts(0.0)},{_ts(1.05)},Cover,,0,0,0,,{text}\n")
+
+    # --- watermark sutil del canal (todo el video)
+    if words and settings.ch("captions", "watermark", default=True):
+        channel = str(settings.ch("channel", "name", default="")).upper()
+        if channel:
+            total_end = words[-1].end + 8
+            text = f"{{\\alpha&H82&}}{_ass_escape(channel)}"
+            lines.append(
+                f"Dialogue: 0,{_ts(0.0)},{_ts(total_end)},Brand,,0,0,0,,{text}\n")
 
     out_ass.write_text("".join(lines), encoding="utf-8-sig")
     log("subs", "ASS generado", groups=len(groups),
@@ -205,5 +221,4 @@ def _ts(seconds: float) -> str:
     return f"{h}:{m:02d}:{s:02d}.{cs:02d}"
 
 
-def _ass_escape(text: str) -> str:
-    return text.replace("{", "(").replace("}", ")").replace("\n", " ")
+def _ass_escape(text: str) -> str:    return text.replace("{", "(").replace("}", ")").replace("\n", " ")

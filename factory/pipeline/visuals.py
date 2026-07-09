@@ -1,13 +1,16 @@
-"""Direccion visual: plan de escenas con lenguaje de montaje + obtencion de assets.
+"""Direccion visual documental: plan de escenas + obtencion de assets.
 
-1. El LLM actua de director: escenas + transicion + overlay + enfasis + energia
-   + mood global + ancla de estilo (mismo "rodaje" en todo el video).
-2. Cada escena se resuelve con: LTX img2vid (escenas hero), parallax 2.5D,
-   Ken Burns variado, o b-roll de Pexels puntuado por un modelo de vision.
-3. Las escenas largas se parten en shots (max_shot_seconds) y las transiciones
-   punch/flash/whip se hornean al inicio del clip.
+Fuentes por escena (el director LLM elige, con cadena de fallbacks):
+- "archival": foto/footage REAL (Wikipedia del tema, Commons, Archive.org).
+  Es la fuente preferida para personas, lugares y eventos reales.
+- "broll":    clip de stock moderno (Pexels con puntuacion de vision),
+  con fallback a footage real de Archive.org.
+- "image":    recreacion FLUX con estetica de foto documental (no "AI cinematic").
 
-En modo simulate se generan clips de color solido.
+Movimiento: LTX img2vid en escenas hero, parallax 2.5D, Ken Burns variado.
+Las escenas largas se parten en shots (max_shot_seconds). Las transiciones
+punch/flash/whip se hornean al inicio del clip. Si hay crossfade configurado,
+cada clip (salvo el ultimo) se genera con una cola extra para el xfade.
 """
 from __future__ import annotations
 
@@ -22,6 +25,7 @@ from ..config import Settings
 from ..llm import generate, vision_score
 from ..utils import log
 from . import motion
+from .archives import ArchivePool
 from .subtitles import Word
 
 SCENES_PROMPT = """You are the film director of a {fmt} documentary video.
@@ -33,25 +37,34 @@ Narration:
 Split it into scenes of AT MOST {max_words} words each (a scene = one visual moment).
 For each scene provide:
 - "text": exact fragment of the narration
-- "visual": vivid image-generation prompt (subject, setting, mood, era)
-- "source": "image", or "broll" when real stock footage would work better (+ "query": 2-3 words)
-- "transition": how the scene ENTERS — "cut" for normal flow, "punch" on a reveal,
-  "flash" on a shock, "whip" on a sudden change of place/time. Most scenes = "cut";
-  use effects ONLY on real narrative turns (2-3 per video max).
-- "overlay": a number/date/short datum from the text to show huge on screen ("1859",
-  "40,000 V"), or "" for most scenes. Max 2 overlays per video.
-- "emphasis": 1-3 exact words from the text that carry the impact (numbers, names, turns)
+- "visual": vivid visual description (subject, setting, era, mood)
+- "source": where the visual should come from:
+    "archival" -> REAL historical photo/footage. USE THIS whenever the scene shows
+                  a real person, place, event, machine or document. Prefer it.
+    "broll"    -> modern stock footage (cities, hands, nature, abstract motion)
+    "image"    -> stylized recreation, only when no real material could exist
+                  (abstract concepts, dramatizations, ancient scenes)
+  Plus "query": 2-4 word search phrase for archival/broll.
+- "transition": how the scene ENTERS — "cut" normally; "punch" on a reveal,
+  "flash" on a shock, "whip" on a jump of place/time (2-3 effects per video max)
+- "overlay": a number/date/short datum to show huge on screen ("1859"), or ""
+  (max 2 overlays per video)
+- "emphasis": 1-3 exact words from the text that carry the impact
 - "energy": 1 calm, 2 building, 3 climax (exactly ONE scene with 3, near the payoff)
-- "pause_before": true only for the scene right after which a dramatic beat lands
+- "pause_before": true only where a dramatic beat lands
 
 Also provide:
 - "mood": overall music mood — one of {moods}
 - "style_anchor": short phrase locking era/palette/materials shared by ALL scenes
 
-Scene 1 must be the most visually striking moment of the whole video.
+Aim for a documentary feel: at least half the scenes should be "archival" when
+the topic involves real documented people or events. Scene 1 must be the most
+visually striking moment of the whole video.
 Return ONLY JSON:
 {{"mood": "...", "style_anchor": "...", "scenes": [{{...}}]}}
 """
+
+_SOURCES = ("archival", "broll", "image")
 
 
 def plan_scenes(settings: Settings, narration: str) -> dict:
@@ -69,25 +82,18 @@ def plan_scenes(settings: Settings, narration: str) -> dict:
     if len(scenes) < 3:
         scenes = _fallback_scenes(narration, max_words)
 
-    # Fuerza la mezcla broll/imagen segun configuracion
-    ratio = float(settings.ch("visual_style", "broll_ratio", default=0.35))
-    has_pexels = bool(settings.env.get("PEXELS_API_KEY"))
-    for scene in scenes:
-        if not has_pexels:
-            scene["source"] = "image"
-    n_broll = sum(1 for s in scenes if s.get("source") == "broll")
-    if has_pexels and n_broll == 0 and ratio > 0:
-        for scene in random.sample(scenes, max(1, int(len(scenes) * ratio))):
-            scene["source"] = "broll"
-            scene["query"] = scene.get("query") or " ".join(scene["visual"].split()[:3])
+    # sin Pexels, el broll cae a archival (y este a FLUX si no hay material)
+    if not settings.env.get("PEXELS_API_KEY"):
+        for scene in scenes:
+            if scene["source"] == "broll":
+                scene["source"] = "archival"
 
-    # exactamente una escena climax; la primera nunca lleva transicion
     if not any(s["energy"] == 3 for s in scenes):
         scenes[-1]["energy"] = 3
     scenes[0]["transition"] = "cut"
 
     log("visuals", "plan de escenas", scenes=len(scenes), mood=mood,
-        broll=sum(1 for s in scenes if s.get("source") == "broll"),
+        sources={s: sum(1 for x in scenes if x["source"] == s) for s in _SOURCES},
         fx=[s["transition"] for s in scenes if s["transition"] != "cut"],
         overlays=[s["overlay"] for s in scenes if s["overlay"]])
     return {"mood": mood, "style_anchor": style_anchor, "scenes": scenes}
@@ -123,8 +129,8 @@ def _extract_scenes(data) -> list[dict]:
         scenes.append({
             "text": text,
             "visual": visual,
-            "source": item.get("source") if item.get("source") in ("image", "broll") else "image",
-            "query": item.get("query", ""),
+            "source": item.get("source") if item.get("source") in _SOURCES else "image",
+            "query": str(item.get("query", "")).strip(),
             "transition": transition if transition in ("cut", "punch", "flash", "whip") else "cut",
             "overlay": str(item.get("overlay", "")).strip()[:14],
             "emphasis": [str(w).strip() for w in emphasis if str(w).strip()][:3],
@@ -165,7 +171,6 @@ def align_scenes(scenes: list[dict], words: list[Word], total: float) -> list[di
         idx += max(1, share)
     scenes[0]["start"] = 0.0
     scenes[-1]["end"] = total
-    # sin huecos ni solapes
     for prev, cur in zip(scenes, scenes[1:]):
         cur["start"] = prev["end"]
     return scenes
@@ -180,40 +185,93 @@ def fetch_visuals(settings: Settings, direction: dict, workdir: Path) -> list[di
     w, h = settings.size
     fps = settings.fps
     max_shot = float(settings.pr("video", "max_shot_seconds", default=3.0))
+    xfade = float(settings.pr("render", "crossfade", default=0.0))
 
-    # mismo seed en todo el video = mismo "rodaje"
     seed = random.randint(0, 2**31) if settings.ch(
         "visual_style", "consistent_seed", default=True) else None
-
     hero_idxs = _pick_hero_scenes(settings, scenes)
     parallax_on = bool(settings.ch("visual_style", "parallax", default=True))
 
+    pool = None
+    if not settings.simulate and settings.ch("visual_style", "archives",
+                                             "enabled", default=True):
+        try:
+            pool = ArchivePool(settings, direction.get("wiki_images", []),
+                               direction.get("queries", []), workdir)
+        except Exception as exc:
+            log("visuals", f"pool de archivo no disponible ({exc})")
+
+    last = len(scenes) - 1
     for i, scene in enumerate(scenes):
         duration = max(0.6, float(scene["end"]) - float(scene["start"]))
+        render_dur = duration + (xfade if i < last else 0.0)  # cola para xfade
         clip = clips_dir / f"scene-{i:03d}.mp4"
         try:
             if settings.simulate:
-                motion.color_clip(clip, duration, w, h, fps, i)
-            elif scene.get("source") == "broll":
-                try:
-                    raw = _best_pexels_clip(settings, scene, clips_dir, i)
-                    motion.fit_clip(raw, clip, duration, w, h, fps)
-                except Exception as exc:
-                    log("visuals", f"broll escena {i} fallo ({exc}); usando FLUX")
-                    _image_scene(settings, scene, style_anchor, seed, clips_dir,
-                                 clip, duration, w, h, fps, max_shot, i,
-                                 hero=(i in hero_idxs), parallax_on=parallax_on)
+                motion.color_clip(clip, render_dur, w, h, fps, i)
             else:
-                _image_scene(settings, scene, style_anchor, seed, clips_dir,
-                             clip, duration, w, h, fps, max_shot, i,
-                             hero=(i in hero_idxs), parallax_on=parallax_on)
-            if not settings.simulate:
+                _resolve_scene(settings, scene, i, pool, style_anchor, seed,
+                               clips_dir, clip, render_dur, w, h, fps, max_shot,
+                               hero=(i in hero_idxs), parallax_on=parallax_on)
                 motion.apply_transition(clip, scene.get("transition", "cut"), w, h, fps)
-        except Exception as exc:  # una escena no debe tumbar el video entero
+        except Exception as exc:
             log("visuals", f"escena {i} fallo ({exc}); usando fondo neutro")
-            motion.color_clip(clip, duration, w, h, fps, i)
+            motion.color_clip(clip, render_dur, w, h, fps, i)
         scene["clip"] = str(clip)
     return scenes
+
+
+def _resolve_scene(settings: Settings, scene: dict, idx: int, pool,
+                   style_anchor: str, seed: int | None, clips_dir: Path,
+                   clip: Path, duration: float, w: int, h: int, fps: int,
+                   max_shot: float, hero: bool, parallax_on: bool) -> None:
+    """Cadena de fallbacks: archival -> broll -> FLUX segun la fuente pedida."""
+    source = scene.get("source", "image")
+
+    if source == "archival" and pool:
+        still = pool.best_still(scene, idx)
+        if still:
+            padded = clips_dir / f"scene-{idx:03d}-arch.png"
+            motion.blurpad_still(still, padded, w, h)
+            _animate_still(settings, padded, clip, duration, w, h, fps,
+                           max_shot, idx, parallax_on)
+            return
+        source = "broll" if settings.env.get("PEXELS_API_KEY") else "image"
+
+    if source == "broll":
+        try:
+            raw = _best_pexels_clip(settings, scene, clips_dir, idx)
+            motion.fit_clip(raw, clip, duration, w, h, fps)
+            return
+        except Exception as exc:
+            log("visuals", f"broll escena {idx} fallo ({exc})")
+        if pool:
+            raw = pool.archive_video(scene, idx)
+            if raw:
+                motion.fit_clip(raw, clip, duration, w, h, fps)
+                return
+        source = "image"
+
+    # FLUX (con estilo documental y ancla del video)
+    _image_scene(settings, scene, style_anchor, seed, clips_dir, clip,
+                 duration, w, h, fps, max_shot, idx, hero, parallax_on)
+
+
+def _animate_still(settings: Settings, png: Path, clip: Path, duration: float,
+                   w: int, h: int, fps: int, max_shot: float, idx: int,
+                   parallax_on: bool) -> None:
+    if duration > max_shot * 1.3:
+        motion.split_image_shots(png, clip, duration, max_shot, w, h, fps,
+                                 start_mode_idx=idx)
+        return
+    if parallax_on and idx % 2 == 1:
+        try:
+            motion.parallax(png, clip, duration, w, h, fps)
+            return
+        except Exception as exc:
+            log("visuals", f"parallax escena {idx} fallo ({exc}); ken burns")
+    motion.ken_burns(png, clip, duration, w, h, fps,
+                     motion.MODES[idx % len(motion.MODES)])
 
 
 def _pick_hero_scenes(settings: Settings, scenes: list[dict]) -> set[int]:
@@ -223,7 +281,7 @@ def _pick_hero_scenes(settings: Settings, scenes: list[dict]) -> set[int]:
         return set()
     ranked = sorted(range(len(scenes)),
                     key=lambda i: (scenes[i]["energy"], i == 0), reverse=True)
-    ranked = [i for i in ranked if scenes[i].get("source") != "broll"]
+    ranked = [i for i in ranked if scenes[i].get("source") == "image"]
     return set(ranked[:n_hero])
 
 
@@ -242,19 +300,8 @@ def _image_scene(settings: Settings, scene: dict, style_anchor: str,
         except Exception as exc:
             log("visuals", f"LTX escena {idx} fallo ({exc}); usando parallax/kenburns")
 
-    if duration > max_shot * 1.3:
-        motion.split_image_shots(png, clip, duration, max_shot, w, h, fps,
-                                 start_mode_idx=idx)
-        return
-
-    if parallax_on and idx % 2 == 1:  # alterna parallax y ken burns
-        try:
-            motion.parallax(png, clip, duration, w, h, fps)
-            return
-        except Exception as exc:
-            log("visuals", f"parallax escena {idx} fallo ({exc}); ken burns")
-    motion.ken_burns(png, clip, duration, w, h, fps,
-                     motion.MODES[idx % len(motion.MODES)])
+    _animate_still(settings, png, clip, duration, w, h, fps, max_shot, idx,
+                   parallax_on)
 
 
 def _ltx_scene(settings: Settings, scene: dict, png: Path, clip: Path,
@@ -262,7 +309,6 @@ def _ltx_scene(settings: Settings, scene: dict, png: Path, clip: Path,
     """Anima la imagen con LTX; si la escena es mas larga, remata con ken burns."""
     gen_seconds = min(duration, 5.0)
     raw = clip.with_suffix(".ltx.mp4")
-    # LTX genera a resolucion contenida y se reescala (mas estable en 16GB)
     gw, gh = (768, 1152) if h > w else (1152, 768)
     comfy.generate_video_ltx(settings, png, scene["visual"], raw, gen_seconds, gw, gh)
     if duration <= gen_seconds + 0.25:
@@ -284,6 +330,8 @@ def _ltx_scene(settings: Settings, scene: dict, png: Path, clip: Path,
 def _best_pexels_clip(settings: Settings, scene: dict, out_dir: Path, idx: int) -> Path:
     """Descarga candidatos de Pexels y elige el mejor con el modelo de vision."""
     key = settings.env.get("PEXELS_API_KEY", "")
+    if not key:
+        raise RuntimeError("sin PEXELS_API_KEY")
     query = scene.get("query") or scene["visual"]
     qs = urllib.parse.urlencode({"query": query, "per_page": 6, "orientation":
                                  "portrait" if settings.fmt == "short" else "landscape"})
@@ -295,7 +343,6 @@ def _best_pexels_clip(settings: Settings, scene: dict, out_dir: Path, idx: int) 
     if not videos:
         raise RuntimeError(f"Pexels sin resultados para '{query}'")
 
-    # puntua los thumbnails con Qwen-VL y elige el mejor
     best_video, best_score = videos[0], -1.0
     if len(videos) > 1:
         for j, video in enumerate(videos):

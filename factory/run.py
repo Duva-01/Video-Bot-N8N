@@ -25,12 +25,13 @@ def run_pipeline(settings: Settings, upload: bool = True,
     workdir.mkdir(parents=True, exist_ok=True)
     db.update_run(conn, run_id, status="topic",
                   canonical_topic=topic["canonical_topic"], angle=topic["angle"],
-                  series_id=topic.get("series_id"),
+                  series_id=topic.get("series_id"), domain=topic.get("domain"),
                   uniqueness_hash=topic["uniqueness_hash"])
 
     try:
-        # 2. Research: facts verificados de Wikipedia
-        facts = research.gather_facts(settings, topic)
+        # 2. Research: facts verificados + imagenes reales del articulo
+        intel = research.gather(settings, topic)
+        facts = intel["facts"]
         if facts:
             (workdir / "facts.md").write_text(facts, encoding="utf-8")
 
@@ -44,6 +45,8 @@ def run_pipeline(settings: Settings, upload: bool = True,
 
         # 4. Direccion visual: escenas + beats + mood + ancla de estilo
         direction = visuals.plan_scenes(settings, meta["narration"])
+        direction["wiki_images"] = intel.get("wiki_images", [])
+        direction["queries"] = intel.get("queries", [])
         scenes = direction["scenes"]
 
         # 5. Voz dirigida por escena (enfasis + pausas) + mastering

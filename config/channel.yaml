@@ -1,13 +1,18 @@
 # Identidad y estrategia del canal. Todo lo funcional vive aqui, no en .env.
 channel:
   name: "The Hidden Thread"
-  tagline: "History, Science, and Technology Explained"
+  tagline: "The hidden side of how the world works"
   language: "en"
   niche: >
-    Documentary essays about how hidden decisions, systems and consequences
-    shaped history, science and technology.
+    Documentary essays about the hidden side of the world: forgotten decisions,
+    invisible systems, business and power moves, wars, economics, geopolitics,
+    accidents, inventions, culture, and near-miss moments that quietly shaped
+    everything — history, science and technology included but never limited to them.
 
 editorial:
+  # El selector rota dominio Y serie para que el canal no se encasille.
+  domains: [history, war, business, economics, geopolitics, technology,
+            science, culture, accidents, inventions, espionage, infrastructure]
   series:
     - id: decision
       label: "The Decision That Changed Everything"
@@ -17,75 +22,107 @@ editorial:
       angle: "An invisible system or mechanism that quietly runs the world"
     - id: almost-happened
       label: "It Almost Happened"
-      angle: "A near-miss moment in history, science or technology"
+      angle: "A near-miss moment that would have changed everything"
+    - id: power-play
+      label: "The Power Play"
+      angle: "A business, political or financial move that rewired power quietly"
+    - id: the-accident
+      label: "The Accident That Built the Future"
+      angle: "A mistake, disaster or coincidence with enormous consequences"
+    - id: forgotten-figure
+      label: "The Forgotten One"
+      angle: "A person history erased whose work still shapes the present"
   topic_cooldown_days: 180
   angle_cooldown_days: 45
   banned_topics: []
 
 research:
   enabled: true                 # facts verificados de Wikipedia antes de escribir
-  max_chars: 6000               # texto de articulo que se pasa al LLM
-  editor_pass: true             # segunda pasada que corta relleno del guion
+  max_chars: 6000
+  editor_pass: true             # segunda pasada que corta relleno
+  expand_pass: true             # si el guion queda corto, se expande automaticamente
 
 voice:
   provider: "chatterbox"        # chatterbox | kokoro
-  # Voz de narrador. Para clonar un narrador concreto: wav limpio de ~30s en
-  # assets/voice/narrator.wav y pon la ruta aqui.
-  reference_audio: null         # ej: "assets/voice/narrator.wav"
-  kokoro_voice: "bm_george"     # narrador britanico documental (alt: am_onyx = grave US)
-  exaggeration: 0.4             # expresividad base de chatterbox (0-1)
+  reference_audio: null         # ej: "assets/voice/narrator.wav" (~30s limpio)
+  kokoro_voice: "bm_george"     # narrador britanico documental (alt: am_onyx)
+  exaggeration: 0.4
   cfg_weight: 0.5
-  # Enfasis dinamico: la expresividad sube con la energia de la escena (1-3)
   energy_exaggeration: {1: 0.32, 2: 0.42, 3: 0.58}
-  pause_seconds: 0.45           # silencio antes de escenas con pause_before
+  pause_seconds: 0.45
   mastering: true               # EQ + compresion + de-esser + loudnorm -14 LUFS
 
 visual_style:
+  # Prompt base para FLUX: documental de epoca, NO "cinematic AI"
   image_style: >
-    cinematic documentary still, muted editorial color palette, deep teal and
-    ivory tones, film grain, dramatic natural light, 35mm photography,
+    authentic documentary photograph, archival photo aesthetic, period-accurate
+    details and clothing, natural imperfect lighting, realistic textures,
+    shot on 35mm film, muted faded colors, slight motion blur, photojournalism,
     no text, no watermark
-  negative: "cartoon, anime, oversaturated, neon, text, watermark, logo, low quality"
-  broll_ratio: 0.35             # fraccion de escenas con clip real de Pexels
-  consistent_seed: true         # mismo seed FLUX en todo el video (mismo "rodaje")
-  hero_video_scenes: 1          # escenas animadas con LTX por video (0 = off)
+  negative: >
+    cartoon, anime, 3d render, cgi, oversaturated, neon, cinematic color grading,
+    perfect symmetry, glossy, text, watermark, logo, low quality
+  broll_ratio: 0.25             # fraccion de escenas con clip real de Pexels
+  consistent_seed: true         # mismo seed FLUX en todo el video
+  hero_video_scenes: 2          # escenas animadas con LTX por video (0 = off)
   ltx:
     enabled: true
-    checkpoint: "ltx-video-2b-v0.9.5.safetensors"   # en ComfyUI/models/checkpoints
-    text_encoder: "t5xxl_fp8_e4m3fn_scaled.safetensors"  # en ComfyUI/models/text_encoders
+    checkpoint: "ltx-video-2b-v0.9.5.safetensors"
+    text_encoder: "t5xxl_fp8_e4m3fn_scaled.safetensors"
     fps: 24
     steps: 22
-  parallax: true                # 2.5D con depth map (Depth-Anything via transformers)
-  vision_model: "qwen2.5vl:7b"  # puntua b-roll de Pexels (ollama pull qwen2.5vl:7b)
+  parallax: true                # 2.5D con depth map
+  vision_model: "qwen2.5vl:7b"  # puntua archivo y b-roll
+
+  # --- Motor de archivo: material REAL (dominio publico / licencias libres)
+  archives:
+    enabled: true
+    min_vision_score: 5.0       # umbral para aceptar una foto de archivo
+    max_candidates: 5           # candidatos a puntuar por escena
+    archive_org_video: true     # buscar footage real en Archive.org como b-roll
+    max_video_mb: 80
+
+  # --- Look unificado (se aplica a TODO el video al final)
+  grade:
+    enabled: true
+    filter: "eq=contrast=1.05:saturation=0.85:brightness=-0.01,vignette=angle=PI/4.8,noise=alls=5:allf=t+u"
 
 captions:
-  font: "Montserrat ExtraBold"
+  # Pon los .ttf en assets/fonts/ (Anton, Bebas Neue, Archivo Black - OFL gratis)
+  font: "Anton"                 # captions karaoke
+  overlay_font: "Bebas Neue"    # datos gigantes
+  cover_font: "Anton"           # hook del primer segundo
   fallback_font: "Arial Black"
   words_per_group: 3
   uppercase: true
-  base_color: "&H00FFFFFF&"     # blanco
+  base_color: "&H00FFFFFF&"
   active_color: "&H0051D9F0&"   # ambar calido (BGR)
-  emphasis_color: "&H002E86FF&" # naranja fuego para palabras de impacto (BGR)
+  emphasis_color: "&H002E86FF&" # naranja fuego (BGR)
   outline_color: "&H00101010&"
-  pop: true                     # animacion de escala al activarse cada palabra
-  overlay_enabled: true         # datos gigantes en pantalla ("1859", "40,000 V")
-  hook_cover: true              # hook en grande durante el primer segundo
+  pop: true
+  overlay_enabled: true
+  hook_cover: true
+  watermark: true               # nombre del canal arriba, sutil
+
+outro:
+  enabled: true                 # end-card LIKE - COMMENT - SUBSCRIBE (3s, cacheada)
+  seconds: 3.2
+  headline: "ENJOYED THE THREAD?"
+  actions: "LIKE   COMMENT   SUBSCRIBE"
 
 sfx:
   enabled: true
-  transition: "assets/audio/whoosh.mp3"   # se usa si existe (descarga uno gratis)
-  overlay: "assets/audio/ding.mp3"        # golpe suave cuando aparece un dato
-  riser: "assets/audio/suspense.mp3"      # sube antes de la escena climax
+  transition: "assets/audio/whoosh.mp3"
+  overlay: "assets/audio/ding.mp3"
+  riser: "assets/audio/suspense.mp3"
   volume_db: -16
 
 music:
   enabled: true
   directory: "assets/music"
-  # Nombra las pistas con su mood para seleccion automatica:
-  # tense-01.mp3, epic-02.mp3, curious-01.mp3, dark-01.mp3, calm-01.mp3
   moods: ["tense", "epic", "curious", "dark", "calm"]
   ducking_db: -13
-  climax_boost_db: 4            # subida de musica en la escena de energia 3
+  climax_boost_db: 4
 
 publish:
   privacy: "private"

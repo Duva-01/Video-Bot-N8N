@@ -68,6 +68,11 @@ def connect() -> sqlite3.Connection:
     conn = sqlite3.connect(DB_PATH)
     conn.row_factory = sqlite3.Row
     conn.executescript(SCHEMA)
+    try:  # migracion: columna domain para rotacion editorial
+        conn.execute("ALTER TABLE runs ADD COLUMN domain TEXT")
+        conn.commit()
+    except sqlite3.OperationalError:
+        pass
     return conn
 
 
@@ -105,7 +110,7 @@ def log_event(conn: sqlite3.Connection, run_id: int | None, stage: str,
 def recent_topics(conn: sqlite3.Connection, days: int) -> list[dict]:
     cutoff = time.time() - days * 86400
     rows = conn.execute(
-        "SELECT canonical_topic, angle, series_id FROM runs "
+        "SELECT canonical_topic, angle, series_id, domain FROM runs "
         "WHERE created_at > ? AND canonical_topic IS NOT NULL",
         (cutoff,),
     ).fetchall()

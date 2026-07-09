@@ -95,6 +95,34 @@ def parallax(png: Path, out: Path, duration: float, w: int, h: int, fps: int) ->
     frames_dir.rmdir()
 
 
+def blurpad_still(png: Path, out_png: Path, w: int, h: int) -> Path:
+    """Encaja una foto de archivo en 9:16 estilo documental: la foto entera
+    centrada sobre su propia version ampliada, difuminada y oscurecida.
+    Evita recortes brutales en fotos horizontales."""
+    from PIL import Image, ImageEnhance, ImageFilter
+
+    img = Image.open(png).convert("RGB")
+    src_ratio, dst_ratio = img.width / img.height, w / h
+    if abs(src_ratio - dst_ratio) < 0.18:  # aspecto parecido: cover normal
+        img.save(out_png, quality=92)
+        return out_png
+
+    # fondo: cover + blur + oscurecer
+    scale = max(w / img.width, h / img.height)
+    bg = img.resize((int(img.width * scale) + 1, int(img.height * scale) + 1))
+    left, top = (bg.width - w) // 2, (bg.height - h) // 2
+    bg = bg.crop((left, top, left + w, top + h))
+    bg = bg.filter(ImageFilter.GaussianBlur(36))
+    bg = ImageEnhance.Brightness(bg).enhance(0.55)
+
+    # frente: contain (la foto entera, ~86% del ancho/alto)
+    fit = min((w * 0.92) / img.width, (h * 0.92) / img.height)
+    fg = img.resize((max(1, int(img.width * fit)), max(1, int(img.height * fit))))
+    bg.paste(fg, ((w - fg.width) // 2, (h - fg.height) // 2))
+    bg.save(out_png, quality=92)
+    return out_png
+
+
 def _estimate_depth(png: Path):
     """Depth map 0..1 con Depth-Anything V2 small (una sola carga)."""
     global _depth_pipe

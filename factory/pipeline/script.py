@@ -94,6 +94,26 @@ Rules: for the ear, short sentences, concrete facts, end on the section's cliffh
 Return ONLY JSON: {{"narration": "..."}}
 """
 
+EXPAND_PROMPT = """You are the head writer of a documentary channel.
+This narration is TOO SHORT for the target length. Current: {current} words.
+Target: {min_w}-{max_w} words.
+
+Narration:
+\"\"\"{narration}\"\"\"
+
+Verified facts you may draw from (never invent new claims):
+{facts}
+
+Expand it by ADDING DEPTH, not padding: one or two extra reveals, a concrete
+consequence, a vivid detail from the facts. Rules:
+- keep the FIRST sentence exactly as written (it is the hook)
+- keep the LAST sentence as the closing loop line
+- short sentences, active voice, written for the ear
+- every added sentence must open or close a loop
+
+Return ONLY JSON: {{"narration": "..."}}
+"""
+
 EDITOR_PROMPT = """You are a ruthless editor of documentary narration.
 
 Narration:
@@ -196,9 +216,36 @@ def _write_short(settings: Settings, topic: dict, hook: str, facts: str) -> dict
     ))
     data["hook"] = data.get("hook") or hook
     data["sections"] = None
-    data["narration"] = _edit_pass(settings, str(data.get("narration", "")), min_w, max_w)
-    log("script", "guion corto listo", words=len(str(data.get("narration", "")).split()))
+    narration = _edit_pass(settings, str(data.get("narration", "")), min_w, max_w)
+    narration = _length_gate(settings, narration, facts, min_w, max_w)
+    data["narration"] = narration
+    log("script", "guion corto listo", words=len(narration.split()),
+        est_seconds=round(len(narration.split()) / 2.6))
     return data
+
+
+def _length_gate(settings: Settings, narration: str, facts: str,
+                 min_w: int, max_w: int) -> str:
+    """Si el guion queda corto, se expande con profundidad real (max 2 intentos)."""
+    if settings.simulate or not settings.ch("research", "expand_pass", default=True):
+        return narration
+    for attempt in range(2):
+        words = len(narration.split())
+        if words >= int(min_w * 0.92):
+            return narration
+        log("script", "guion corto: expandiendo", words=words, objetivo=min_w,
+            intento=attempt + 1)
+        try:
+            data = generate(settings, EXPAND_PROMPT.format(
+                current=words, min_w=min_w, max_w=max_w,
+                narration=narration, facts=facts))
+            expanded = str(data.get("narration", "")).strip() if isinstance(data, dict) else ""
+            if len(expanded.split()) > words:
+                narration = expanded
+        except Exception as exc:
+            log("script", f"expand fallo ({exc}); se mantiene el guion")
+            break
+    return narration
 
 
 def _write_long(settings: Settings, topic: dict, hook: str, facts: str) -> dict:

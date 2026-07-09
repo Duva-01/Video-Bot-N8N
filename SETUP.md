@@ -54,6 +54,17 @@ Descarga 5-10 pistas instrumentales de **YouTube Studio → Audio Library**
 SFX opcional: un `whoosh.mp3` gratis (p.ej. de Pixabay) en `assets/audio/`
 para las transiciones. `ding.mp3` y `suspense.mp3` ya vienen en el repo.
 
+## 5b. Tipografias (captions con identidad)
+
+Descarga estas fuentes gratis (licencia OFL, uso comercial permitido) desde
+fonts.google.com y copia los .ttf a `assets/fonts/`:
+
+- **Anton** (captions y hook) -> `Anton-Regular.ttf`
+- **Bebas Neue** (overlays de datos gigantes) -> `BebasNeue-Regular.ttf`
+
+Sin ellas, libass usa una fuente generica. Tras anadirlas, borra
+`assets/branding/outro-*.mp4` para que el outro se regenere con la nueva fuente.
+
 ## 6. Credenciales (.env)
 
 Ya tienes `YOUTUBE_CLIENT_ID`, `YOUTUBE_CLIENT_SECRET` y `YOUTUBE_REFRESH_TOKEN`.
