@@ -32,6 +32,13 @@ def main() -> None:
     p_stats = sub.add_parser("stats", help="analytics + insights de hooks")
     p_stats.add_argument("--simulate", action="store_true")
 
+    p_music = sub.add_parser("music", help="genera la biblioteca musical local (ACE-Step)")
+    p_music.add_argument("--styles", default="", help="lista separada por comas (defecto: los 10)")
+    p_music.add_argument("--per-style", type=int, default=1)
+    p_music.add_argument("--seconds", type=float, default=None)
+    p_music.add_argument("--force", action="store_true", help="regenerar aunque existan")
+    p_music.add_argument("--simulate", action="store_true", help="pistas sinteticas de prueba")
+
     sub.add_parser("check", help="diagnostico del entorno")
 
     args = parser.parse_args()
@@ -53,6 +60,12 @@ def main() -> None:
         conn = db.connect()
         refresh_stats(settings, conn)
         print_report(conn)
+    elif args.cmd == "music":
+        from .pipeline.music import generate_library
+        settings = load_settings("short", simulate=args.simulate)
+        styles = [s.strip() for s in args.styles.split(",") if s.strip()] or None
+        generate_library(settings, styles=styles, per_style=args.per_style,
+                         seconds=args.seconds, force=args.force)
     elif args.cmd == "check":
         _check()
 

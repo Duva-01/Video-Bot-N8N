@@ -120,9 +120,16 @@ sfx:
 music:
   enabled: true
   directory: "assets/music"
-  moods: ["tense", "epic", "curious", "dark", "calm"]
+  # 10 estilos generados en local con ACE-Step: python -m factory music
+  moods: ["tense", "epic", "curious", "dark", "somber",
+          "triumphant", "mystery", "war", "noir", "minimal"]
   ducking_db: -13
   climax_boost_db: 4
+  ace:
+    checkpoint: "ace_step_v1_3.5b.safetensors"   # en ComfyUI/models/checkpoints
+    steps: 50
+    cfg: 5.0
+    seconds: 95
 
 publish:
   privacy: "private"

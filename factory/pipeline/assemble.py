@@ -100,10 +100,17 @@ def assemble(settings: Settings, scenes: list[dict], voice_wav: Path,
 
     run_cmd(args, desc=f"render final ({encoder})")
 
-    # --- outro end-card
+    # --- outro end-card (un fallo aqui nunca tumba el video)
     outro_path = ensure_outro(settings)
     if outro_path:
-        out = _append_outro(settings, out, outro_path, workdir, encoder)
+        try:
+            out = _append_outro(settings, out, outro_path, workdir, encoder)
+        except SystemExit:
+            log("assemble", "outro fallo al concatenar; video sin outro")
+            outro_path = None
+        except Exception as exc:
+            log("assemble", f"outro fallo ({exc}); video sin outro")
+            outro_path = None
 
     log("assemble", "video montado", file=out.name, mood=mood,
         sfx=len(sfx_events), seconds=round(ffprobe_duration(out), 1),

@@ -133,6 +133,57 @@ def generate_video_ltx(settings: Settings, image_png: Path, motion_prompt: str,
     return out_mp4
 
 
+# musica con ACE-Step (nodos core de ComfyUI)
+ACE_WORKFLOW = {
+    "ckpt": {"class_type": "CheckpointLoaderSimple", "inputs": {"ckpt_name": ""}},
+    "latent": {"class_type": "EmptyAceStepLatentAudio",
+               "inputs": {"seconds": 95, "batch_size": 1}},
+    "pos": {"class_type": "TextEncodeAceStepAudio",
+            "inputs": {"clip": ["ckpt", 1], "tags": "", "lyrics": "[inst]",
+                        "lyrics_strength": 1.0}},
+    "neg": {"class_type": "TextEncodeAceStepAudio",
+            "inputs": {"clip": ["ckpt", 1], "tags": "", "lyrics": "",
+                        "lyrics_strength": 1.0}},
+    "shift": {"class_type": "ModelSamplingSD3",
+              "inputs": {"model": ["ckpt", 0], "shift": 5.0}},
+    "sampler": {"class_type": "KSampler",
+                "inputs": {"model": ["shift", 0], "positive": ["pos", 0],
+                            "negative": ["neg", 0], "latent_image": ["latent", 0],
+                            "seed": 0, "steps": 50, "cfg": 5.0,
+                            "sampler_name": "euler", "scheduler": "simple",
+                            "denoise": 1.0}},
+    "decode": {"class_type": "VAEDecodeAudio",
+               "inputs": {"samples": ["sampler", 0], "vae": ["ckpt", 2]}},
+    "save": {"class_type": "SaveAudio",
+             "inputs": {"audio": ["decode", 0], "filename_prefix": "factory-music"}},
+}
+
+
+def generate_music(settings: Settings, tags: str, negative: str, out_path: Path,
+                   seconds: float) -> Path:
+    """Genera una pista instrumental con ACE-Step y la guarda (flac)."""
+    url = settings.ch("services", "comfyui_url", default="http://127.0.0.1:8188")
+    cfg = settings.ch("music", "ace", default={}) or {}
+
+    wf = json.loads(json.dumps(ACE_WORKFLOW))
+    wf["ckpt"]["inputs"]["ckpt_name"] = cfg.get(
+        "checkpoint", "ace_step_v1_3.5b.safetensors")
+    wf["latent"]["inputs"]["seconds"] = float(seconds)
+    wf["pos"]["inputs"]["tags"] = tags
+    wf["neg"]["inputs"]["tags"] = negative
+    wf["sampler"]["inputs"]["seed"] = random.randint(0, 2**31)
+    wf["sampler"]["inputs"]["steps"] = int(cfg.get("steps", 50))
+    wf["sampler"]["inputs"]["cfg"] = float(cfg.get("cfg", 5.0))
+
+    prompt_id = _queue(url, wf)
+    outputs = _wait(url, prompt_id, timeout=1800)
+    if not outputs:
+        raise RuntimeError("ComfyUI no devolvio audio (¿checkpoint ACE-Step instalado?)")
+    _download(url, outputs[0], out_path)
+    log("comfy", "musica generada", file=out_path.name)
+    return out_path
+
+
 # ------------------------------------------------------------------ http
 def _queue(url: str, workflow: dict) -> str:
     payload = json.dumps({"prompt": workflow}).encode("utf-8")
@@ -160,6 +211,7 @@ def _wait(url: str, prompt_id: str, timeout: int) -> list[dict]:
             images = []
             for node in entry.get("outputs", {}).values():
                 images.extend(node.get("images", []))
+                images.extend(node.get("audio", []))
             if images:
                 return images
         time.sleep(2)

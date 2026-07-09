@@ -8,7 +8,7 @@ from __future__ import annotations
 from pathlib import Path
 
 from ..config import ASSETS_DIR, ROOT, Settings
-from ..utils import log, run_cmd
+from ..utils import ffprobe_duration, log, run_cmd
 
 BG = (15, 23, 32)        # azul petroleo del canal
 IVORY = (217, 210, 195)
@@ -24,10 +24,17 @@ def ensure_outro(settings: Settings) -> Path | None:
     fps = settings.fps
     out = ASSETS_DIR / "branding" / f"outro-{w}x{h}-{fps}.mp4"
     if out.exists():
-        return out
+        if ffprobe_duration(out) > 0.5:
+            return out
+        log("outro", "cache de outro corrupta; regenerando", file=out.name)
+        out.unlink(missing_ok=True)
     try:
         _build(settings, out, w, h, fps)
-        return out
+        if ffprobe_duration(out) > 0.5:
+            return out
+        log("outro", "outro generado invalido; se omite")
+        out.unlink(missing_ok=True)
+        return None
     except Exception as exc:
         log("outro", f"no se pudo generar el outro ({exc})")
         return None

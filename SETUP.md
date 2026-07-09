@@ -45,11 +45,24 @@ descarga `ltx-video-2b-v0.9.5.safetensors` a `ComfyUI/models/checkpoints/` y
 `t5xxl_fp8_e4m3fn_scaled.safetensors` a `ComfyUI/models/text_encoders/`.
 Si no estan, la pipeline usa parallax/Ken Burns automaticamente.
 
-## 5. Musica y SFX
+## 5. Musica (generada en LOCAL con ACE-Step) y SFX
 
-Descarga 5-10 pistas instrumentales de **YouTube Studio → Audio Library**
-(sin copyright) a `assets/music/`, nombradas con su mood:
-`tense-01.mp3`, `epic-01.mp3`, `curious-01.mp3`, `dark-01.mp3`, `calm-01.mp3`.
+La musica se genera en tu GPU con ACE-Step (Apache 2.0, sin copyright):
+
+1. Descarga `ace_step_v1_3.5b.safetensors` (repo Comfy-Org en HuggingFace)
+   a `ComfyUI/models/checkpoints/`.
+2. Con ComfyUI abierto, genera la biblioteca (10 estilos, ~2-4 min por pista):
+
+```powershell
+python -m factory music                 # 1 pista por estilo (10 pistas)
+python -m factory music --per-style 3   # mas variedad
+python -m factory music --styles war,noir --force   # regenerar estilos concretos
+```
+
+Estilos: tense, epic, curious, dark, somber, triumphant, mystery, war, noir,
+minimal. El director LLM elige el mood de cada video y el montaje coge una
+pista de ese estilo. Alternativa manual: deja mp3 de YouTube Audio Library en
+`assets/music/` nombrados `<estilo>-01.mp3`.
 
 SFX opcional: un `whoosh.mp3` gratis (p.ej. de Pixabay) en `assets/audio/`
 para las transiciones. `ding.mp3` y `suspense.mp3` ya vienen en el repo.
