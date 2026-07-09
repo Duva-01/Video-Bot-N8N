@@ -30,6 +30,7 @@ Si `chatterbox-tts` da conflicto de dependencias, instala en este orden:
 ```powershell
 ollama pull qwen3:14b      # guiones (calidad)
 ollama pull llama3.1:8b    # tareas rapidas (puntuar hooks)
+ollama pull qwen2.5vl:7b   # vision: puntua el b-roll de Pexels
 ```
 
 ## 4. ComfyUI + FLUX (imagenes por escena)
@@ -39,13 +40,19 @@ ollama pull llama3.1:8b    # tareas rapidas (puntuar hooks)
    en HuggingFace) y ponlo en `ComfyUI/models/checkpoints/`.
 3. Arranca ComfyUI (queda en `http://127.0.0.1:8188`).
 
-Opcional (hero shots de video IA): instala los nodos de LTX-Video desde el
-ComfyUI Manager. La pipeline funciona sin esto.
+Para los hero shots animados (LTX img2vid, nodos nativos de ComfyUI):
+descarga `ltx-video-2b-v0.9.5.safetensors` a `ComfyUI/models/checkpoints/` y
+`t5xxl_fp8_e4m3fn_scaled.safetensors` a `ComfyUI/models/text_encoders/`.
+Si no estan, la pipeline usa parallax/Ken Burns automaticamente.
 
-## 5. Musica
+## 5. Musica y SFX
 
 Descarga 5-10 pistas instrumentales de **YouTube Studio → Audio Library**
-(sin copyright) y dejalas en `assets/music/`.
+(sin copyright) a `assets/music/`, nombradas con su mood:
+`tense-01.mp3`, `epic-01.mp3`, `curious-01.mp3`, `dark-01.mp3`, `calm-01.mp3`.
+
+SFX opcional: un `whoosh.mp3` gratis (p.ej. de Pixabay) en `assets/audio/`
+para las transiciones. `ding.mp3` y `suspense.mp3` ya vienen en el repo.
 
 ## 6. Credenciales (.env)
 

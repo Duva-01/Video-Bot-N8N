@@ -1,10 +1,18 @@
-"""Subtitulos karaoke: faster-whisper (timestamps por palabra) -> ASS.
+"""Subtitulos karaoke con diseno propio + overlays de datos + hook cover.
 
-Formato que domina en Shorts: 2-3 palabras en pantalla, palabra activa resaltada.
+- faster-whisper da timestamps por palabra.
+- Captions: 2-3 palabras, palabra activa con "pop" animado en ambar; las
+  palabras de impacto (numeros, nombres, giros) van en color fuego y mas
+  grandes aunque no esten activas.
+- Overlays: datos gigantes en pantalla ("1859") con fade + escala.
+- Hook cover: el hook en grande durante el primer segundo (el frame 1 es la
+  miniatura del short en el feed).
+
 En modo simulate se estiman los tiempos repartiendo la duracion entre palabras.
 """
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -63,49 +71,130 @@ WrapStyle: 2
 
 [V4+ Styles]
 Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding
-Style: Caption,{font},{size},{base},{base},{outline},&H96000000,-1,0,0,0,100,100,0,0,1,{border},0,2,60,60,{margin_v},1
+Style: Caption,{font},{size},{base},{base},{outline},&H78000000,-1,0,0,0,100,100,1,0,1,{border},2,2,60,60,{margin_v},1
+Style: Overlay,{font},{overlay_size},{emphasis},{emphasis},{outline},&H96000000,-1,0,0,0,100,100,2,0,1,{overlay_border},3,8,60,60,{overlay_margin},1
+Style: Cover,{font},{cover_size},{base},{base},{outline},&H96000000,-1,0,0,0,100,100,1,0,1,{border},3,5,80,80,0,1
 
 [Events]
 Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
 """
 
 
-def build_ass(settings: Settings, words: list[Word], out_ass: Path) -> Path:
+def build_ass(settings: Settings, words: list[Word], out_ass: Path,
+              scenes: list[dict] | None = None, hook: str | None = None) -> Path:
     w, h = settings.size
     group_size = int(settings.ch("captions", "words_per_group", default=3))
-    active = settings.ch("captions", "active_color", default="&H0051D9F0&").strip("&")
-    base = settings.ch("captions", "base_color", default="&H00FFFFFF&").strip("&")
-    outline = settings.ch("captions", "outline_color", default="&H00101010&").strip("&")
+    active = _c(settings.ch("captions", "active_color", default="&H0051D9F0&"))
+    base = _c(settings.ch("captions", "base_color", default="&H00FFFFFF&"))
+    emphasis_c = _c(settings.ch("captions", "emphasis_color", default="&H002E86FF&"))
+    outline = _c(settings.ch("captions", "outline_color", default="&H00101010&"))
     font = settings.ch("captions", "font", default="Arial Black")
+    upper = bool(settings.ch("captions", "uppercase", default=True))
+    pop = bool(settings.ch("captions", "pop", default=True))
 
-    size = int(h * 0.045) if settings.fmt == "short" else int(h * 0.055)
-    margin_v = int(h * 0.28) if settings.fmt == "short" else int(h * 0.08)
+    size = int(h * 0.048) if settings.fmt == "short" else int(h * 0.055)
+    margin_v = int(h * 0.30) if settings.fmt == "short" else int(h * 0.08)
+    overlay_size = int(h * 0.10)
+    cover_size = int(h * 0.052)
 
-    lines = [ASS_HEADER.format(w=w, h=h, font=font, size=size, base=f"&{base}&",
-                               outline=f"&{outline}&", border=max(2, size // 14),
-                               margin_v=margin_v)]
+    lines = [ASS_HEADER.format(
+        w=w, h=h, font=font, size=size, base=base, outline=outline,
+        emphasis=emphasis_c, border=max(3, size // 12),
+        margin_v=margin_v, overlay_size=overlay_size,
+        overlay_border=max(4, overlay_size // 14),
+        overlay_margin=int(h * 0.16), cover_size=cover_size)]
 
+    emphasis_words = _emphasis_set(scenes)
+
+    # --- captions karaoke
     groups = [words[i:i + group_size] for i in range(0, len(words), group_size)]
     for group in groups:
         for idx, word in enumerate(group):
-            start, end = word.start, (group[idx + 1].start if idx + 1 < len(group) else group[-1].end)
+            start = word.start
+            end = group[idx + 1].start if idx + 1 < len(group) else group[-1].end
             if end <= start:
                 end = start + 0.05
             parts = []
             for j, other in enumerate(group):
-                token = _ass_escape(other.text)
+                token = _ass_escape(other.text.upper() if upper else other.text)
+                is_emph = _norm(other.text) in emphasis_words
+                color = emphasis_c if is_emph else (active if j == idx else base)
+                tags = f"\\c{color}"
+                if is_emph:
+                    tags += "\\fscx106\\fscy106"
                 if j == idx:
-                    parts.append(f"{{\\c&{active}&\\fscx108\\fscy108}}{token}{{\\r}}")
-                else:
-                    parts.append(token)
+                    if pop:
+                        tags += "\\fscx84\\fscy84\\t(0,70,\\fscx112\\fscy112)"
+                    else:
+                        tags += "\\fscx108\\fscy108"
+                parts.append(f"{{{tags}}}{token}{{\\r}}")
             text = " ".join(parts)
-            lines.append(
-                f"Dialogue: 0,{_ts(start)},{_ts(end)},Caption,,0,0,0,,{text}\n"
-            )
+            lines.append(f"Dialogue: 1,{_ts(start)},{_ts(end)},Caption,,0,0,0,,{text}\n")
+
+    # --- overlays de datos gigantes
+    if scenes and settings.ch("captions", "overlay_enabled", default=True):
+        for scene in scenes:
+            datum = str(scene.get("overlay", "")).strip()
+            if not datum or "start" not in scene:
+                continue
+            start = float(scene["start"]) + 0.08
+            end = min(float(scene["end"]), start + 2.4)
+            if end - start < 0.5:
+                continue
+            text = ("{\\fad(120,220)\\fscx72\\fscy72\\t(0,140,\\fscx100\\fscy100)}"
+                    f"{_ass_escape(datum.upper() if upper else datum)}")
+            lines.append(f"Dialogue: 2,{_ts(start)},{_ts(end)},Overlay,,0,0,0,,{text}\n")
+
+    # --- hook cover en el primer segundo (frame 1 = miniatura del feed)
+    if hook and settings.fmt == "short" and settings.ch(
+            "captions", "hook_cover", default=True):
+        wrapped = _wrap(hook.upper() if upper else hook, max_chars=18)
+        text = ("{\\fad(50,260)\\fscx90\\fscy90\\t(0,120,\\fscx100\\fscy100)}"
+                f"{_ass_escape(wrapped)}")
+        lines.append(f"Dialogue: 3,{_ts(0.0)},{_ts(1.05)},Cover,,0,0,0,,{text}\n")
 
     out_ass.write_text("".join(lines), encoding="utf-8-sig")
-    log("subs", "ASS karaoke generado", groups=len(groups), file=out_ass.name)
+    log("subs", "ASS generado", groups=len(groups),
+        emphasis=len(emphasis_words), file=out_ass.name)
     return out_ass
+
+
+def _emphasis_set(scenes: list[dict] | None) -> set[str]:
+    result: set[str] = set()
+    for scene in scenes or []:
+        for word in scene.get("emphasis", []) or []:
+            for token in str(word).split():
+                norm = _norm(token)
+                if norm:
+                    result.add(norm)
+    return result
+
+
+def _wrap(text: str, max_chars: int = 18) -> str:
+    """Envuelve texto largo con \\N (WrapStyle 2 no envuelve solo)."""
+    lines, line = [], ""
+    for word in text.split():
+        trial = f"{line} {word}".strip()
+        if len(trial) > max_chars and line:
+            lines.append(line)
+            line = word
+        else:
+            line = trial
+    lines.append(line)
+    return "\\N".join(lines)
+
+
+def _norm(token: str) -> str:
+    return re.sub(r"[^\w]", "", token).lower()
+
+
+def _c(color: str) -> str:
+    color = str(color).strip()
+    if not color.startswith("&"):
+        color = f"&{color}"
+    if not color.endswith("&"):
+        color = f"{color}&"
+    return color
 
 
 def _ts(seconds: float) -> str:

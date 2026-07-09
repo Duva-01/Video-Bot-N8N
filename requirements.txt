@@ -14,3 +14,6 @@ faster-whisper>=1.0
 chatterbox-tts
 kokoro>=0.9
 soundfile>=0.12
+# Parallax 2.5D (depth maps con Depth-Anything V2 small)
+transformers>=4.45
+numpy

@@ -1,5 +1,11 @@
-"""Montaje final con FFmpeg: concat de escenas + voz + musica con ducking +
-subtitulos karaoke, encoding NVENC (fallback libx264)."""
+"""Montaje final con FFmpeg.
+
+- Concat de escenas (transiciones ya horneadas en cada clip).
+- Musica elegida por mood del guion, con ducking bajo la voz y subida en el climax.
+- SFX alineados a los beats: whoosh en transiciones, ding en overlays de datos,
+  riser entrando hacia la escena climax.
+- Subtitulos/overlays ASS quemados. Encoding NVENC (fallback libx264).
+"""
 from __future__ import annotations
 
 import random
@@ -10,7 +16,7 @@ from ..utils import ffprobe_duration, log, pick_encoder, run_cmd
 
 
 def assemble(settings: Settings, scenes: list[dict], voice_wav: Path,
-             ass_file: Path | None, workdir: Path) -> Path:
+             ass_file: Path | None, workdir: Path, mood: str = "curious") -> Path:
     concat_txt = workdir / "concat.txt"
     lines = []
     for scene in scenes:
@@ -28,25 +34,54 @@ def assemble(settings: Settings, scenes: list[dict], voice_wav: Path,
 
     encoder = pick_encoder(settings.pr("render", "encoder", default="auto"))
     duration = ffprobe_duration(voice_wav)
-    music = _pick_music(settings)
+    music = _pick_music(settings, mood)
+    sfx_events = _sfx_events(settings, scenes, duration)
     out = workdir / "final.mp4"
 
+    # --- inputs
     args = ["ffmpeg", "-y", "-i", str(base), "-i", str(voice_wav)]
-    filters = []
+    input_idx = 2
+    music_idx = -1
     if music:
         args += ["-stream_loop", "-1", "-i", str(music)]
-        duck = float(settings.ch("music", "ducking_db", default=-13))
-        gain = 10 ** (duck / 20)
-        filters.append(
-            f"[2:a]volume={gain:.3f},afade=t=out:st={max(0.0, duration - 2):.2f}:d=2[bg];"
-            "[1:a][bg]sidechaincompress=threshold=0.05:ratio=8:attack=20:release=400"
-            ":level_sc=1[mixbg];"
-            "[1:a][mixbg]amix=inputs=2:duration=first:weights=1 0.9[aout]"
-        )
-        amap = "[aout]"
-    else:
-        amap = "1:a"
+        music_idx = input_idx
+        input_idx += 1
+    for event in sfx_events:
+        args += ["-i", str(event["file"])]
+        event["idx"] = input_idx
+        input_idx += 1
 
+    # --- audio graph
+    filters = []
+    mix_label = "1:a"
+    if music:
+        gain = 10 ** (float(settings.ch("music", "ducking_db", default=-13)) / 20)
+        boost = 10 ** (float(settings.ch("music", "climax_boost_db", default=4)) / 20)
+        cs, ce = _climax_window(scenes, duration)
+        vol = (f"volume='{gain:.3f}*if(between(t,{cs:.2f},{ce:.2f}),{boost:.3f},1)'"
+               ":eval=frame")
+        filters.append(
+            f"[{music_idx}:a]{vol},afade=t=out:st={max(0.0, duration - 2):.2f}:d=2[bg];"
+            "[bg][1:a]sidechaincompress=threshold=0.05:ratio=8:attack=20:release=400"
+            ":level_sc=1[duck];"
+            "[1:a][duck]amix=inputs=2:duration=first:normalize=0[mix1]"
+        )
+        mix_label = "[mix1]"
+    if sfx_events:
+        sfx_labels = []
+        for k, event in enumerate(sfx_events):
+            delay = max(0, int(event["at"] * 1000))
+            filters.append(
+                f"[{event['idx']}:a]adelay={delay}:all=1,"
+                f"volume={event['gain']:.3f}[sfx{k}]")
+            sfx_labels.append(f"[sfx{k}]")
+        src_label = mix_label if mix_label.startswith("[") else f"[{mix_label}]"
+        filters.append(
+            f"{src_label}{''.join(sfx_labels)}"
+            f"amix=inputs={1 + len(sfx_labels)}:duration=first:normalize=0[aout]")
+        mix_label = "[aout]"
+
+    # --- video graph
     vf = []
     if ass_file and ass_file.exists():
         ass_escaped = _escape_filter_path(ass_file)
@@ -59,7 +94,7 @@ def assemble(settings: Settings, scenes: list[dict], voice_wav: Path,
 
     if filters:
         args += ["-filter_complex", ";".join(filters)]
-    args += ["-map", vmap, "-map", amap, "-t", f"{duration:.3f}"]
+    args += ["-map", vmap, "-map", mix_label, "-t", f"{duration:.3f}"]
 
     if encoder == "h264_nvenc":
         args += ["-c:v", "h264_nvenc", "-preset", settings.pr("render", "preset", default="p5"),
@@ -74,12 +109,14 @@ def assemble(settings: Settings, scenes: list[dict], voice_wav: Path,
              "-movflags", "+faststart", str(out)]
 
     run_cmd(args, desc=f"render final ({encoder})")
-    log("assemble", "video montado", file=out.name,
-        seconds=round(ffprobe_duration(out), 1), encoder=encoder)
+    log("assemble", "video montado", file=out.name, mood=mood,
+        sfx=len(sfx_events), seconds=round(ffprobe_duration(out), 1),
+        encoder=encoder)
     return out
 
 
-def _pick_music(settings: Settings) -> Path | None:
+# ------------------------------------------------------------------ audio
+def _pick_music(settings: Settings, mood: str) -> Path | None:
     if not settings.ch("music", "enabled", default=True):
         return None
     music_dir = ROOT / settings.ch("music", "directory", default="assets/music")
@@ -90,7 +127,44 @@ def _pick_music(settings: Settings) -> Path | None:
     if not tracks:
         log("assemble", "sin musica: pon pistas en assets/music (YouTube Audio Library)")
         return None
-    return random.choice(tracks)
+    matching = [t for t in tracks if mood.lower() in t.stem.lower()]
+    track = random.choice(matching or tracks)
+    log("assemble", "musica elegida", track=track.name, mood=mood,
+        by_mood=bool(matching))
+    return track
+
+
+def _climax_window(scenes: list[dict], duration: float) -> tuple[float, float]:
+    for scene in scenes:
+        if int(scene.get("energy", 1)) == 3 and "start" in scene:
+            return float(scene["start"]), min(float(scene["end"]), duration)
+    return duration, duration  # sin climax -> sin boost
+
+
+def _sfx_events(settings: Settings, scenes: list[dict], duration: float) -> list[dict]:
+    if not settings.ch("sfx", "enabled", default=True):
+        return []
+    gain = 10 ** (float(settings.ch("sfx", "volume_db", default=-16)) / 20)
+    files = {kind: ROOT / str(settings.ch("sfx", kind, default=""))
+             for kind in ("transition", "overlay", "riser")}
+
+    events: list[dict] = []
+    for i, scene in enumerate(scenes):
+        start = float(scene.get("start", 0))
+        if i > 0 and scene.get("transition") in ("punch", "flash", "whip") \
+                and files["transition"].is_file():
+            events.append({"file": files["transition"], "at": max(0.0, start - 0.15),
+                           "gain": gain})
+        if str(scene.get("overlay", "")).strip() and files["overlay"].is_file():
+            events.append({"file": files["overlay"], "at": start + 0.08,
+                           "gain": gain * 0.8})
+    for scene in scenes:
+        if int(scene.get("energy", 1)) == 3 and files["riser"].is_file():
+            events.append({"file": files["riser"],
+                           "at": max(0.0, float(scene.get("start", 0)) - 2.5),
+                           "gain": gain * 0.7})
+            break
+    return [e for e in events if e["at"] < duration][:10]
 
 
 def _escape_filter_path(path: Path) -> str:

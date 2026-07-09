@@ -8,7 +8,6 @@ channel:
     shaped history, science and technology.
 
 editorial:
-  # Formatos de serie reconocibles. El selector de temas rota entre ellos.
   series:
     - id: decision
       label: "The Decision That Changed Everything"
@@ -19,48 +18,79 @@ editorial:
     - id: almost-happened
       label: "It Almost Happened"
       angle: "A near-miss moment in history, science or technology"
-  # Anti-repeticion
   topic_cooldown_days: 180
   angle_cooldown_days: 45
   banned_topics: []
 
+research:
+  enabled: true                 # facts verificados de Wikipedia antes de escribir
+  max_chars: 6000               # texto de articulo que se pasa al LLM
+  editor_pass: true             # segunda pasada que corta relleno del guion
+
 voice:
   provider: "chatterbox"        # chatterbox | kokoro
-  # Voz de catalogo. Para clonar: pon la ruta a un wav de ~30s en reference_audio.
-  reference_audio: null
-  kokoro_voice: "am_michael"    # fallback rapido
-  exaggeration: 0.45            # chatterbox: expresividad (0-1)
-  cfg_weight: 0.5               # chatterbox: fidelidad al texto
+  # Voz de narrador. Para clonar un narrador concreto: wav limpio de ~30s en
+  # assets/voice/narrator.wav y pon la ruta aqui.
+  reference_audio: null         # ej: "assets/voice/narrator.wav"
+  kokoro_voice: "bm_george"     # narrador britanico documental (alt: am_onyx = grave US)
+  exaggeration: 0.4             # expresividad base de chatterbox (0-1)
+  cfg_weight: 0.5
+  # Enfasis dinamico: la expresividad sube con la energia de la escena (1-3)
+  energy_exaggeration: {1: 0.32, 2: 0.42, 3: 0.58}
+  pause_seconds: 0.45           # silencio antes de escenas con pause_before
+  mastering: true               # EQ + compresion + de-esser + loudnorm -14 LUFS
 
 visual_style:
-  # Sufijo de estilo fijo que se anade a todos los prompts de imagen (identidad visual)
   image_style: >
     cinematic documentary still, muted editorial color palette, deep teal and
     ivory tones, film grain, dramatic natural light, 35mm photography,
     no text, no watermark
   negative: "cartoon, anime, oversaturated, neon, text, watermark, logo, low quality"
-  # Mezcla de fuentes visuales por escena
   broll_ratio: 0.35             # fraccion de escenas con clip real de Pexels
-  hero_video_scenes: 1          # escenas con video IA (LTX) por short (0 = desactivado)
+  consistent_seed: true         # mismo seed FLUX en todo el video (mismo "rodaje")
+  hero_video_scenes: 1          # escenas animadas con LTX por video (0 = off)
+  ltx:
+    enabled: true
+    checkpoint: "ltx-video-2b-v0.9.5.safetensors"   # en ComfyUI/models/checkpoints
+    text_encoder: "t5xxl_fp8_e4m3fn_scaled.safetensors"  # en ComfyUI/models/text_encoders
+    fps: 24
+    steps: 22
+  parallax: true                # 2.5D con depth map (Depth-Anything via transformers)
+  vision_model: "qwen2.5vl:7b"  # puntua b-roll de Pexels (ollama pull qwen2.5vl:7b)
 
 captions:
   font: "Montserrat ExtraBold"
   fallback_font: "Arial Black"
   words_per_group: 3
-  active_color: "&H0051D9F0&"   # BGR: ambar calido
-  base_color: "&H00FFFFFF&"
+  uppercase: true
+  base_color: "&H00FFFFFF&"     # blanco
+  active_color: "&H0051D9F0&"   # ambar calido (BGR)
+  emphasis_color: "&H002E86FF&" # naranja fuego para palabras de impacto (BGR)
   outline_color: "&H00101010&"
+  pop: true                     # animacion de escala al activarse cada palabra
+  overlay_enabled: true         # datos gigantes en pantalla ("1859", "40,000 V")
+  hook_cover: true              # hook en grande durante el primer segundo
+
+sfx:
+  enabled: true
+  transition: "assets/audio/whoosh.mp3"   # se usa si existe (descarga uno gratis)
+  overlay: "assets/audio/ding.mp3"        # golpe suave cuando aparece un dato
+  riser: "assets/audio/suspense.mp3"      # sube antes de la escena climax
+  volume_db: -16
 
 music:
   enabled: true
-  directory: "assets/music"     # deja aqui mp3 de YouTube Audio Library
-  ducking_db: -13               # atenuacion bajo la voz
+  directory: "assets/music"
+  # Nombra las pistas con su mood para seleccion automatica:
+  # tense-01.mp3, epic-02.mp3, curious-01.mp3, dark-01.mp3, calm-01.mp3
+  moods: ["tense", "epic", "curious", "dark", "calm"]
+  ducking_db: -13
+  climax_boost_db: 4            # subida de musica en la escena de energia 3
 
 publish:
-  # private hasta pasar la auditoria de la API; despues: public o scheduled
   privacy: "private"
-  schedule_hours_utc: [15, 20]  # horas de publicacion para el modo scheduled
-  category_id: "27"             # Education
+  schedule_hours_utc: [15, 20]
+  category_id: "27"
   made_for_kids: false
 
 services:

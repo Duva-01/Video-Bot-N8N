@@ -7,7 +7,8 @@ from pathlib import Path
 
 from . import db
 from .config import OUTPUT_DIR, Settings
-from .pipeline import assemble, publish, script, subtitles, thumbnail, topics, visuals, voice
+from .pipeline import (assemble, publish, research, script, subtitles,
+                       thumbnail, topics, visuals, voice)
 from .utils import log, slugify
 
 
@@ -18,7 +19,7 @@ def run_pipeline(settings: Settings, upload: bool = True,
 
     # 1. Tema con anti-repeticion
     topic = topics.select_topic(settings, conn)
-    slug = f"{time.strftime('%Y%m%d-%H%M')}-{slugify(topic['canonical_topic'])}"
+    slug = f"{time.strftime('%Y%m%d-%H%M%S')}-{slugify(topic['canonical_topic'])}"
     run_id = db.create_run(conn, slug, settings.fmt)
     workdir = OUTPUT_DIR / slug
     workdir.mkdir(parents=True, exist_ok=True)
@@ -28,36 +29,49 @@ def run_pipeline(settings: Settings, upload: bool = True,
                   uniqueness_hash=topic["uniqueness_hash"])
 
     try:
-        # 2. Guion multi-paso
-        meta = script.write_script(settings, conn, topic)
+        # 2. Research: facts verificados de Wikipedia
+        facts = research.gather_facts(settings, topic)
+        if facts:
+            (workdir / "facts.md").write_text(facts, encoding="utf-8")
+
+        # 3. Guion multi-paso (hooks -> guion -> editor)
+        meta = script.write_script(settings, conn, topic, facts=facts)
         (workdir / "script.json").write_text(
             json.dumps(meta, indent=2, ensure_ascii=False), encoding="utf-8")
         db.update_run(conn, run_id, status="scripted", title=meta.get("title"),
                       description=meta.get("summary"),
                       tags=json.dumps(meta.get("tags", [])))
 
-        # 3. Voz
+        # 4. Direccion visual: escenas + beats + mood + ancla de estilo
+        direction = visuals.plan_scenes(settings, meta["narration"])
+        scenes = direction["scenes"]
+
+        # 5. Voz dirigida por escena (enfasis + pausas) + mastering
         voice_wav = workdir / "voice.wav"
-        duration = voice.synthesize(settings, meta["narration"], voice_wav)
+        duration = voice.synthesize(settings, meta["narration"], voice_wav,
+                                    scenes=scenes)
         db.update_run(conn, run_id, status="voiced")
 
-        # 4. Subtitulos karaoke
+        # 6. Timing por palabra + alineacion de escenas
         words = subtitles.transcribe(settings, voice_wav, meta["narration"], duration)
-        ass_file = subtitles.build_ass(settings, words, workdir / "captions.ass")
+        scenes = visuals.align_scenes(scenes, words, duration)
 
-        # 5. Visuales por escena
-        scene_plan = visuals.plan_scenes(settings, meta["narration"])
-        scene_plan = visuals.align_scenes(scene_plan, words, duration)
-        scene_plan = visuals.fetch_visuals(settings, scene_plan, workdir)
+        # 7. Captions karaoke + overlays de datos + hook cover
+        ass_file = subtitles.build_ass(settings, words, workdir / "captions.ass",
+                                       scenes=scenes, hook=meta.get("hook"))
+
+        # 8. Visuales: LTX / parallax / ken burns / broll con vision
+        scenes = visuals.fetch_visuals(settings, direction, workdir)
         (workdir / "scenes.json").write_text(
-            json.dumps(scene_plan, indent=2, ensure_ascii=False), encoding="utf-8")
+            json.dumps(direction, indent=2, ensure_ascii=False), encoding="utf-8")
         db.update_run(conn, run_id, status="visuals")
 
-        # 6. Montaje final
-        final = assemble.assemble(settings, scene_plan, voice_wav, ass_file, workdir)
+        # 9. Montaje final: transiciones + SFX + musica dinamica
+        final = assemble.assemble(settings, scenes, voice_wav, ass_file, workdir,
+                                  mood=direction.get("mood", "curious"))
         db.update_run(conn, run_id, status="rendered", video_path=str(final))
 
-        # 6b. Capitulos + miniatura (longform)
+        # 9b. Capitulos + miniatura (longform)
         thumb = None
         if settings.fmt == "long":
             meta["chapters_text"] = _chapters_text(meta, words, duration)
@@ -66,7 +80,7 @@ def run_pipeline(settings: Settings, upload: bool = True,
             if thumb:
                 db.update_run(conn, run_id, thumbnail_path=str(thumb))
 
-        # 7. Subida
+        # 10. Subida
         if upload:
             publish_at = publish.next_publish_slot(settings, conn) if schedule else None
             video_id = publish.upload(settings, conn, run_id, final, meta,
@@ -93,7 +107,6 @@ def _chapters_text(meta: dict, words, duration: float) -> str:
     sections = meta.get("sections") or []
     if not sections:
         return ""
-    # reparte el tiempo proporcionalmente a las palabras de cada seccion
     counts = [max(1, len(s["narration"].split())) for s in sections]
     total = sum(counts)
     lines, cursor = [], 0.0

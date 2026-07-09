@@ -1,1 +1,2 @@
-from . import analytics, assemble, publish, script, subtitles, thumbnail, topics, visuals, voice  # noqa: F401
+from . import (analytics, assemble, motion, publish, research, script,  # noqa: F401
+               subtitles, thumbnail, topics, visuals, voice)

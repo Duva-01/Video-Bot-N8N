@@ -60,4 +60,4 @@ def select_topic(settings: Settings, conn: sqlite3.Connection) -> dict:
             cand["uniqueness_hash"] = db.uniqueness_hash(topic, angle)
             log("topics", "tema elegido", topic=topic, angle=angle)
             return cand
-    raise RuntimeError("Ningun candidato de tema paso el fi
+    raise RuntimeError("Ningun candidato de tema paso el filtro anti-repeticion")
